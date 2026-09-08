@@ -1690,6 +1690,100 @@ def guide_training_app_creation(idea: str = "", course_type: str = "custom") -> 
         }
 
     ACTIVE_TRAINING_COURSE = "original"
+    if idea_clean:
+        TRAINING_PARAMETERS["USER_IDEA"] = idea_clean
+
+    # --- 受講生の作りたいものに寄り添い、武器庫（.agents/skills/）から最適なスキルを動的に召喚 ---
+    idea_lower = idea_clean.lower()
+    summoned_skills = ["pick-your-agent-project"]
+    skill_badges = []
+    architecture_points = []
+
+    # 1. マルチモーダル画像認識・ビジョン能力の召喚判定
+    needs_vision = any(k in idea_lower for k in (
+        "写真", "画像", "カメラ", "撮影", "3面", "キューブ", "図面", "メーター", "領収書", "レシート",
+        "手書き", "ocr", "看板", "外観", "スキャン", "face", "image", "photo", "picture", "visual", "vision"
+    ))
+    if needs_vision:
+        summoned_skills.append("gemini-multimodal-vision")
+        skill_badges.append("📷 Gemini Multimodal Vision (写真・画像からの直接認識)")
+        architecture_points.append(
+            "- 【画像入力＆マルチモーダル解析】利用者が写真をアップロードできる受け口（Base64/Multipart）を設け、"
+            "Gemini 3.8 Flash (Part.from_bytes) による画像認識・配色抽出・パリティ検証を行う自作ツールを実装すること"
+        )
+
+    # 2. RAG ナレッジ検索スキルの召喚判定
+    needs_rag = any(k in idea_lower for k in (
+        "マニュアル", "規程", "社内", "文書", "pdf", "ドキュメント", "faq", "問い合わせ", "過去問", "事例", "ナレッジ", "手順書", "検索", "rag"
+    ))
+    if needs_rag:
+        summoned_skills.append("build-rag")
+        skill_badges.append("📚 build-rag (Vertex AI RAG Engine / 社内文書検索)")
+        architecture_points.append(
+            "- 【ドキュメント検索 (RAG)】.agents/skills/build-rag を参照し、マニュアルや文書から根拠を正確に引いて回答する関数ツールを配備すること"
+        )
+
+    # 3. 長期記憶（Memory Bank）スキルの召喚判定
+    needs_memory = any(k in idea_lower for k in (
+        "記憶", "覚える", "前回", "履歴", "パーソナライズ", "好み", "傾向", "継続", "セッション", "進捗", "タイム", "スコア", "練習"
+    )) or needs_vision
+    if needs_memory:
+        summoned_skills.append("setup-memory-bank")
+        skill_badges.append("🧠 setup-memory-bank (Vertex AI Memory Bank / 長期記憶)")
+        architecture_points.append(
+            "- 【長期記憶 (Memory Bank)】.agents/skills/setup-memory-bank を参照し、ユーザーの過去の利用履歴や好みをセッションを跨いで蓄積・参照すること"
+        )
+
+    # 4. A2UI リッチカード表現スキル（常時召喚）
+    summoned_skills.append("enable-a2ui")
+    skill_badges.append("🃏 enable-a2ui (直感的なリッチカード・ステップ表示)")
+    architecture_points.append(
+        "- 【A2UIカード表示】after_model_callback=a2ui_callback を組み込み、結果やナビゲーションを視覚的なカードUI形式でフィードバックすること"
+    )
+
+    # 5. Webフロントエンド＆GitHub公開スキル（常時召喚）
+    summoned_skills.extend(["build-agent-frontend", "publish-to-github"])
+    skill_badges.append("🚀 build-agent-frontend (FastAPI + Web UI + Cloud Run)")
+    skill_badges.append("🐙 publish-to-github (受講生個人GitHubへの公開・成果保全)")
+
+    arch_details_text = "\n".join(architecture_points)
+    skill_badges_text = "\n".join([f"  {b}" for b in skill_badges])
+
+    prompt_for_agy = (
+        f"【AntiGravity投入用プロンプト: Step T-2（企画『{idea_clean or '自作エージェント'}』要件定義）】\n"
+        f"受講生オリジナル企画: 『{idea_clean or '現場課題を解決する自作エージェント'}』\n"
+        f"あなたは株式会社AltXのAI実践研修専属メンターです。\n\n"
+        f"【HITMANによるアーキテクチャ診断とスキル召喚】\n"
+        f"受講生が実現したい体験に寄り添い、リポジトリ内の武器庫（.agents/skills/）から以下のスキルを召喚して設計します：\n"
+        f"{skill_badges_text}\n\n"
+        f"【自律実行タスク】\n"
+        f"上記スキルを参照し、受講生の企画『{idea_clean or '自作エージェント'}』の要件定義書「altx-agent-workspace/project_brief.md」を作成してください。\n"
+        f"以下の項目を必ず盛り込んでください：\n"
+        f"1. エージェント名と目的（解決する現場課題: {idea_clean or '自作エージェント'}）\n"
+        f"2. モデル選定（gemini-3.8-flash 優先、フォールバック: 3.6-flash）\n"
+        f"3. 召喚スキルの活用設計:\n"
+        f"{arch_details_text}\n"
+        f"4. 必要な関数ツール定義（ツール名、引数、返り値のスキーマ）\n"
+        f"5. A2UIカード表示仕様（カードレイアウト、視覚表現）\n"
+        f"6. テストシナリオ（正常系・異常系・客観検証観点）\n\n"
+        f"作成完了後、ターミナルで `cat altx-agent-workspace/project_brief.md` を実行してその内容を出力し、受講生へ案内してください：\n"
+        f"「この出力ログをコピーして、HITMANのチャット欄に貼り付けてください。HITMANが客観Wチェックを行い、ステップ T-3（エージェント実装）へ進みます！」"
+    )
+
+    # TRAINING_SOP_ORIGINAL T-2 の prompt を動的更新
+    TRAINING_SOP_ORIGINAL["T-2"]["agy_prompt"] = prompt_for_agy
+    TRAINING_SOP_ORIGINAL["T-2"]["title"] = f"ステップ T-2: 『{idea_clean or '自作エージェント'}』要件定義＆設計"
+    TRAINING_SOP_ORIGINAL["T-2"]["objective"] = f"企画『{idea_clean or '現場課題を解決する自作エージェント'}』の要件定義書 project_brief.md を作成し、catログを提出する。"
+
+    user_message = (
+        f"【コース確定: コースA（オリジナルAI開発『{idea_clean or '自作エージェント'}』）】\n"
+        f"素晴らしい現場アイデアですね！受講生の「やりたいこと」を最高の実用体験として具現化するため、HITMANの武器庫から以下のスキルを召喚しました：\n\n"
+        f"{skill_badges_text}\n\n"
+        f"【次のアクション（ステップ T-2: アイデア策定＆要件定義）】\n"
+        f"提示された専用プロンプトをAntiGravityに投入してください。AntiGravityが召喚されたスキル群を読み込んで「altx-agent-workspace/project_brief.md」を自律策定します。\n"
+        f"作成後、ターミナルで `cat altx-agent-workspace/project_brief.md` を実行した出力ログを本チャットに貼り付けてください。客観Wチェック承認後にステップ T-3 へ進みます！"
+    )
+
     return {
         "status": "success",
         "course": "コースA: オリジナルアプリ開発コース（自作AIツール開発）",
@@ -1699,34 +1793,16 @@ def guide_training_app_creation(idea: str = "", course_type: str = "custom") -> 
         "title": "ステップ T-2: オリジナル企画＆要件定義（Project Brief策定）",
         "command": "cat altx-agent-workspace/project_brief.md",
         "objective": f"企画『{idea_clean or '現場課題を解決する自作エージェント'}』の要件定義書 project_brief.md を作成し、catログを提出する。",
+        "summoned_skills": summoned_skills,
         "recommended_architecture": {
             "framework": "Google ADK (Agent Development Kit) + Python",
             "model": "gemini-3.8-flash (未提供・エラー時は gemini-3.6-flash)",
-            "ui": "A2UI (Agent-to-UI) または FastAPI チャットフロントエンド",
+            "ui": "A2UI (Agent-to-UI) + FastAPI チャットフロントエンド",
             "workspace": "altx-agent-workspace",
-            "skills": "pick-your-agent-project, build-agent-frontend, enable-a2ui, publish-to-github",
+            "skills": ", ".join(summoned_skills),
         },
-        "prompt_for_antigravity": (
-            f"【AntiGravity投入用プロンプト: Step T-2（企画『{idea_clean or '自作エージェント'}』要件定義）】\n"
-            f"受講生オリジナル企画: 『{idea_clean or '現場課題を解決する自作エージェント'}』\n"
-            f"あなたは株式会社AltXのAI研修専属メンターです。\n"
-            f".agents/skills/ にある pick-your-agent-project スキルを活用し、受講生の企画『{idea_clean or '自作エージェント'}』の要件定義書「altx-agent-workspace/project_brief.md」を作成してください。\n"
-            f"以下の項目を必ず含めてください：\n"
-            f"1. エージェント名と目的（解決する課題: {idea_clean or '自作エージェント'}）\n"
-            f"2. 使用するモデル（gemini-3.8-flash または 3.6-flash）\n"
-            f"3. 必要な関数ツール定義（自作ツール最低1つ）\n"
-            f"4. A2UIカード表示仕様（カードレイアウト）\n"
-            f"5. 長期記憶（Memory Bank）活用方針\n"
-            f"作成完了後、ファイルの内容を出力してください。"
-        ),
-        "message": (
-            f"【コース確定: コースA（オリジナルアプリ企画『{idea_clean or '自作エージェント'}』）】\n"
-            f"素晴らしいアイデアですね！「{idea_clean or '自作エージェント'}」の企画・要件定義を進めていきましょう。\n"
-            f"現場で役立つ実用的なAIエージェントとして形にしていくため、まずは要件定義書（project_brief.md）を策定します。\n\n"
-            f"【次のアクション（ステップ T-2: アイデア策定＆要件定義）】\n"
-            f"AntiGravityの開発環境にて、提示されたプロンプトを投入して「altx-agent-workspace/project_brief.md」を作成してください。\n"
-            f"作成後、ターミナルで `cat altx-agent-workspace/project_brief.md` を実行し、その出力ログを本チャットに貼り付けてください。客観Wチェック後にステップ T-3（エージェント実装）へ進みます！"
-        ),
+        "prompt_for_antigravity": prompt_for_agy,
+        "message": user_message,
     }
 
 

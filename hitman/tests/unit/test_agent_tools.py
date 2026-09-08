@@ -415,17 +415,36 @@ def test_supervisor_step_skip_tool():
 
 def test_guide_training_app_creation():
     """研修モードでのオリジナルアプリ開発またはHITMAN作成ガイダンスの検証。"""
-    # 1. アイデアなし -> HITMAN作成コース
+    # 1. アイデアなし -> HITMAN作成コース（コースB）
     res_hitman = guide_training_app_creation("")
     assert res_hitman["status"] == "success"
     assert "HITMAN作成コース" in res_hitman["course"]
     assert "Excel手順書" in res_hitman["concept"]
 
-    # 2. オリジナルアイデア -> カスタムアプリ開発コース
+    # 2. オリジナルアイデア -> カスタムアプリ開発コース（コースA）
     res_custom = guide_training_app_creation("社内Gitリポジトリのセキュリティ脆弱性自動監査エージェント")
     assert res_custom["status"] == "success"
     assert "オリジナルアプリ開発コース" in res_custom["course"]
     assert "Google ADK" in res_custom["recommended_architecture"]["framework"]
+
+    # 3. 画像認識スキル召喚テスト（ルービックキューブ3面写真攻略）
+    res_vision = guide_training_app_creation("ルービックキューブの写真を3面分共有するだけで、完全攻略のルートを表示させるAIアプリ")
+    assert res_vision["status"] == "success"
+    assert "gemini-multimodal-vision" in res_vision["summoned_skills"]
+    assert "画像認識" in res_vision["prompt_for_antigravity"] or "写真" in res_vision["prompt_for_antigravity"]
+    assert "enable-a2ui" in res_vision["summoned_skills"]
+
+    # 4. RAGスキル召喚テスト（社内規程・マニュアル問い合わせBot）
+    res_rag = guide_training_app_creation("社内就業規則やITセキュリティマニュアルの問い合わせ回答Bot")
+    assert res_rag["status"] == "success"
+    assert "build-rag" in res_rag["summoned_skills"]
+    assert "RAG" in res_rag["prompt_for_antigravity"]
+
+    # 5. 長期記憶スキル召喚テスト（ユーザーの好みを記憶するパーソナル推薦Bot）
+    res_memory = guide_training_app_creation("会話履歴や過去のユーザー好みを記憶して個別最適な提案を行うエージェント")
+    assert res_memory["status"] == "success"
+    assert "setup-memory-bank" in res_memory["summoned_skills"]
+
 
 
 def test_set_and_get_operation_mode():
