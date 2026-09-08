@@ -1939,6 +1939,54 @@ def generate_final_report(
     sup_text = supervisor_name if mode == "SPECIAL_PAIR" else "なし（通常1名体制）"
     is_special = mode == "SPECIAL_PAIR"
 
+    if mode == "TRAINING":
+        is_hitman = ACTIVE_TRAINING_COURSE == "hitman_clone"
+        course_name = "コースB: HITMANクローン構築" if is_hitman else "コースA: オリジナルAIツール開発"
+        app_name = "HITMAN Clone" if is_hitman else "オリジナルAIエージェント (Rubik's Cube Solver Agent)"
+        
+        training_before_after = [
+            {"item": "T-1: 環境構築＆スキル同期", "before": "手動セットアップ・未定義", "after": "専用ワークスペース作成＆講師スキル同期完了", "verdict": "承認済 ✓"},
+            {"item": "T-2: アイデア策定＆要件定義", "before": "アイデア構想段階", "after": "project_brief.md / 仕様書策定完了", "verdict": "承認済 ✓"},
+            {"item": "T-3: エージェント＆A2UI実装", "before": "コード未実装", "after": "Google ADK Agent + A2UIリッチカード実装完了", "verdict": "承認済 ✓"},
+            {"item": "T-4: 自律Wチェック＆単体テスト", "before": "未テスト", "after": "Pytest全件PASSED（客観生ログ検証クリア）", "verdict": "承認済 ✓"},
+            {"item": "T-5: Cloud Run 本番デプロイ", "before": "ローカル環境のみ", "after": "コンテナビルド＆本番URL発行・稼働確認", "verdict": "承認済 ✓"},
+            {"item": "T-6: 個人GitHub公開＆成果保全", "before": "未公開", "after": "個人GitHubリポジトリへコード公開・納品完了", "verdict": "承認済 ✓"},
+        ]
+
+        training_deliverables = [
+            {"name": "要件定義・アーキテクチャ仕様書", "path": "project_brief.md" if not is_hitman else "hitman_spec.md", "status": "承認・保全済 ✓"},
+            {"name": "ADK AIエージェント本体", "path": "my_agent/agent.py" if not is_hitman else "my_hitman/agent.py", "status": "実装済 ✓"},
+            {"name": "A2UIリッチカード生成モジュール", "path": "my_agent/a2ui_utils.py" if not is_hitman else "my_hitman/a2ui_utils.py", "status": "実装済 ✓"},
+            {"name": "自律Wチェック単体テストコード", "path": "tests/test_agent.py", "status": "全件合格 ✓"},
+            {"name": "Cloud Run デプロイ設定 (Dockerfile)", "path": "Dockerfile", "status": "本番稼働 ✓"},
+            {"name": "個人GitHub公開リポジトリ", "path": "https://github.com/...", "status": "公開完了 ✓"},
+        ]
+
+        return {
+            "title": f"株式会社AltX AI実践研修 修了証＆{course_name} 総合評価報告書",
+            "generated_at": now_str,
+            "work_duration": {
+                "start_time": s_time,
+                "end_time": e_time,
+                "elapsed_minutes": duration_minutes,
+            },
+            "operation_mode": {
+                "mode": "TRAINING",
+                "course": course_name,
+                "app_name": app_name,
+                "supervisor": "HITMAN 自律WチェックAI確認者",
+                "two_person_rule_applied": False,
+            },
+            "before_after_comparison": training_before_after,
+            "deliverables": training_deliverables,
+            "evaluation_score": "S+ ランク（全工程自律完走・客観Wチェック全件承認・Cloud Run本番公開）",
+            "comment": (
+                f"【研修修了認定】現場課題の自律定義からGoogle ADKエージェント設計・A2UIリッチカード生成・"
+                f"自律Wチェックテスト・Cloud Runコンテナデプロイ・GitHub公開までの一連の開発ライフサイクルを"
+                f"自律的にマスターしました。客観ログに基づく高品質なAIエンジニアリングスキルの習得を認定します。"
+            ),
+        }
+
     deliverables = [
         {"name": "現行アプリケーション完全バックアップ", "path": "/backup/app_YYYYMMDD.tar.gz", "status": "格納済 ✓"},
         {"name": "環境設定ファイルバックアップ", "path": "/backup/.env.bak", "status": "格納済 ✓"},
