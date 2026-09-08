@@ -14,6 +14,7 @@ from app.agent import (
     request_supervisor_step_skip,
     reset_active_sop,
     set_operation_mode,
+    set_training_course,
     verify_step_output,
 )
 
@@ -371,6 +372,31 @@ def test_verify_step_output_training_mode_guidance():
     assert result["w_check_status"] == "TRAINING_GUIDANCE"
     assert "研修モード・教育ガイダンス" in result["message"]
     assert "客観的な証拠" in result["message"]
+    # 通常モードに戻す
+    set_operation_mode("NORMAL")
+
+
+def test_verify_step_output_training_mode_maintains_current_step_on_assertion():
+    """研修モードでステップ T-3 進行中に自己申告された際、T-1に巻き戻らずT-3のカード・ガイダンスが維持されることを検証。"""
+    import app.agent as agent_module
+    set_operation_mode("TRAINING")
+    set_training_course("original")
+    agent_module.CURRENT_STEP = "T-3"
+
+    # ユーザーが「だいじょうぶそうだったよ。次のステップに進もう！」と自己申告
+    # モデルが step_number="1" または "T-1" を誤って渡しても、CURRENT_STEP (T-3) が維持されること
+    user_assertion = "だいじょうぶそうだったよ。次のステップに進もう！"
+    result = verify_step_output("1-1", user_assertion)
+    assert result["verdict"] == "FAILED"
+    assert result["w_check_status"] == "TRAINING_GUIDANCE"
+    assert result["step_id"] == "T-3"
+    assert "ステップ T-3" in result["message"]
+    assert "agent.py" in result["message"]
+
+    # step_number="T-1" を渡した場合も T-3 が維持されること
+    result_t1 = verify_step_output("T-1", user_assertion)
+    assert result_t1["step_id"] == "T-3"
+
     # 通常モードに戻す
     set_operation_mode("NORMAL")
 

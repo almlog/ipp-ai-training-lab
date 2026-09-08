@@ -531,6 +531,7 @@ ACTIVE_OPERATION_MODE: str = MODE_NORMAL
 ACTIVE_SUPERVISOR_NAME: str = ""
 ACTIVE_SUPERVISOR_ROLE: str = ""
 ACTIVE_AUDIT_LOG: list[dict] = []
+CURRENT_STEP: str = "1-1"
 
 
 def set_training_course(course_type: str) -> dict:
@@ -677,10 +678,12 @@ def set_operation_mode(mode: str, supervisor_name: str = "", supervisor_role: st
     Returns:
         切り替え後の運用モード情報。
     """
-    global ACTIVE_OPERATION_MODE, ACTIVE_SUPERVISOR_NAME, ACTIVE_SUPERVISOR_ROLE
+    global ACTIVE_OPERATION_MODE, ACTIVE_SUPERVISOR_NAME, ACTIVE_SUPERVISOR_ROLE, CURRENT_STEP
     m = (mode or "").strip().upper()
     if "TRAIN" in m or "研修" in m:
         ACTIVE_OPERATION_MODE = MODE_TRAINING
+        if not CURRENT_STEP.startswith("T-"):
+            CURRENT_STEP = "T-1"
     elif "SPEC" in m or "PAIR" in m or "エスカレ" in m or "特別" in m or "2人" in m:
         ACTIVE_OPERATION_MODE = MODE_SPECIAL_PAIR
         if supervisor_name:
@@ -689,6 +692,8 @@ def set_operation_mode(mode: str, supervisor_name: str = "", supervisor_role: st
             ACTIVE_SUPERVISOR_ROLE = supervisor_role
     elif "NORM" in m or "通常" in m:
         ACTIVE_OPERATION_MODE = MODE_NORMAL
+        if CURRENT_STEP.startswith("T-"):
+            CURRENT_STEP = "1-1"
     else:
         return {
             "status": "error",
@@ -697,6 +702,7 @@ def set_operation_mode(mode: str, supervisor_name: str = "", supervisor_role: st
     return {
         "status": "success",
         "mode": ACTIVE_OPERATION_MODE,
+        "current_step": CURRENT_STEP,
         "message": f"【運用モード変更】HITMANの運用モードを【{ACTIVE_OPERATION_MODE}】へ切り替えました。",
         "details": get_operation_mode(),
     }
@@ -1101,22 +1107,39 @@ def is_pure_assertion_without_log(raw: str) -> bool:
 
 def _make_no_log_response(step_str: str, detail: str = "") -> dict:
     """客観ログ未検知時のレスポンスを運用モードに応じて生成する。"""
-    global ACTIVE_OPERATION_MODE, ACTIVE_SUPERVISOR_NAME
+    global ACTIVE_OPERATION_MODE, ACTIVE_SUPERVISOR_NAME, CURRENT_STEP, ACTIVE_TRAINING_COURSE
 
     if ACTIVE_OPERATION_MODE == MODE_TRAINING:
+        target_step = CURRENT_STEP if CURRENT_STEP in TRAINING_STEP_SEQUENCE else step_str
+        if step_str in TRAINING_STEP_SEQUENCE and CURRENT_STEP in TRAINING_STEP_SEQUENCE:
+            # step_strがCURRENT_STEPより過去の場合は巻き戻さずCURRENT_STEPを維持
+            if TRAINING_STEP_SEQUENCE.index(step_str) < TRAINING_STEP_SEQUENCE.index(CURRENT_STEP):
+                target_step = CURRENT_STEP
+            else:
+                target_step = step_str
+        elif CURRENT_STEP in TRAINING_STEP_SEQUENCE:
+            target_step = CURRENT_STEP
+        else:
+            target_step = step_str if step_str.startswith("T-") else "T-1"
+
+        sop_db = get_training_sop(ACTIVE_TRAINING_COURSE)
+        step_data = sop_db.get(target_step, {})
+        step_title = step_data.get("title", f"ステップ {target_step}")
+        cmd = step_data.get("command", "")
+
         return {
             "verdict": "FAILED",
             "w_check_status": "TRAINING_GUIDANCE",
-            "step_id": step_str,
+            "step_id": target_step,
             "reason": f"【研修教育ガイダンス】客観的なターミナル実行ログが検知できません。{detail}",
             "autonomous_verdict": (
                 "【研修インストラクター 指導】自己申告のみではWチェックを通せません。"
                 "本番運用では『客観的証跡（エビデンス）』を残すことがエンジニアを守る鉄則です！"
             ),
             "message": (
-                "【研修モード・教育ガイダンス】自己申告だけでは合格判定を出せません！\n"
+                f"【研修モード・教育ガイダンス（{step_title}）】自己申告だけでは合格判定を出せません！\n"
                 "本番作業では『客観的な証拠（ターミナルログ）』を残すことがプロとしての基本です。\n"
-                f"ターミナルで該当コマンドを実行し、出力されたログをそのまま貼り付けてみましょう！\n"
+                f"現在取り組み中の【{step_title}】の指定コマンド（`{cmd}` 等）をターミナルで実行し、出力されたログをそのまま貼り付けてください！\n"
                 f"（補足: {detail}）"
             ),
         }
@@ -1168,10 +1191,24 @@ def verify_step_output(step_number: int | str, command_output: str) -> dict:
     Returns:
         合否結果（SUCCESS/FAILED）、Wチェック承認状態（w_check_status）、自律判定理由、分岐先を含む辞書。
     """
+    global CURRENT_STEP, ACTIVE_OPERATION_MODE, ACTIVE_TRAINING_COURSE
     sanitized = sanitize_terminal_log(command_output)
     compressed = compress_large_log(sanitized)
     output_lower = compressed.lower()
     step_str = str(step_number).upper()
+
+    # 研修モード時のステップ番号エイリアス変換 (例: '1' -> 'T-1', '1-1' -> 'T-1')
+    if ACTIVE_OPERATION_MODE == MODE_TRAINING or step_str.startswith("T-"):
+        step_alias = {
+            "1": "T-1", "1-1": "T-1", "STEP1": "T-1", "STEP 1": "T-1",
+            "2": "T-2", "2-1": "T-2", "STEP2": "T-2", "STEP 2": "T-2",
+            "3": "T-3", "3-1": "T-3", "STEP3": "T-3", "STEP 3": "T-3",
+            "4": "T-4", "4-1": "T-4", "STEP4": "T-4", "STEP 4": "T-4",
+            "5": "T-5", "5-1": "T-5", "STEP5": "T-5", "STEP 5": "T-5",
+            "6": "T-6", "6-1": "T-6", "STEP6": "T-6", "STEP 6": "T-6",
+        }
+        if step_str in step_alias:
+            step_str = step_alias[step_str]
 
     # 0. 研修モードにおける受講コース選択・変更要求の自動判別（自己申告差し戻し回避）
     is_spec_or_code_log = any(k in output_lower for k in (
@@ -1194,6 +1231,7 @@ def verify_step_output(step_number: int | str, command_output: str) -> dict:
 
     if is_course_b_choice:
         set_training_course("hitman_clone")
+        CURRENT_STEP = "T-2"
         return {
             "verdict": "SUCCESS",
             "w_check_status": "COURSE_SELECTED",
@@ -1208,6 +1246,7 @@ def verify_step_output(step_number: int | str, command_output: str) -> dict:
         }
     elif is_course_a_choice:
         set_training_course("original")
+        CURRENT_STEP = "T-2"
         return {
             "verdict": "SUCCESS",
             "w_check_status": "COURSE_SELECTED",
@@ -1273,6 +1312,11 @@ def verify_step_output(step_number: int | str, command_output: str) -> dict:
 
     # 4. 自己申告文（口頭テキスト・ログ不在）の検知と厳格差し戻し
     if is_pure_assertion_without_log(command_output):
+        if ACTIVE_OPERATION_MODE == MODE_TRAINING and CURRENT_STEP in TRAINING_STEP_SEQUENCE:
+            cur_idx = TRAINING_STEP_SEQUENCE.index(CURRENT_STEP)
+            cand_idx = TRAINING_STEP_SEQUENCE.index(step_str) if step_str in TRAINING_STEP_SEQUENCE else -1
+            if cand_idx < cur_idx:
+                step_str = CURRENT_STEP
         return _make_no_log_response(step_str, "ターミナルログの出力構造（ヘッダー、終了ステータス等）が見当たりません。")
 
     # ==============================================================================
@@ -1290,6 +1334,7 @@ def verify_step_output(step_number: int | str, command_output: str) -> dict:
             ))
             if not has_t1_sig:
                 return _make_no_log_response("T-1", f"作業フォルダ作成（{ws_cur}）、git clone、または環境確認の実行ログが確認できません。")
+            CURRENT_STEP = "T-2"
             return {
                 "verdict": "SUCCESS",
                 "w_check_status": "VERIFIED_APPROVED",
@@ -1312,6 +1357,7 @@ def verify_step_output(step_number: int | str, command_output: str) -> dict:
             ))
             if not has_t2_sig:
                 return _make_no_log_response("T-2", "project_brief.md または hitman_spec.md の内容・要件定義の出力が確認できません。")
+            CURRENT_STEP = "T-3"
             return {
                 "verdict": "SUCCESS",
                 "w_check_status": "VERIFIED_APPROVED",
@@ -1332,6 +1378,7 @@ def verify_step_output(step_number: int | str, command_output: str) -> dict:
             ))
             if not has_t3_sig:
                 return _make_no_log_response("T-3", "agent.py や A2UIカード連携コード、生成ファイル群の出力が確認できません。")
+            CURRENT_STEP = "T-4"
             return {
                 "verdict": "SUCCESS",
                 "w_check_status": "VERIFIED_APPROVED",
@@ -1358,6 +1405,7 @@ def verify_step_output(step_number: int | str, command_output: str) -> dict:
             has_t4_sig = any(k in output_lower for k in ("passed", "test session starts", "collected ", "100%", "0 error", "ok"))
             if not has_t4_sig:
                 return _make_no_log_response("T-4", "pytest実行ログ（passed, test session starts等）が確認できません。")
+            CURRENT_STEP = "T-5"
             return {
                 "verdict": "SUCCESS",
                 "w_check_status": "VERIFIED_APPROVED",
@@ -1375,6 +1423,7 @@ def verify_step_output(step_number: int | str, command_output: str) -> dict:
             has_t5_sig = any(k in output_lower for k in ("run.app", "service url:", "deploying container", "ok", "service [", "https://"))
             if not has_t5_sig:
                 return _make_no_log_response("T-5", "Cloud Run デプロイログまたはサービスURL（https://...run.app）が確認できません。")
+            CURRENT_STEP = "T-6"
             return {
                 "verdict": "SUCCESS",
                 "w_check_status": "VERIFIED_APPROVED",
@@ -1392,6 +1441,7 @@ def verify_step_output(step_number: int | str, command_output: str) -> dict:
             has_t6_sig = any(k in output_lower for k in ("github.com", "remote: create a pull request", "to https://github.com", "origin", "pushed", "repo view"))
             if not has_t6_sig:
                 return _make_no_log_response("T-6", "個人GitHubリポジトリURL（https://github.com/...）またはプッシュログが確認できません。")
+            CURRENT_STEP = "T-6"
             return {
                 "verdict": "SUCCESS",
                 "w_check_status": "VERIFIED_APPROVED",
@@ -1641,7 +1691,7 @@ def guide_training_app_creation(idea: str = "", course_type: str = "custom") -> 
     Returns:
         開発ガイダンス、推奨構成、AntiGravity投入プロンプト案を含む辞書。
     """
-    global ACTIVE_TRAINING_COURSE
+    global ACTIVE_TRAINING_COURSE, CURRENT_STEP
     idea_clean = (idea or "").strip()
     is_hitman = (
         course_type in ("hitman", "hitman_clone")
@@ -1653,6 +1703,7 @@ def guide_training_app_creation(idea: str = "", course_type: str = "custom") -> 
 
     if is_hitman:
         ACTIVE_TRAINING_COURSE = "hitman_clone"
+        CURRENT_STEP = "T-2"
         return {
             "status": "success",
             "course": "コースB: HITMAN作成コース（HITMANクローン構築体験）",
@@ -1690,6 +1741,7 @@ def guide_training_app_creation(idea: str = "", course_type: str = "custom") -> 
         }
 
     ACTIVE_TRAINING_COURSE = "original"
+    CURRENT_STEP = "T-2"
     if idea_clean:
         TRAINING_PARAMETERS["USER_IDEA"] = idea_clean
 
@@ -2181,6 +2233,7 @@ a2ui_instruction = schema_manager.generate_system_prompt(
         "3. 【研修モード (TRAINING)】: 株式会社ＡｌｔＸのAI実践研修用特別モード。"
         "受講生がHITMANの手順書を活用しながら、現場課題を解決するオリジナルアプリ（AIエージェント・自動化ツール）を作成・デプロイする体験を熱心に伴走支援してください。"
         "受講生が自己申告を入力した際は、なぜ本番運用で客観証拠が必要なのかを教育的に解説し、指定コマンドの実行を優しく促してください。"
+        "【重要: 自己申告差し戻し時のステップ維持規程】受講生が自己申告（「大丈夫でした」「できました」「次のステップに進もう」「確認した」等）を入力して差し戻す際は、教育的指導を行った上で、受講生が現在取り組んでいるステップ（例: T-2合格後なら必ず『ステップ T-3』）の手順カード（A2UI）を再提示すること。絶対にステップ T-1 や過去の完了済みステップに巻き戻してはならない！"
         "【重要: 研修コース選択および自作アプリ企画・アイデア入力時の規程】"
         "受講生から『コースA』『コースB』『HITMANクローン』『オリジナル開発』などのコース選択や進路、あるいは『〜〜を作りたい』『〜〜のアプリ』などのオリジナル企画・アイデアが入力された場合は、決して `verify_step_output` で自己申告違反として差し戻してはなりません。"
         "直ちに `guide_training_app_creation` ツールを呼び出してアイデアを承認・具体化し、選択されたコースの『ステップ T-2: 要件定義・仕様策定』の手順カード（A2UI: コースAなら command='cat altx-agent-workspace/project_brief.md', コースBなら command='cat altx-agent-workspace/hitman_spec.md'）を必ず提示してください。"

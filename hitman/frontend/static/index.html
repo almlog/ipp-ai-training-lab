@@ -4662,12 +4662,8 @@ function detectStepTransitions(text, parts) {
         appState.currentStep = candidate;
       }
     }
-  } else if (text.includes("BLOCKED_RETRY") || text.includes("【自律判定: 再投入ブロック】") || text.includes("【判定: 不合格】")) {
-    appState.sopResults[appState.currentStep] = {
-      verdict: "FAILED",
-      timestamp: now,
-      logSnippet: text.substring(0, 100)
-    };
+  } else if (text.includes("差し戻し") || text.includes("自己申告") || text.includes("CLAIM_BLOCKED") || text.includes("BLOCKED_RETRY") || text.includes("【自律判定: 再投入ブロック】") || text.includes("【判定: 不合格】")) {
+    // 差し戻し・再投入要求時は、受講生が現在取り組んでいるステップ（appState.currentStep）を絶対に維持する（巻き戻し厳禁）
     appState.errorStep = appState.currentStep;
   } else {
     // Detect which step was presented next for general inquiries or instructions
@@ -4678,8 +4674,13 @@ function detectStepTransitions(text, parts) {
       if (appState.sopResults[candidate] && appState.sopResults[candidate].verdict === "SUCCESS") {
         continue;
       }
-      if (appState.mode === "TRAINING" && candidate === "T-1" && (appState.currentStep === "T-2" || (appState.sopResults["T-1"] && appState.sopResults["T-1"].verdict === "SUCCESS"))) {
-        continue;
+      if (appState.mode === "TRAINING") {
+        const curIdx = STEP_SEQUENCE.indexOf(appState.currentStep);
+        const candIdx = STEP_SEQUENCE.indexOf(candidate);
+        // 研修モードでは、現在ステップより前のステップへの巻き戻りを絶対に防止
+        if (candIdx >= 0 && curIdx >= 0 && candIdx < curIdx) {
+          continue;
+        }
       }
       const access = canAccessStep(candidate);
       if (access.allowed || candidate.startsWith("R-") || candidate.startsWith("E-")) {
