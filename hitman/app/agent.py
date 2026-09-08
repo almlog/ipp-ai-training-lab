@@ -220,14 +220,21 @@ TRAINING_SOP_ORIGINAL = {
         "expected_check": "altx-agent-workspace 内に altx-ai-training-lab が正常クローンされ、.agents/skills/ が認識されること",
         "cautions": "AntiGravity のモデル設定で「gemini-3.8-flash」を選択してください（エラーや未提供時は「gemini-3.6-flash」へフォールバック）。以後の全作業は必ず専用フォルダ（altx-agent-workspace）内で行ってください。",
         "agy_prompt": (
-            "【AntiGravity投入用プロンプト: Step T-1】\n"
-            "あなたは株式会社AltXのAI研修専属メンターです。\n"
-            "1. モデル選定: チャットのモデル設定でまず「gemini-3.8-flash」を選択してください。エラーや利用不可の場合は「gemini-3.6-flash」を選択してください。\n"
-            "2. 作業ディレクトリ: 「altx-agent-workspace」を作成し、以後のファイル作成や作業はすべてこのフォルダ内で行ってください。\n"
+            "【AntiGravity投入用プロンプト: Step T-1（環境構築・スキル同期）】\n"
+            "あなたは株式会社AltXのAI実践研修専属メンターです。\n"
+            "まず受講生に以下の通り挨拶してください：\n"
+            "「お疲れ様です！株式会社AltX AI研修のAntiGravityです。ステップ T-1（開発環境構築とスキル同期）を開始します。まずは専用作業フォルダの作成と研修スキル群の同期を自律実行します。」\n\n"
+            "【自律実行タスク】\n"
+            "1. モデル選定確認: チャット設定で「gemini-3.8-flash」（エラー時は3.6-flash）が選択されていることを確認する。\n"
+            "2. 作業ディレクトリ作成: 「altx-agent-workspace」を作成し、以後の作業フォルダとする。\n"
             "3. リポジトリクローン:\n"
             "   git clone https://github.com/almlog/altx-ai-training-lab.git\n"
-            "   を実行し、リポジトリ内の .agents/skills/ にある研修スキル群（pick-your-agent-project, build-agent-frontend, enable-a2ui 等）を読み込んで自己学習してください。\n"
-            "4. 準備完了の確認: Pythonバージョン（3.11/3.12+）およびAPIキー疎通確認テストを行い、実行結果ログを出力してください。"
+            "   を実行し、リポジトリ内の .agents/skills/ （pick-your-agent-project, build-agent-frontend, enable-a2ui 等）を読み込んで自己学習する。\n"
+            "4. 検証と出力:\n"
+            "   ターミナルで以下を実行し、その生ログを出力してください：\n"
+            "   python --version && ls -la altx-ai-training-lab/.agents/skills/\n\n"
+            "最後に受講生へ以下を案内してください：\n"
+            "「上記ターミナルログをコピーして、HITMANのチャット欄に貼り付けてください。HITMANが客観Wチェックを行い、合格承認後にステップ T-2（企画・要件定義）へ進みます！」"
         ),
     },
     "T-2": {
@@ -238,15 +245,21 @@ TRAINING_SOP_ORIGINAL = {
         "expected_check": "project_brief.md にエージェント名、解決課題、使用ツール、A2UIカード設計、Memory Bank要件が定義されていること",
         "cautions": "スキル「pick-your-agent-project」を活用して要件を棚卸ししてください。自作関数ツールを最低1つ含めてください。",
         "agy_prompt": (
-            "【AntiGravity投入用プロンプト: Step T-2】\n"
-            "スキル「pick-your-agent-project」を活用して、私が現場で抱える課題を解決するオリジナルAIエージェントの企画・要件定義を作成してください。\n"
-            "私の課題・作りたいもの: （※ここに自分のアイデアを記入。例: 社内問い合わせ自動応答、監視ログ異常検知、障害一次切り分け等）\n"
-            "以下の項目を含む「altx-agent-workspace/project_brief.md」を作成し、内容を出力してください：\n"
-            "1. エージェント名と目的（解決する現場課題）\n"
-            "2. 使用するモデル（gemini-3.8-flash または 3.6-flash）\n"
-            "3. 必要な関数ツール（自作ツール最低1つ）\n"
-            "4. A2UIカード表示仕様（カードのレイアウト）\n"
-            "5. 長期記憶（Memory Bank）活用方針"
+            "【AntiGravity投入用プロンプト: Step T-2（企画・要件定義）】\n"
+            "あなたは株式会社AltXのAI実践研修専属メンターです。\n"
+            "まず受講生に対して、以下の通り挨拶と問いかけを行い、対話セッションを開始してください：\n"
+            "「お疲れ様です！株式会社AltX AI研修のAntiGravityです。ステップ T-2（アイデア策定・要件定義）として、あなたが現場や日常業務で『こんなツールがあったら便利だな』と感じていることを一緒に形にしていきましょう。\n"
+            "日常業務で時間がかかっていることや自動化したい作業、作ってみたいAIツールのイメージはありますか？（※迷ったら『おすすめのアイデアを教えて』と言っていただければ、現場で役立つ代表例をご提案します。また『コースBのお手本で作る』と答えれば、HITMANクローン構築に切り替えることも可能です）」\n\n"
+            "【進行ルール】\n"
+            "1. 受講生から返答があったら、スキル「pick-your-agent-project」を活用して要件を整理し、余計な寄り道をせずに以下の項目を含む「altx-agent-workspace/project_brief.md」を即座に作成してください：\n"
+            "   - エージェント名と解決する現場課題\n"
+            "   - 使用モデル（gemini-3.8-flash または 3.6-flash）\n"
+            "   - 必要な関数ツール（自作ツール最低1つ）\n"
+            "   - A2UIカード表示仕様（カードのレイアウト）\n"
+            "   - 長期記憶（Memory Bank）活用方針\n"
+            "2. もし受講生が「アイデアが思いつかない」「判断に迷う」「エラーで進まない」となった場合は、直ちに受講生へ「HITMAN画面で【コースB: HITMANクローン構築】を選択してください。完成版の正解設計図があり、迷わず100%成功できます！」とエスコートしてください。\n"
+            "3. 作成完了後、ターミナルで `cat altx-agent-workspace/project_brief.md` を実行してその内容を出力し、最後に受講生へ以下を案内してください：\n"
+            "「この出力ログをコピーして、HITMANのチャット欄に貼り付けてください。HITMANが客観Wチェックを行い、合格承認後にステップ T-3（エージェントコア＆A2UI実装）へ進みます！」"
         ),
     },
     "T-3": {
@@ -257,13 +270,20 @@ TRAINING_SOP_ORIGINAL = {
         "expected_check": "my_agent/ 配下に agent.py, main.py, a2ui_utils.py が配置され、ADKエージェントとA2UIコールバックが実装されていること",
         "cautions": "スキル「enable-a2ui」および「google-agents-cli-adk-code-ja」を参照し、構文エラーがないことを確認してください。",
         "agy_prompt": (
-            "【AntiGravity投入用プロンプト: Step T-3】\n"
-            "project_brief.md の定義に基づき、Google ADK (Python) で自作エージェントを実装してください。\n"
-            "作業ディレクトリ: altx-agent-workspace/my_agent/\n"
-            "1. agent.py: ADK Agent, 自作関数ツール, A2UIカードコールバック (after_model_callback)\n"
-            "2. a2ui_utils.py: A2UIカード生成ユーティリティ\n"
-            "3. pyproject.toml または requirements.txt: 依存ライブラリ\n"
-            "ファイルを生成し、ディレクトリ構成と agent.py の先頭部分を出力してください。"
+            "【AntiGravity投入用プロンプト: Step T-3（エージェント実装＆A2UI）】\n"
+            "あなたは株式会社AltXのAI実践研修専属メンターです。\n"
+            "受講生に以下を伝えてください：\n"
+            "「お疲れ様です！ステップ T-3（エージェントコア＆A2UI実装）に入ります。先ほど策定した project_brief.md に基づき、Google ADKエージェント本体、自作関数ツール、およびA2UIリッチカード表示を実装します。」\n\n"
+            "【自律実行タスク】\n"
+            "1. スキル「enable-a2ui」および「google-agents-cli-adk-code-ja」を参照する。\n"
+            "2. ディレクトリ「altx-agent-workspace/my_agent/」配下に以下を自律実装する：\n"
+            "   - agent.py: ADK Agent本体、自作関数ツール、A2UIカード生成コールバック（after_model_callback）\n"
+            "   - a2ui_utils.py: A2UIカード用サーフェス定義\n"
+            "   - pyproject.toml または requirements.txt: 依存ライブラリ\n"
+            "3. 実装後、ターミナルで以下を実行して出力してください：\n"
+            "   ls -la altx-agent-workspace/my_agent/ && head -n 30 altx-agent-workspace/my_agent/agent.py\n\n"
+            "最後に受講生へ以下を案内してください：\n"
+            "「上記出力ログをコピーして、HITMANのチャット欄に貼り付けてください。HITMANがコード構成とA2UI構造を客観検証し、ステップ T-4（ローカルテスト）へ進みます！」"
         ),
     },
     "T-4": {
@@ -274,9 +294,15 @@ TRAINING_SOP_ORIGINAL = {
         "expected_check": "テストが全件実行され、全テストが passed（エラー0件）で終了すること",
         "cautions": "テストが1件でも失敗した場合は修正を行い、合格するまで再実行してください。",
         "agy_prompt": (
-            "【AntiGravity投入用プロンプト: Step T-4】\n"
-            "altx-agent-workspace/my_agent/ に対する単体テスト（tests/test_agent.py）を作成し、pytest を実行してください。\n"
-            "エージェントの関数ツール呼び出し、A2UIカード生成、例外ハンドリングをテストし、全件 PASSED となることを確認して実行結果ログを出力してください。"
+            "【AntiGravity投入用プロンプト: Step T-4（ローカルテスト＆動作検証）】\n"
+            "あなたは株式会社AltXのAI実践研修専属メンターです。\n"
+            "受講生に以下を伝えてください：\n"
+            "「お疲れ様です！ステップ T-4（ローカルテスト＆自律Wチェック）です。実装したエージェントの関数ツールやA2UIカード生成が正常に動作するか、自動テストを実行して客観検証します。」\n\n"
+            "【自律実行タスク】\n"
+            "1. 「altx-agent-workspace/my_agent/tests/test_agent.py」を作成し、ツール呼び出しと応答生成を検証するpytest単体テストを実装する。\n"
+            "2. ターミナルで `pytest altx-agent-workspace/my_agent/tests/ -v` を実行し、全件 PASSED となることを確認する。\n\n"
+            "最後に受講生へ以下を案内してください：\n"
+            "「上記テスト実行ログ（全件PASSED）をコピーして、HITMANのチャット欄に貼り付けてください。HITMANがWチェック承認を行い、ステップ T-5（Cloud Runデプロイ）へ進みます！」"
         ),
     },
     "T-5": {
@@ -287,11 +313,16 @@ TRAINING_SOP_ORIGINAL = {
         "expected_check": "Cloud Run へのデプロイが成功し、Service URL（https://...run.app）が出力されること",
         "cautions": "スキル「build-agent-frontend」および「google-agents-cli-deploy-ja」を参照してください。",
         "agy_prompt": (
-            "【AntiGravity投入用プロンプト: Step T-5】\n"
-            "スキル「build-agent-frontend」および「google-agents-cli-deploy-ja」を活用して、作成したエージェントを Google Cloud Run へデプロイしてください。\n"
-            "1. Dockerfile / Cloud Run デプロイ設定の生成\n"
-            "2. gcloud run deploy コマンドの実行（またはデプロイ手順の提示）\n"
-            "3. 発行された本番公開サービスURL（https://...run.app）を出力してください。"
+            "【AntiGravity投入用プロンプト: Step T-5（Cloud Run本番デプロイ）】\n"
+            "あなたは株式会社AltXのAI実践研修専属メンターです。\n"
+            "受講生に以下を伝えてください：\n"
+            "「お疲れ様です！ステップ T-5（Cloud Run 本番デプロイ）です。作成したAIエージェントを Google Cloud Run へコンテナデプロイし、本番Webサービスとして公開します。」\n\n"
+            "【自律実行タスク】\n"
+            "1. スキル「build-agent-frontend」および「google-agents-cli-deploy-ja」を参照し、Dockerfile / FastAPIプロキシフロントエンドを準備する。\n"
+            "2. Cloud Run へのデプロイを実行（またはコンテナビルド検証を行いService URLを発行）する。\n"
+            "3. 発行された本番サービスURL（https://...run.app）を出力する。\n\n"
+            "最後に受講生へ以下を案内してください：\n"
+            "「上記デプロイ完了ログ（Service URL含む）をコピーして、HITMANのチャット欄に貼り付けてください。HITMANが本番健全性を検証し、最終ステップ T-6（GitHub公開＆修了証発行）へ進みます！」"
         ),
     },
     "T-6": {
@@ -302,11 +333,15 @@ TRAINING_SOP_ORIGINAL = {
         "expected_check": "受講生の個人GitHubリポジトリURLが出力され、公開が確認できること",
         "cautions": "スキル「publish-to-github」を活用し、gh CLIのデバイス認証フローを用いて安全に自身のGitHubへプッシュしてください。",
         "agy_prompt": (
-            "【AntiGravity投入用プロンプト: Step T-6】\n"
-            "スキル「publish-to-github」を活用して、完成したエージェントのソースコードを私の個人GitHubリポジトリへ公開（Public）してください。\n"
-            "1. gh auth login（デバイス認証）による個人GitHubログイン\n"
-            "2. 新規リポジトリ作成とコミット・プッシュ\n"
-            "3. 公開されたリポジトリURL（https://github.com/...）を出力し、研修修了報告書をまとめてください。"
+            "【AntiGravity投入用プロンプト: Step T-6（個人GitHub公開＆修了認定）】\n"
+            "あなたは株式会社AltXのAI実践研修専属メンターです。\n"
+            "受講生に以下を伝えてください：\n"
+            "「お疲れ様です！最終ステップ T-6（個人GitHub公開＆修了認定）です。完成した成果物をあなたの個人GitHubリポジトリへ公開し、研修修了の客観証拠とします。」\n\n"
+            "【自律実行タスク】\n"
+            "1. スキル「publish-to-github」を活用し、gh CLIのデバイス認証フローを用いて安全に個人GitHubへ公開する。\n"
+            "2. リポジトリURL（https://github.com/...）を出力する。\n\n"
+            "最後に受講生へ以下を案内してください：\n"
+            "「上記GitHub公開ログ（リポジトリURL含む）をコピーして、HITMANのチャット欄に貼り付けてください。HITMANが修了認定を行い、全作業の客観証跡を含む最終評価レポートを発行します！」"
         ),
     },
 }
@@ -322,13 +357,20 @@ TRAINING_SOP_HITMAN_CLONE = {
         "cautions": "AntiGravity のモデル設定で「gemini-3.8-flash」を選択してください（エラーや未提供時は「gemini-3.6-flash」へフォールバック）。以後の全作業は必ず専用フォルダ（altx-agent-workspace）内で行ってください。",
         "agy_prompt": (
             "【AntiGravity投入用プロンプト: Step T-1 (HITMANクローン)】\n"
-            "あなたは株式会社AltXのAI研修専属メンターです。\n"
-            "1. モデル選定: チャットのモデル設定でまず「gemini-3.8-flash」を選択してください。エラーや利用不可の場合は「gemini-3.6-flash」を選択してください。\n"
-            "2. 作業ディレクトリ: 「altx-agent-workspace」を作成し、以後のファイル作成や作業はすべてこのフォルダ内で行ってください。\n"
+            "あなたは株式会社AltXのAI実践研修専属メンターです。\n"
+            "受講生に以下の通り挨拶してください：\n"
+            "「お疲れ様です！株式会社AltX AI研修のAntiGravityです。王道お手本コース【コースB: HITMANクローン構築】を開始します。まずは専用作業フォルダの作成と研修スキル群の同期を自律実行します。」\n\n"
+            "【自律実行タスク】\n"
+            "1. モデル選定確認: チャット設定で「gemini-3.8-flash」（エラー時は3.6-flash）が選択されていることを確認する。\n"
+            "2. 作業ディレクトリ作成: 「altx-agent-workspace」を作成し、以後の作業フォルダとする。\n"
             "3. リポジトリクローン:\n"
             "   git clone https://github.com/almlog/altx-ai-training-lab.git\n"
-            "   を実行し、リポジトリ内の .agents/skills/ にある研修スキル群を読み込んで自己学習してください。\n"
-            "4. 準備完了の確認: Pythonバージョン（3.11/3.12+）およびAPIキー疎通確認テストを行い、実行結果ログを出力してください。"
+            "   を実行し、リポジトリ内の .agents/skills/ を読み込んで自己学習する。\n"
+            "4. 検証と出力:\n"
+            "   ターミナルで以下を実行し、その生ログを出力してください：\n"
+            "   python --version && ls -la altx-ai-training-lab/.agents/skills/\n\n"
+            "最後に受講生へ以下を案内してください：\n"
+            "「上記ターミナルログをコピーして、HITMANのチャット欄に貼り付けてください。HITMANが客観Wチェックを行い、合格承認後にステップ T-2（仕様設計）へ進みます！」"
         ),
     },
     "T-2": {
@@ -340,11 +382,17 @@ TRAINING_SOP_HITMAN_CLONE = {
         "cautions": "HITMAN自身のアーキテクチャ（事前確認・客観検証・ロールバック分岐・エスカレ協議）を参考に設計してください。",
         "agy_prompt": (
             "【AntiGravity投入用プロンプト: Step T-2 (HITMANクローン)】\n"
-            "AIペアオペレーター「HITMAN」クローンの仕様を設計します。\n"
-            "1. Excel/CSV手順書を読み込むデータ構造\n"
-            "2. ターミナルログを検証するWチェック判定ルール（正常合格、エラー検知、自己申告遮断）\n"
-            "3. 上長協議エスカレーションゲートの仕様\n"
-            "以上の設計を「altx-agent-workspace/hitman_spec.md」として作成し、内容を出力してください。"
+            "あなたは株式会社AltXのAI実践研修専属メンターです。\n"
+            "受講生に以下の通り挨拶してください：\n"
+            "「お疲れ様です！ステップ T-2（HITMAN仕様設計＆SOP定義）です。完成版のお手本に基づき、Excel手順書の解析データ構造、自律Wチェック判定ルール、およびエスカレーションゲート仕様を定義した hitman_spec.md を自律策定します。」\n\n"
+            "【自律実行タスク】\n"
+            "以下の項目を含む「altx-agent-workspace/hitman_spec.md」を作成してください：\n"
+            "1. SOPデータ構造: Excel/CSV/Markdown手順書の読み込みとステップ管理\n"
+            "2. Wチェック判定エンジン: ターミナル生ログ検証（合格承認、エラー検知、自己申告遮断）\n"
+            "3. 分岐制御: 想定外事象のエスカレーションゲートおよびロールバック（R-1/R-2）仕様\n"
+            "4. A2UIカード表示仕様: 手順書カード、コマンドコピーボタン\n\n"
+            "作成後、ターミナルで `cat altx-agent-workspace/hitman_spec.md` を実行してその内容を出力し、最後に受講生へ案内してください：\n"
+            "「この出力ログをコピーして、HITMANのチャット欄に貼り付けてください。HITMANが客観Wチェックを行い、合格承認後にステップ T-3（判定コア実装）へ進みます！」"
         ),
     },
     "T-3": {
@@ -356,11 +404,18 @@ TRAINING_SOP_HITMAN_CLONE = {
         "cautions": "スキル「enable-a2ui」および「google-agents-cli-adk-code-ja」を参照してください。",
         "agy_prompt": (
             "【AntiGravity投入用プロンプト: Step T-3 (HITMANクローン)】\n"
-            "hitman_spec.md に基づき、HITMANクローンの判定コアとA2UIカード表示を実装してください。\n"
-            "作業ディレクトリ: altx-agent-workspace/my_hitman/\n"
-            "1. agent.py: ADK Agent, verify_step_output, A2UIカード表示\n"
-            "2. excel_parser.py: 手順書パーサー\n"
-            "ファイルを生成し、コードの主要部分を出力してください。"
+            "あなたは株式会社AltXのAI実践研修専属メンターです。\n"
+            "受講生に以下を伝えてください：\n"
+            "「お疲れ様です！ステップ T-3（HITMAN判定コア＆A2UI実装）に入ります。hitman_spec.md に基づき、ADK Agent、手順書パーサー、およびWチェック判定エンジンを実装します。」\n\n"
+            "【自律実行タスク】\n"
+            "ディレクトリ「altx-agent-workspace/my_hitman/」配下に以下を自律実装する：\n"
+            "1. agent.py: ADK Agent、verify_step_output ツール、A2UIカード生成コールバック\n"
+            "2. excel_parser.py: 手順書（.xlsm/.csv）パーサーロジック\n"
+            "3. a2ui_utils.py: A2UIカード生成関数群\n"
+            "実装後、ターミナルで以下を実行して出力してください：\n"
+            "ls -la altx-agent-workspace/my_hitman/ && head -n 30 altx-agent-workspace/my_hitman/agent.py\n\n"
+            "最後に受講生へ案内してください：\n"
+            "「上記出力ログをコピーして、HITMANのチャット欄に貼り付けてください。HITMANがコード構成を客観検証し、ステップ T-4（ローカルテスト）へ進みます！」"
         ),
     },
     "T-4": {
@@ -372,8 +427,15 @@ TRAINING_SOP_HITMAN_CLONE = {
         "cautions": "自己申告のみの入力が正しく差し戻されることを必ずテストしてください。",
         "agy_prompt": (
             "【AntiGravity投入用プロンプト: Step T-4 (HITMANクローン)】\n"
-            "my_hitman に対する単体テストを作成し、pytest を実行してください。\n"
-            "自己申告テキストの差し戻し、エラーキーワード検知時のロールバック、正常ログでのWチェック承認が正しくテストされ、全件 PASSED となることを確認してログを出力してください。"
+            "あなたは株式会社AltXのAI実践研修専属メンターです。\n"
+            "受講生に以下を伝えてください：\n"
+            "「お疲れ様です！ステップ T-4（ローカルテスト＆自律Wチェック）です。HITMANの根幹である『自己申告の差し戻し』と『客観生ログでの合格判定』をpytestで自動検証します。」\n\n"
+            "【自律実行タスク】\n"
+            "1. 「altx-agent-workspace/my_hitman/tests/test_agent.py」を作成する。\n"
+            "2. 自己申告入力のブロック、エラー検知、正常ログでの合格承認を検証するテストを実装する。\n"
+            "3. ターミナルで `pytest altx-agent-workspace/my_hitman/tests/ -v` を実行し、全件 PASSED となることを確認する。\n\n"
+            "最後に受講生へ案内してください：\n"
+            "「上記テスト実行ログ（全件PASSED）をコピーして、HITMANのチャット欄に貼り付けてください。HITMANがWチェック承認を行い、ステップ T-5（Cloud Runデプロイ）へ進みます！」"
         ),
     },
     "T-5": {
@@ -385,8 +447,14 @@ TRAINING_SOP_HITMAN_CLONE = {
         "cautions": "スキル「build-agent-frontend」および「google-agents-cli-deploy-ja」を参照してください。",
         "agy_prompt": (
             "【AntiGravity投入用プロンプト: Step T-5 (HITMANクローン)】\n"
-            "スキル「build-agent-frontend」を活用して、HITMANクローンを Cloud Run へデプロイしてください。\n"
-            "発行されたサービスURL（https://...run.app）を出力してください。"
+            "あなたは株式会社AltXのAI実践研修専属メンターです。\n"
+            "受講生に以下を伝えてください：\n"
+            "「お疲れ様です！ステップ T-5（Cloud Run 本番デプロイ）です。HITMANクローンを Google Cloud Run へデプロイし、Webサービスとして公開します。」\n\n"
+            "【自律実行タスク】\n"
+            "1. スキル「build-agent-frontend」を活用して Dockerfile / FastAPIプロキシを準備する。\n"
+            "2. Cloud Run へのデプロイ（またはコンテナ検証）を実行し、本番サービスURLを発行する。\n\n"
+            "最後に受講生へ案内してください：\n"
+            "「上記デプロイ完了ログ（Service URL含む）をコピーして、HITMANのチャット欄に貼り付けてください。HITMANが本番健全性を検証し、最終ステップ T-6（GitHub公開＆修了証発行）へ進みます！」"
         ),
     },
     "T-6": {
@@ -398,8 +466,14 @@ TRAINING_SOP_HITMAN_CLONE = {
         "cautions": "スキル「publish-to-github」を活用し、gh CLIのデバイス認証フローを用いて安全に自身のGitHubへプッシュしてください。",
         "agy_prompt": (
             "【AntiGravity投入用プロンプト: Step T-6 (HITMANクローン)】\n"
-            "スキル「publish-to-github」を活用して、HITMANクローンを私の個人GitHubへ公開してください。\n"
-            "公開リポジトリURL（https://github.com/...）を出力してください。"
+            "あなたは株式会社AltXのAI実践研修専属メンターです。\n"
+            "受講生に以下を伝えてください：\n"
+            "「お疲れ様です！最終ステップ T-6（個人GitHub公開＆修了認定）です。完成したHITMANクローンを個人GitHubへ公開し、研修修了の客観証拠とします。」\n\n"
+            "【自律実行タスク】\n"
+            "1. スキル「publish-to-github」を活用し、gh CLIのデバイス認証フローで個人GitHubへプッシュする。\n"
+            "2. リポジトリURL（https://github.com/...）を出力する。\n\n"
+            "最後に受講生へ案内してください：\n"
+            "「上記GitHub公開ログをコピーして、HITMANのチャット欄に貼り付けてください。HITMANが修了認定を行い、最終評価レポートを発行します！」"
         ),
     },
 }
