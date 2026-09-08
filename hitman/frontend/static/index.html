@@ -397,6 +397,182 @@
     text-align: center;
   }
 
+  /* Collapsed Course Bar (Single-line, sleek summary) */
+  .course-collapsed-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.6rem;
+    padding: 0.45rem 0.75rem;
+    border-radius: 8px;
+    transition: all 0.2s ease;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  }
+  .course-collapsed-bar.theme-a {
+    background: linear-gradient(135deg, #eff6ff, #f0fdf4);
+    border: 1px solid #bfdbfe;
+  }
+  .course-collapsed-bar.theme-b {
+    background: linear-gradient(135deg, #faf5ff, #fdf4ff);
+    border: 1px solid #e9d5ff;
+  }
+  .course-collapsed-left {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    min-width: 0;
+  }
+  .course-collapsed-icon {
+    font-size: 22px;
+    flex-shrink: 0;
+  }
+  .theme-a .course-collapsed-icon { color: #2563eb; }
+  .theme-b .course-collapsed-icon { color: #7c3aed; }
+  .course-collapsed-text {
+    min-width: 0;
+  }
+  .course-collapsed-header-line {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+  }
+  .course-collapsed-tag {
+    font-size: 0.68rem;
+    font-weight: 700;
+    padding: 0.1rem 0.45rem;
+    border-radius: 9999px;
+  }
+  .theme-a .course-collapsed-tag { background: #dbeafe; color: #1e40af; }
+  .theme-b .course-collapsed-tag { background: #f3e8ff; color: #6b21a8; }
+  .course-collapsed-name {
+    font-size: 0.86rem;
+    color: #0f172a;
+    font-weight: 800;
+  }
+  .course-badge-status {
+    font-size: 0.68rem;
+    background: #dcfce7;
+    color: #15803d;
+    padding: 0.1rem 0.45rem;
+    border-radius: 4px;
+    font-weight: 700;
+  }
+  .course-collapsed-subtext {
+    font-size: 0.72rem;
+    color: #64748b;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .btn-toggle-course-card {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.3rem 0.6rem;
+    border-radius: 6px;
+    border: 1px solid #cbd5e1;
+    background: #ffffff;
+    color: #334155;
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    flex-shrink: 0;
+    transition: all 0.15s ease;
+  }
+  .btn-toggle-course-card:hover {
+    background: #f8fafc;
+    border-color: #94a3b8;
+    color: #0f172a;
+  }
+  .btn-fold-course-card {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.2rem;
+    padding: 0.25rem 0.55rem;
+    border-radius: 6px;
+    border: 1px solid #cbd5e1;
+    background: #ffffff;
+    color: #475569;
+    font-size: 0.73rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  .btn-fold-course-card:hover {
+    background: #f1f5f9;
+    color: #0f172a;
+    border-color: #94a3b8;
+  }
+  .chat-course-confirmed-banner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.6rem;
+    padding: 0.65rem 0.85rem;
+    border-radius: 8px;
+    margin: 0.5rem 0;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  }
+  .chat-course-confirmed-banner.theme-a {
+    background: #eff6ff;
+    border: 1px solid #bfdbfe;
+  }
+  .chat-course-confirmed-banner.theme-b {
+    background: #faf5ff;
+    border: 1px solid #e9d5ff;
+  }
+  .btn-toggle-course-card-chat {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.3rem 0.55rem;
+    border-radius: 6px;
+    border: 1px solid #cbd5e1;
+    background: #ffffff;
+    color: #334155;
+    font-size: 0.74rem;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    flex-shrink: 0;
+    transition: all 0.15s ease;
+  }
+  .btn-toggle-course-card-chat:hover {
+    background: #f8fafc;
+    border-color: #94a3b8;
+  }
+  .header-course-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.25rem 0.65rem;
+    border-radius: 9999px;
+    font-size: 0.76rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    user-select: none;
+    white-space: nowrap;
+  }
+  .header-course-badge.course-a {
+    background: linear-gradient(135deg, #1d4ed8, #2563eb);
+    color: #eff6ff;
+    border: 1px solid #60a5fa;
+    box-shadow: 0 1px 4px rgba(37, 99, 235, 0.35);
+  }
+  .header-course-badge.course-b {
+    background: linear-gradient(135deg, #6d28d9, #7c3aed);
+    color: #faf5ff;
+    border: 1px solid #c084fc;
+    box-shadow: 0 1px 4px rgba(124, 58, 237, 0.35);
+  }
+  .header-course-badge:hover {
+    transform: translateY(-1px);
+    filter: brightness(1.1);
+  }
+
   .btn-copy-agy {
     display: inline-flex;
     align-items: center;
@@ -1792,6 +1968,11 @@ html, body {
       <span class="material-symbols-outlined" style="font-size:15px;" id="mode-badge-icon">check_circle</span>
       <span id="mode-badge-text">通常モード（1名体制）</span>
     </div>
+    <div id="header-training-course-badge" class="header-course-badge" style="display:none;" onclick="toggleCourseCardCollapse()" title="受講コース（クリックでメニュー開閉）">
+      <span class="material-symbols-outlined" style="font-size:15px;" id="header-course-badge-icon">rocket_launch</span>
+      <span id="header-course-badge-text">コースA: 自作AI開発</span>
+      <span class="material-symbols-outlined" style="font-size:13px;opacity:0.8;">unfold_more</span>
+    </div>
     <button class="btn-report-hdr" style="border-color:#3b82f6;color:#93c5fd;" onclick="openImportModal()" title="自社や既存のExcel/CSV/Markdown手順書を取り込んでAIペア作業を開始">
       <span class="material-symbols-outlined" style="font-size:16px;">upload_file</span>
       <span>手順書インポート</span>
@@ -2356,6 +2537,8 @@ let appState = {
   endTime: null,
   mode: "NORMAL", // "NORMAL", "TRAINING", "SPECIAL_PAIR"
   trainingCourse: "original", // "original" or "hitman_clone"
+  courseCardCollapsed: false,
+  trainingCourseSelected: false,
   supervisorName: "",
   costMetrics: {
     totalPromptTokens: 0,
@@ -2577,6 +2760,11 @@ function loadState() {
     try {
       const parsed = JSON.parse(saved);
       appState = Object.assign(appState, parsed);
+      if (appState.mode === "TRAINING" && (appState.trainingCourseSelected || (appState.sopResults && appState.sopResults["T-1"]))) {
+        if (appState.courseCardCollapsed === undefined) {
+          appState.courseCardCollapsed = true;
+        }
+      }
       return true;
     } catch(e) { console.warn("Failed to load saved state", e); }
   }
@@ -2978,6 +3166,21 @@ function updateModeUI() {
     hdrTestLogBtn.style.display = (appState.mode === "TRAINING" || isDebugEnabled) ? "inline-flex" : "none";
   }
 
+  const hdrCourseBadge = document.getElementById("header-training-course-badge");
+  const hdrCourseIcon = document.getElementById("header-course-badge-icon");
+  const hdrCourseText = document.getElementById("header-course-badge-text");
+  if (hdrCourseBadge) {
+    if (appState.mode === "TRAINING") {
+      hdrCourseBadge.style.display = "inline-flex";
+      const isB = appState.trainingCourse === "hitman_clone";
+      hdrCourseBadge.className = `header-course-badge ${isB ? 'course-b' : 'course-a'}`;
+      if (hdrCourseIcon) hdrCourseIcon.textContent = isB ? "shield" : "rocket_launch";
+      if (hdrCourseText) hdrCourseText.textContent = isB ? "コースB: HITMANクローン" : "コースA: 自作AI開発";
+    } else {
+      hdrCourseBadge.style.display = "none";
+    }
+  }
+
   updateCourseSelectionUI();
 
   const escBanner = document.getElementById("escalation-alert-banner");
@@ -3048,6 +3251,8 @@ async function switchTrainingCourse(course) {
     });
     const data = await res.json();
     appState.trainingCourse = data.course || course;
+    appState.trainingCourseSelected = true;
+    appState.courseCardCollapsed = true;
     if (data.sop) {
       if (data.parameters) appState.parameters = data.parameters;
       if (data.approval) appState.approval = data.approval;
@@ -3413,8 +3618,59 @@ function escapeHtml(str) {
     .replace(/'/g, "&#039;");
 }
 
+function toggleCourseCardCollapse() {
+  appState.courseCardCollapsed = !appState.courseCardCollapsed;
+  updateCourseSelectionUI();
+  saveState();
+}
+
 function getCourseCardsHtml(isChat = false) {
   const isB = appState.trainingCourse === "hitman_clone";
+  const isCollapsed = appState.courseCardCollapsed === true;
+
+  if (isCollapsed) {
+    if (isChat) {
+      return `
+        <div class="chat-course-confirmed-banner ${isB ? 'theme-b' : 'theme-a'}">
+          <div style="display:flex;align-items:center;gap:0.55rem;min-width:0;">
+            <span class="material-symbols-outlined" style="font-size:22px;color:${isB ? '#7c3aed' : '#2563eb'};flex-shrink:0;">${isB ? 'shield' : 'rocket_launch'}</span>
+            <div>
+              <div style="font-size:0.84rem;font-weight:800;color:#0f172a;display:flex;align-items:center;gap:0.4rem;flex-wrap:wrap;">
+                <span>受講コース確定: ${isB ? '🛡️ コースB: HITMANクローン構築' : '🚀 コースA: オリジナルAIツール開発'}</span>
+                <span style="font-size:0.68rem;background:#dcfce7;color:#15803d;padding:0.1rem 0.45rem;border-radius:4px;font-weight:700;">✓ 選択中</span>
+              </div>
+              <div style="font-size:0.72rem;color:#64748b;">${isB ? '王道お手本コースで100%成功・安全運行へ進みます。' : '自由創作コースで現場の独自AI開発へ進みます。'}</div>
+            </div>
+          </div>
+          <button type="button" class="btn-toggle-course-card-chat" onclick="toggleCourseCardCollapse()" title="コースの変更または詳細を表示">
+            <span class="material-symbols-outlined" style="font-size:14px;">unfold_more</span>
+            <span>コース変更 / 詳細</span>
+          </button>
+        </div>
+      `;
+    }
+
+    return `
+      <div class="course-collapsed-bar ${isB ? 'theme-b' : 'theme-a'}">
+        <div class="course-collapsed-left">
+          <span class="material-symbols-outlined course-collapsed-icon">${isB ? 'shield' : 'rocket_launch'}</span>
+          <div class="course-collapsed-text">
+            <div class="course-collapsed-header-line">
+              <span class="course-collapsed-tag">${isB ? '王道お手本' : '自由創作'}</span>
+              <span class="course-collapsed-name">${isB ? '【コースB】HITMANクローン構築' : '【コースA】オリジナルAIツール開発'}</span>
+              <span class="course-badge-status">✓ 選択中</span>
+            </div>
+            <div class="course-collapsed-subtext">${isB ? 'Excel解析・客観Wチェック・A2UIカード判定の本格AIオペレーター' : '現場の運用課題・自作社内ボットをAIと自律開発'}</div>
+          </div>
+        </div>
+        <button type="button" class="btn-toggle-course-card" onclick="toggleCourseCardCollapse()" title="受講コースの変更または詳細を表示">
+          <span class="material-symbols-outlined" style="font-size:14px;">unfold_more</span>
+          <span>コース切替 / 詳細</span>
+        </button>
+      </div>
+    `;
+  }
+
   return `
     <div class="course-showcase-box" style="${isChat ? 'margin:0.6rem 0;border:1px solid #cbd5e1;background:#ffffff;' : ''}">
       <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.4rem;">
@@ -3422,9 +3678,15 @@ function getCourseCardsHtml(isChat = false) {
           <span class="material-symbols-outlined" style="font-size:20px;color:#d97706;">school</span>
           <strong style="font-size:0.86rem;color:#92400e;">研修受講コース選択（あなたはどっちで受講する？）</strong>
         </div>
-        <span style="font-size:0.72rem;background:${isB ? '#ede9fe' : '#fef3c7'};color:${isB ? '#6d28d9' : '#b45309'};padding:0.2rem 0.55rem;border-radius:4px;font-weight:700;">
-          現在: ${isB ? 'コースB (HITMANクローン)' : 'コースA (自作AI開発)'}
-        </span>
+        <div style="display:flex;align-items:center;gap:0.4rem;">
+          <span style="font-size:0.72rem;background:${isB ? '#ede9fe' : '#fef3c7'};color:${isB ? '#6d28d9' : '#b45309'};padding:0.2rem 0.55rem;border-radius:4px;font-weight:700;">
+            現在: ${isB ? 'コースB (HITMANクローン)' : 'コースA (自作AI開発)'}
+          </span>
+          <button type="button" class="btn-fold-course-card" onclick="toggleCourseCardCollapse()" title="メニューを折りたたむ">
+            <span class="material-symbols-outlined" style="font-size:14px;">expand_less</span>
+            <span>たたむ</span>
+          </button>
+        </div>
       </div>
       <div class="course-showcase-grid">
         <!-- Course A -->
@@ -3446,7 +3708,7 @@ function getCourseCardsHtml(isChat = false) {
             </ul>
           </div>
           <button type="button" class="btn-course-action course-a ${!isB ? 'is-selected' : ''}" onclick="switchTrainingCourse('original')">
-            ${!isB ? '✓ コースA 選択中' : '🚀 コースAを選択して進む'}
+            ${!isB ? '✓ コースA 選択中（確定・折りたたむ）' : '🚀 コースAを選択して進む'}
           </button>
         </div>
 
@@ -3469,7 +3731,7 @@ function getCourseCardsHtml(isChat = false) {
             </ul>
           </div>
           <button type="button" class="btn-course-action course-b ${isB ? 'is-selected' : ''}" onclick="switchTrainingCourse('hitman_clone')">
-            ${isB ? '✓ コースB (推奨) 選択中' : '🛡️ コースBを選択して進む (推奨)'}
+            ${isB ? '✓ コースB (推奨) 選択中（確定・折りたたむ）' : '🛡️ コースBを選択して進む (推奨)'}
           </button>
         </div>
       </div>
@@ -4574,6 +4836,8 @@ function detectStepTransitions(text, parts) {
     } else if (text.includes("コースA") || text.includes("original") || text.includes("オリジナルAI")) {
       appState.trainingCourse = "original";
     }
+    appState.trainingCourseSelected = true;
+    appState.courseCardCollapsed = true;
     // If T-1 is already done, keep currentStep at T-2 (do not rewind)
     if (appState.sopResults["T-1"] && appState.sopResults["T-1"].verdict === "SUCCESS") {
       appState.currentStep = "T-2";
