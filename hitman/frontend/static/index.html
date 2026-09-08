@@ -270,6 +270,133 @@
     color: #ffffff;
     box-shadow: 0 1px 3px rgba(37, 99, 235, 0.3);
   }
+
+  /* Slide 10 Rich Course Showcase Cards */
+  .course-showcase-box {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 0.85rem;
+    margin: 0.6rem 0;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.04);
+  }
+  .course-showcase-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+    margin-top: 0.6rem;
+  }
+  @media (max-width: 650px) {
+    .course-showcase-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+  .course-item-card {
+    border: 2px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 0.8rem;
+    background: #f8fafc;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    transition: all 0.2s ease;
+  }
+  .course-item-card.active {
+    border-color: #2563eb;
+    background: #eff6ff;
+    box-shadow: 0 0 0 3px rgba(37,99,235,0.15);
+  }
+  .course-item-card.recommend {
+    border-color: #c084fc;
+    background: #faf5ff;
+  }
+  .course-item-card.recommend.active {
+    border-color: #7c3aed;
+    background: #f5f3ff;
+    box-shadow: 0 0 0 3px rgba(124,58,237,0.2);
+  }
+  .course-pill {
+    font-size: 0.68rem;
+    font-weight: 700;
+    padding: 0.15rem 0.5rem;
+    border-radius: 9999px;
+    display: inline-block;
+    margin-bottom: 0.35rem;
+  }
+  .course-pill-a {
+    background: #dbeafe;
+    color: #1d4ed8;
+  }
+  .course-pill-b {
+    background: #fef08a;
+    color: #854d0e;
+    border: 1px solid #facc15;
+  }
+  .course-item-title {
+    font-size: 0.88rem;
+    font-weight: 800;
+    color: #0f172a;
+    margin-bottom: 0.4rem;
+  }
+  .course-sec-heading {
+    font-size: 0.74rem;
+    font-weight: 700;
+    color: #475569;
+    margin-top: 0.4rem;
+    margin-bottom: 0.2rem;
+  }
+  .course-item-list {
+    margin: 0;
+    padding-left: 1.1rem;
+    font-size: 0.75rem;
+    color: #334155;
+    line-height: 1.45;
+  }
+  .btn-course-action {
+    margin-top: 0.75rem;
+    width: 100%;
+    padding: 0.5rem 0.6rem;
+    font-size: 0.8rem;
+    font-weight: 700;
+    border-radius: 6px;
+    cursor: pointer;
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.3rem;
+    transition: all 0.2s;
+  }
+  .btn-course-action.course-a {
+    background: #2563eb;
+    color: #fff;
+  }
+  .btn-course-action.course-a:hover {
+    background: #1d4ed8;
+  }
+  .btn-course-action.course-b {
+    background: #7c3aed;
+    color: #fff;
+  }
+  .btn-course-action.course-b:hover {
+    background: #6d28d9;
+  }
+  .btn-course-action.is-selected {
+    background: #16a34a !important;
+    color: #fff !important;
+    cursor: default;
+  }
+  .course-bottom-tip {
+    margin-top: 0.6rem;
+    padding: 0.45rem 0.65rem;
+    background: #fefce8;
+    border: 1px solid #fef08a;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    color: #854d0e;
+    text-align: center;
+  }
+
   .btn-copy-agy {
     display: inline-flex;
     align-items: center;
@@ -283,12 +410,54 @@
     font-weight: 600;
     cursor: pointer;
     margin-top: 0.3rem;
+    margin-right: 0.3rem;
     transition: all 0.15s ease;
   }
   .btn-copy-agy:hover {
     background: #dbeafe;
     border-color: #93c5fd;
     color: #1e40af;
+  }
+  .btn-step-test-log {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 3px 8px;
+    background: #faf5ff;
+    border: 1px solid #d8b4fe;
+    border-radius: 4px;
+    color: #7e22ce;
+    font-size: 0.72rem;
+    font-weight: 600;
+    cursor: pointer;
+    margin-top: 0.3rem;
+    transition: all 0.15s ease;
+  }
+  .btn-step-test-log:hover {
+    background: #f3e8ff;
+    border-color: #c084fc;
+    color: #6b21a8;
+  }
+  .btn-test-log-hdr {
+    background: #2e1065;
+    color: #e9d5ff;
+    border: 1px solid #7c3aed;
+    border-radius: 6px;
+    padding: 0.3rem 0.65rem;
+    font-size: 0.76rem;
+    font-weight: 700;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+  .btn-test-log-hdr:hover {
+    background: #4c1d95;
+    color: #fff;
+    border-color: #a855f7;
+    transform: translateY(-1px);
   }
   .btn-config-env {
     display: inline-flex;
@@ -308,6 +477,32 @@
   .btn-config-env:hover {
     background: #dcfce7;
     border-color: #4ade80;
+  }
+  .formatted-markdown-body {
+    line-height: 1.6;
+    color: #1e293b;
+    word-break: break-word;
+  }
+  .formatted-markdown-body ol {
+    margin: 0.4rem 0 0.6rem;
+    padding-left: 1.4rem;
+  }
+  .formatted-markdown-body ul {
+    margin: 0.4rem 0 0.6rem;
+    padding-left: 1.2rem;
+  }
+  .formatted-markdown-body li {
+    margin-bottom: 0.3rem;
+    line-height: 1.55;
+  }
+  .formatted-markdown-body code {
+    background: #f1f5f9;
+    color: #0284c7;
+    padding: 0.12rem 0.35rem;
+    border-radius: 4px;
+    font-family: monospace;
+    font-size: 0.88em;
+    border: 1px solid #e2e8f0;
   }
 
   .flow-banner.training {
@@ -1605,6 +1800,10 @@ html, body {
       <span class="material-symbols-outlined" style="font-size:16px;">assessment</span>
       <span>最終評価レポート</span>
     </button>
+    <button type="button" class="btn-test-log-hdr" id="btn-hdr-test-log" onclick="openTestEvidencesModal()" title="講師・検証用: T-1〜T-6の合格生ログを確認・入力欄に注入">
+      <span class="material-symbols-outlined" style="font-size:16px;color:#c084fc;">terminal</span>
+      <span>🧪 テストログ集</span>
+    </button>
     <div class="header-status">
       <div class="status-dot"></div>
       <span>稼働中</span>
@@ -1673,6 +1872,11 @@ html, body {
       </details>
     </div>
 
+    <!-- Training Mode Course Selector Card (Visible when mode is TRAINING) -->
+    <div id="training-course-card" style="display:none;margin: 0.4rem 0.6rem;">
+      <!-- Populated dynamically by updateCourseSelectionUI() -->
+    </div>
+
     <div class="panel-tabs">
       <button class="tab-btn active" onclick="switchTab('flow')">
         <span class="material-symbols-outlined" style="font-size:18px;">account_tree</span>
@@ -1706,80 +1910,51 @@ html, body {
 
     <!-- Tab 2: SOP Sheet -->
     <div id="tab-sop" class="tab-content">
-      <div class="sop-toolbar">
-        <div style="font-size:0.85rem; font-weight:700; color:#1e3a8a;">
-          <span id="sop-progress-label">進捗: 0 / 10 完了 (0%)</span>
-        </div>
-        <div style="display:flex; gap:0.4rem;">
-          <button class="chip" onclick="exportSopMarkdown()">📥 Markdown出力</button>
-          <button class="chip" onclick="window.print()">🖨 印刷</button>
-        </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;">
+        <span id="sop-progress-label" style="font-size:0.8rem;font-weight:600;color:#334155;">進捗: 0 / 10 完了 (0%)</span>
+        <button type="button" class="btn-copy-agy" onclick="exportSopMarkdown()" style="margin:0;"><span class="material-symbols-outlined" style="font-size:14px;">download</span><span>手順書MD出力</span></button>
       </div>
-      <div style="overflow-x:auto;">
-        <table class="sop-table">
-          <thead>
-            <tr>
-              <th style="width:55px;">項番</th>
-              <th>作業項目</th>
-              <th>コマンド</th>
-              <th style="width:75px;">合否</th>
-              <th style="width:85px;">実行日時</th>
-            </tr>
-          </thead>
-          <tbody id="sop-table-body">
-            <!-- SOP rows rendered dynamically -->
-          </tbody>
-        </table>
-      </div>
+      <table class="sop-table">
+        <thead>
+          <tr>
+            <th style="width: 50px;">項番</th>
+            <th>作業内容</th>
+            <th>コマンド</th>
+            <th style="width: 60px;">状態</th>
+          </tr>
+        </thead>
+        <tbody id="sop-table-body">
+          <!-- Dynamically populated -->
+        </tbody>
+      </table>
     </div>
 
-    <!-- Tab 3: Logs & SQL Viewer -->
+    <!-- Tab 3: Logs -->
     <div id="tab-logs" class="tab-content">
-      <div class="sub-tabs-bar">
-        <button class="sub-tab-btn active" id="btn-sub-log" onclick="switchLogSubTab('log')">TeraTerm実行ログ</button>
-        <button class="sub-tab-btn" id="btn-sub-sql" onclick="switchLogSubTab('sql')">投入予定SQLファイル</button>
-      </div>
-      
-      <div id="sub-log-panel">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem;">
-          <span style="font-size:0.8rem; font-weight:600; color:#64748b;" id="log-stat-label">ログ未読込</span>
-          <button class="chip" onclick="copyRawLog()">📋 ログ全体をコピー</button>
-        </div>
-        <div id="raw-log-viewer" class="log-viewer-area">(ログデータはまだありません。画面へドラッグ＆ドロップ、または右下の📎ボタンからTeraTermログを読み込めます)</div>
-      </div>
-
-      <div id="sub-sql-panel" style="display:none;">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem;">
-          <span style="font-size:0.8rem; font-weight:600; color:#64748b;" id="sql-stat-label">SQL未読込</span>
-          <button class="chip" style="color:#2563eb; font-weight:700;" onclick="triggerAnalyzeSqlImpact()">🔍 事前SELECTとSQL影響評価を実行</button>
-        </div>
-        <div id="sql-viewer" class="log-viewer-area" style="color:#38bdf8;">(更新予定の .sql ファイルを画面へドラッグ＆ドロップ、または右下の📎ボタンから読み込んでください)</div>
-      </div>
+      <div style="font-size:0.8rem;color:#64748b;margin-bottom:0.4rem;">直近のターミナル / SQL実行証跡ログ:</div>
+      <div class="log-viewer-area" id="log-viewer-content">まだログは記録されていません。</div>
     </div>
 
-    <!-- Tab 4: Final Report Tab -->
+    <!-- Tab 4: Report -->
     <div id="tab-report" class="tab-content">
-      <div class="sop-toolbar">
-        <div style="font-size:0.85rem; font-weight:700; color:#1e3a8a;">
-          <span>リリース作業 最終評価・作業完了報告書</span>
-        </div>
-        <div style="display:flex; gap:0.4rem;">
-          <button class="chip" onclick="exportReportMarkdown()">📥 レポート出力 (MD)</button>
-          <button class="chip" onclick="window.print()">🖨 印刷 (PDF)</button>
-        </div>
+      <div style="display:flex; justify-content:flex-end; margin-bottom:0.6rem;">
+        <button class="btn-report-hdr" style="background:#2563eb;color:#fff;border:none;" onclick="exportReportMarkdown()">
+          <span class="material-symbols-outlined" style="font-size:16px;">download</span>
+          <span>Markdown形式でダウンロード</span>
+        </button>
       </div>
-      <div id="report-container" class="report-sheet">
-        <!-- Live rendered report -->
+      <div class="report-sheet" id="report-container">
+        <!-- Dynamically rendered -->
       </div>
     </div>
   </div>
 
-  <!-- Right Panel: Chat & Operations -->
+  <!-- Right Panel: Pair Operations Chat -->
   <div id="right-panel">
-    <!-- Two-Person Special Mode Banner -->
+    <!-- Supervisor Pair Mode Active Alert Banner -->
     <div id="two-person-banner" class="two-person-banner" style="display:none;">
-      <span class="material-symbols-outlined" style="font-size:20px;">group</span>
-      <span id="two-person-text">【特別モード: 2人体制（上長ペア作業中）】後続の全コマンド投入は相互ダブルチェックを行ってください。</span>
+      <span class="material-symbols-outlined" style="font-size:20px;color:#d97706;">group</span>
+      <span id="two-person-banner-text">【特別モード: 2人体制（上長ペア作業中）】上長: 山田部長 / 作業者: web-user。全コマンド投入において相互ダブルチェックを実施してください。</span>
     </div>
 
     <!-- Escalation Active Alert Banner -->
@@ -1798,20 +1973,6 @@ html, body {
       <!-- Chat bubbles -->
     </div>
 
-    <div class="quick-bar">
-      <button class="chip" style="background:#1e3a8a;color:#fff;font-weight:600;" onclick="openImportModal()">📤 手順書インポート</button>
-      <button class="chip" onclick="quickSend('手順書のステップ1を開始したいです')">▶ ステップ1開始</button>
-      <button class="chip" onclick="quickSend('ステップ 3-3 のDB更新事前確認を実行したいです')">▶ 3-3 DB事前確認/SQL評価</button>
-      <button class="chip" onclick="quickPasteLog()">📋 ログ貼り付け判定</button>
-      <button class="chip" id="chip-training-idea" style="display:none;color:#0284c7;font-weight:700;" onclick="quickSend('現場課題を解決するオリジナルAIアプリを企画・開発したいです。相談に乗ってください。')">💡 自作アプリ企画</button>
-      <button class="chip" id="chip-training-env" style="display:none;color:#059669;font-weight:700;" onclick="openTrainingEnvModal()">⚙️ フォルダ・環境設定</button>
-      <button class="chip" id="chip-training-hitman" style="display:none;color:#059669;font-weight:700;" onclick="quickSend('何を作ればいいか思いつかないので、HITMAN作成コースでペアオペレーターの構築・デプロイを体験したいです。')">🛠️ HITMAN作成体験</button>
-      <button class="chip" id="chip-supervisor-skip" style="display:none;color:#d97706;font-weight:700;" onclick="openSupervisorSkipModal()">⏩ 上長責任スキップ</button>
-      <button class="chip" style="color:#b45309;" onclick="openEscalationModal()">🚨 エスカレ対応ゲート</button>
-      <button class="chip" style="color:#0284c7;" onclick="openReportModal()">📊 最終評価レポート</button>
-      <button class="chip" style="color:#b91c1c;" onclick="quickSend('緊急ロールバック手順（R-1）を開始してください')">🚨 ロールバック</button>
-    </div>
-
     <form id="form">
       <input type="file" id="file-input" accept=".log,.txt,.sql,.xlsm,.xlsx" style="display:none;" onchange="handleFileSelect(event)">
       <button type="button" class="attach-btn" onclick="document.getElementById('file-input').click()" title="TeraTermログ（.log/.txt）、更新SQL（.sql）、または現場Excel手順書（.xlsm/.xlsx）を添付">
@@ -1823,6 +1984,38 @@ html, body {
         <span>送信</span>
       </button>
     </form>
+  </div>
+</div>
+
+<!-- Modal: Test Log Evidence Inspector -->
+<div id="modal-test-evidences" class="modal-backdrop">
+  <div class="modal-dialog" style="max-width: 680px;">
+    <div class="modal-header" style="background:#0f172a;color:#fff;display:flex;align-items:center;justify-content:space-between;">
+      <div style="display:flex;align-items:center;gap:0.5rem;">
+        <span class="material-symbols-outlined" style="color:#c084fc;">terminal</span>
+        <strong style="font-size:0.95rem;">🧪 講師・検証用 テスト合格生ログ集 (T-1 〜 T-6)</strong>
+      </div>
+      <button class="modal-close-btn" onclick="closeTestEvidencesModal()" style="color:#fff;background:transparent;border:none;font-size:20px;cursor:pointer;">&times;</button>
+    </div>
+    <div class="modal-body" style="padding:1rem;">
+      <div style="font-size:0.8rem;color:#475569;margin-bottom:0.6rem;line-height:1.45;">
+        各ステップの客観Wチェック判定を即座に合格通過（🟢 VERIFIED_APPROVED）させるためのターミナル実行ログ（生ログ）です。<br>
+        <strong>「📥 入力欄にセット」</strong> を押すとチャット入力欄に自動転送され、そのまま <strong>[送信]</strong> できます。
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.6rem;background:#f1f5f9;padding:0.4rem 0.6rem;border-radius:6px;">
+        <span style="font-size:0.78rem;font-weight:700;color:#334155;">対象コース:</span>
+        <div style="display:flex;gap:0.4rem;">
+          <button type="button" id="ev-tab-orig" class="course-btn active" style="padding:0.25rem 0.55rem;font-size:0.75rem;" onclick="switchTestEvidencesCourse('original')">コースA: 自作AI</button>
+          <button type="button" id="ev-tab-hitman" class="course-btn" style="padding:0.25rem 0.55rem;font-size:0.75rem;" onclick="switchTestEvidencesCourse('hitman_clone')">コースB: HITMAN (推奨)</button>
+        </div>
+      </div>
+      <div id="test-evidences-list" style="display:flex;flex-direction:column;gap:0.75rem;max-height:55vh;overflow-y:auto;padding-right:4px;">
+        <!-- Populated dynamically -->
+      </div>
+    </div>
+    <div class="modal-footer" style="padding:0.6rem 1rem;background:#f8fafc;display:flex;justify-content:flex-end;">
+      <button type="button" class="btn-cancel" onclick="closeTestEvidencesModal()">閉じる</button>
+    </div>
   </div>
 </div>
 
@@ -2095,6 +2288,20 @@ html, body {
         </select>
         <input type="text" id="env-modal-custom-pyenv" class="esc-input" style="display:none;margin-top:4px;" placeholder="例: C:\Python311\python.exe または conda activate myenv">
       </div>
+
+      <div class="esc-form-group" style="background:#f8fafc;padding:0.65rem 0.8rem;border-radius:6px;border:1px solid #e2e8f0;margin-top:0.8rem;">
+        <label style="display:flex;align-items:center;gap:0.45rem;cursor:pointer;font-weight:700;color:#7c3aed;font-size:0.82rem;">
+          <input type="checkbox" id="env-modal-debug-mode" checked onchange="toggleTrainerDebugMode(this.checked)">
+          <span>🛠️ 講師検証用デバッグモード（ワンクリックテストログ注入ボタンを表示）</span>
+        </label>
+        <span style="font-size:0.72rem;color:#64748b;display:block;margin-top:3px;">※受講生の本番環境ではチェックを外して非表示にできます。現在は検証・デモ用にONになっています。</span>
+      </div>
+
+      <div style="margin-top:0.8rem;border-top:1px dashed #cbd5e1;padding-top:0.8rem;">
+        <button type="button" class="btn-report-hdr" style="background:#7c3aed;color:#fff;border-color:#6d28d9;width:100%;justify-content:center;padding:0.5rem;" onclick="pasteTestDummyLog(); closeTrainingEnvModal();">
+          🛠️ 講師検証用: 現在ステップの合格テストログを入力欄に注入
+        </button>
+      </div>
     </div>
     <div class="modal-footer">
       <button type="button" class="btn-report-hdr" style="color:#64748b;border-color:#cbd5e1;" onclick="resetTrainingEnvDefaults()">デフォルトに戻す</button>
@@ -2181,6 +2388,7 @@ let appState = {
   },
   branchRules: {}
 };
+window.appState = appState;
 
 // SOP Definition with Steps, Escalation Gate, and Rollback Branch (動的に更新可能)
 let SOP_ITEMS = [
@@ -2699,6 +2907,18 @@ async function resetToDefaultSopBackend() {
   }
 }
 
+async function switchTrainingModeManual() {
+  await changeOperationModeFromHdr("TRAINING");
+}
+
+function quickStartStep1() {
+  if (appState.mode === "TRAINING") {
+    sendMessage("ステップ T-1 の手順を確認したいです");
+  } else {
+    sendMessage("手順書のステップ1を開始したいです");
+  }
+}
+
 // --- UI Mode & Tab Switching ---
 function updateModeUI() {
   const badge = document.getElementById("mode-badge");
@@ -2710,11 +2930,14 @@ function updateModeUI() {
   const chipTrainingIdea = document.getElementById("chip-training-idea");
   const chipTrainingHitman = document.getElementById("chip-training-hitman");
   const chipTrainingEnv = document.getElementById("chip-training-env");
+  const chipTrainingDummyLog = document.getElementById("chip-training-dummy-log");
   const chipSupervisorSkip = document.getElementById("chip-supervisor-skip");
 
   if (modeSelect) {
     modeSelect.value = appState.mode || "NORMAL";
   }
+
+  const isDebugEnabled = appState.trainerDebugMode !== false;
 
   if (appState.mode === "SPECIAL_PAIR") {
     badge.className = "mode-badge mode-special";
@@ -2724,6 +2947,7 @@ function updateModeUI() {
     twoPersonText.textContent = `【特別モード: 2人体制（上長ペア作業中）】上長: ${appState.supervisorName || "上長"} / 作業者: ${appState.userId}。後続の全コマンド投入は相互ダブルチェックを行ってください。`;
     if (chipTrainingIdea) chipTrainingIdea.style.display = "none";
     if (chipTrainingHitman) chipTrainingHitman.style.display = "none";
+    if (chipTrainingDummyLog) chipTrainingDummyLog.style.display = "none";
     if (chipSupervisorSkip) chipSupervisorSkip.style.display = "inline-flex";
   } else if (appState.mode === "TRAINING") {
     badge.className = "mode-badge mode-training";
@@ -2733,6 +2957,7 @@ function updateModeUI() {
     twoPersonBanner.style.display = "none";
     if (chipTrainingIdea) chipTrainingIdea.style.display = "inline-flex";
     if (chipTrainingHitman) chipTrainingHitman.style.display = "inline-flex";
+    if (chipTrainingDummyLog) chipTrainingDummyLog.style.display = isDebugEnabled ? "inline-flex" : "none";
     if (chipSupervisorSkip) chipSupervisorSkip.style.display = "none";
   } else {
     badge.className = "mode-badge mode-normal";
@@ -2741,28 +2966,19 @@ function updateModeUI() {
     twoPersonBanner.style.display = "none";
     if (chipTrainingIdea) chipTrainingIdea.style.display = "none";
     if (chipTrainingHitman) chipTrainingHitman.style.display = "none";
+    if (chipTrainingDummyLog) chipTrainingDummyLog.style.display = "none";
     if (chipSupervisorSkip) chipSupervisorSkip.style.display = "none";
   }
 
-  const trainingCard = document.getElementById("training-course-card");
-  if (trainingCard) {
-    if (appState.mode === "TRAINING") {
-      trainingCard.style.display = "block";
-      const btnOrig = document.getElementById("btn-course-original");
-      const btnHitman = document.getElementById("btn-course-hitman");
-      if (btnOrig && btnHitman) {
-        if (appState.trainingCourse === "hitman_clone") {
-          btnOrig.classList.remove("active");
-          btnHitman.classList.add("active");
-        } else {
-          btnOrig.classList.add("active");
-          btnHitman.classList.remove("active");
-        }
-      }
-    } else {
-      trainingCard.style.display = "none";
-    }
+  const debugChk = document.getElementById("env-modal-debug-mode");
+  if (debugChk) debugChk.checked = isDebugEnabled;
+
+  const hdrTestLogBtn = document.getElementById("btn-hdr-test-log");
+  if (hdrTestLogBtn) {
+    hdrTestLogBtn.style.display = (appState.mode === "TRAINING" || isDebugEnabled) ? "inline-flex" : "none";
   }
+
+  updateCourseSelectionUI();
 
   const escBanner = document.getElementById("escalation-alert-banner");
   const inputEl = document.getElementById("input");
@@ -2837,8 +3053,15 @@ async function switchTrainingCourse(course) {
       if (data.approval) appState.approval = data.approval;
       if (data.branch_rules) appState.branchRules = data.branch_rules;
       updateSopItemsFromDb(data.sop, data.sequence);
-      appState.sopResults = {};
-      appState.currentStep = (data.sequence && data.sequence.length > 0) ? data.sequence[0] : "T-1";
+      const t1Done = (appState.sopResults["T-1"] && appState.sopResults["T-1"].verdict === "SUCCESS") || appState.currentStep === "T-2";
+      if (!t1Done) {
+        appState.sopResults = {};
+        appState.currentStep = (data.sequence && data.sequence.length > 0) ? data.sequence[0] : "T-1";
+      } else {
+        const t1Val = appState.sopResults["T-1"];
+        appState.sopResults = { "T-1": t1Val };
+        appState.currentStep = "T-2";
+      }
       appState.errorStep = null;
       appState.escalationActive = false;
       renderFlowChart();
@@ -2848,7 +3071,11 @@ async function switchTrainingCourse(course) {
     updateModeUI();
     saveState();
     showToast(`✓ 【${data.course_name || course}】に切り替えました`);
-    sendMessage(`【受講コース選択: ${data.course_name || course}】\n研修モードの手順フローを更新しました。最初のステップ『${appState.currentStep}』の作業手順とAntiGravity投入用プロンプトを提示してください。`);
+    if (appState.currentStep === "T-2") {
+      sendMessage(`【受講コース選択: ${data.course_name || course}】\n研修モードの手順フローを${data.course_name || course}に確定しました。ステップ T-1 は完了済みです。続いて『ステップ T-2: 仕様・要件定義策定』の作業手順とAntiGravity投入用プロンプトを提示してください。`);
+    } else {
+      sendMessage(`【受講コース選択: ${data.course_name || course}】\n研修モードの手順フローを${data.course_name || course}に切り替えました。最初のステップ『${appState.currentStep}』の作業手順とAntiGravity投入用プロンプトを提示してください。`);
+    }
   } catch(e) {
     alert("コース切替エラー: " + e.message);
   }
@@ -2986,6 +3213,407 @@ function _fallbackCopy(text, stepId) {
   document.execCommand("copy");
   document.body.removeChild(ta);
   showToast(`📋 ステップ ${stepId} のAntiGravityプロンプトをコピーしました！`);
+}
+
+const TEST_EVIDENCES = {
+  original: {
+    "T-1": `$ mkdir altx-agent-workspace && cd altx-agent-workspace
+$ git clone https://github.com/almlog/altx-ai-training-lab.git
+Cloning into 'altx-ai-training-lab'...
+remote: Enumerating objects: 125, done.
+remote: Total 125 (delta 40), reused 110 (delta 30)
+Resolving deltas: 100% (40/40), done.
+
+$ python --version
+Python 3.12.2
+
+$ ls -la altx-ai-training-lab/.agents/skills/
+drwxr-xr-x 2 user staff 4096 Sep 7 20:20 build-agent-frontend
+drwxr-xr-x 2 user staff 4096 Sep 7 20:20 enable-a2ui
+drwxr-xr-x 2 user staff 4096 Sep 7 20:20 memory-bank-setup
+drwxr-xr-x 2 user staff 4096 Sep 7 20:20 pick-your-agent-project
+drwxr-xr-x 2 user staff 4096 Sep 7 20:20 publish-to-github
+drwxr-xr-x 2 user staff 4096 Sep 7 20:20 rag-engine-setup
+drwxr-xr-x 2 user staff 4096 Sep 7 20:20 troubleshoot-lab-setup
+drwxr-xr-x 2 user staff 4096 Sep 7 20:20 novasmart-governance-lab`,
+
+    "T-2": `# project_brief.md (自作AIエージェント要件定義)
+## 1. アプリ概要
+- アプリ名: my_agent (社内申請＆FAQアシスタント)
+- 目的: 社内申請手続きの問い合わせに24時間自律回答する。
+## 2. アーキテクチャ
+- フレームワーク: Google ADK (Agent Development Kit 1.5.0) + Python
+- UIコンポーネント: A2UI v0.8 リッチカード表示
+- ツール: consult_policy_faq, request_human_approval`,
+
+    "T-3": `【ステップ T-3: エージェントコア＆A2UI実装 完了ログ】
+$ ls -la altx-agent-workspace/my_agent/
+-rw-r--r-- 1 user staff 1850 Sep 7 20:22 agent.py
+-rw-r--r-- 1 user staff  920 Sep 7 20:22 a2ui_utils.py
+
+$ head -n 30 altx-agent-workspace/my_agent/agent.py
+from google.adk.agents import Agent
+from google.adk.models import Gemini
+from a2ui_utils import a2ui_callback
+
+MODEL = "gemini-3.8-flash"
+root_agent = Agent(name="my_agent", model=Gemini(model=MODEL), after_model_callback=a2ui_callback)`,
+
+    "T-4": `【ステップ T-4: 単体テスト＆自律Wチェック 完了ログ】
+$ pytest altx-agent-workspace/my_agent/tests/ -v
+============================= test session starts =============================
+collected 5 items
+
+tests/test_agent.py::test_agent_initialization PASSED                   [ 20%]
+tests/test_agent.py::test_consult_policy_faq PASSED                      [ 40%]
+tests/test_agent.py::test_a2ui_callback_integration PASSED               [ 60%]
+tests/test_agent.py::test_error_handling PASSED                          [ 80%]
+tests/test_agent.py::test_schema_validity PASSED                         [100%]
+
+============================== 5 passed in 1.42s ==============================`,
+
+    "T-5": `【ステップ T-5: Cloud Run 本番デプロイ 完了ログ】
+$ gcloud run deploy my-agent --source altx-agent-workspace/my_agent --region asia-northeast1 --allow-unauthenticated
+Building Container... DONE
+Creating Revision... DONE
+Service [my-agent] has been deployed and is serving 100 percent of traffic.
+Service URL: https://my-agent-1070367799384.asia-northeast1.run.app`,
+
+    "T-6": `【ステップ T-6: 個人GitHub公開＆修了証発行 完了ログ】
+$ gh auth status
+✓ Logged in to github.com as shunpei-suzuki
+
+$ git push origin main
+To https://github.com/shunpei-suzuki/my-ai-agent.git
+ * [new branch]      main -> main`
+  },
+
+  hitman_clone: {
+    "T-1": `$ mkdir altx-agent-workspace && cd altx-agent-workspace
+$ git clone https://github.com/almlog/altx-ai-training-lab.git
+Cloning into 'altx-ai-training-lab'...
+remote: Enumerating objects: 125, done.
+remote: Total 125 (delta 40), reused 110 (delta 30)
+Resolving deltas: 100% (40/40), done.
+
+$ python --version
+Python 3.12.2
+
+$ ls -la altx-ai-training-lab/.agents/skills/
+drwxr-xr-x 2 user staff 4096 Sep 7 20:20 build-agent-frontend
+drwxr-xr-x 2 user staff 4096 Sep 7 20:20 enable-a2ui
+drwxr-xr-x 2 user staff 4096 Sep 7 20:20 memory-bank-setup
+drwxr-xr-x 2 user staff 4096 Sep 7 20:20 pick-your-agent-project
+drwxr-xr-x 2 user staff 4096 Sep 7 20:20 publish-to-github
+drwxr-xr-x 2 user staff 4096 Sep 7 20:20 rag-engine-setup
+drwxr-xr-x 2 user staff 4096 Sep 7 20:20 troubleshoot-lab-setup
+drwxr-xr-x 2 user staff 4096 Sep 7 20:20 novasmart-governance-lab`,
+
+    "T-2": `# hitman_spec.md (HITMANクローン構築 仕様書)
+## 1. アプリ概要
+- アプリ名: my_hitman (Excel手順書 AIペアオペレーター)
+- 目的: レガシーSOPを自律解析し、客観WチェックとA2UIカードで安全作業をナビゲートする。
+## 2. アーキテクチャ
+- フレームワーク: Google ADK + Python (Gemini 3.8/3.6 Flash)
+- UIコンポーネント: A2UI v0.8 リッチカード表示 (Card, Column, Row, Text)
+- 判定エンジン: verify_step_output, is_pure_assertion_without_log
+- 安全制御: evaluate_escalation_gate, analyze_sql_impact`,
+
+    "T-3": `【ステップ T-3: HITMAN判定コア＆A2UI実装 完了ログ】
+$ ls -la altx-agent-workspace/my_hitman/
+-rw-r--r-- 1 user staff 3200 Sep 7 20:25 agent.py
+-rw-r--r-- 1 user staff 1200 Sep 7 20:25 a2ui_utils.py
+
+$ head -n 30 altx-agent-workspace/my_hitman/agent.py
+from google.adk.agents import Agent
+from google.adk.models import Gemini
+from a2ui_utils import a2ui_callback
+
+MODEL = "gemini-3.8-flash"
+root_agent = Agent(
+    name="my_hitman",
+    model=Gemini(model=MODEL),
+    instruction="あなたは現場作業をナビゲートするAIペアオペレーターHITMANです。",
+    after_model_callback=a2ui_callback
+)`,
+
+    "T-4": `【ステップ T-4: 単体テスト＆自律Wチェック 完了ログ】
+$ pytest altx-agent-workspace/my_hitman/tests/ -v
+============================= test session starts =============================
+collected 6 items
+
+tests/test_hitman.py::test_excel_parser PASSED                         [ 16%]
+tests/test_hitman.py::test_objective_w_check PASSED                    [ 33%]
+tests/test_hitman.py::test_reject_pure_assertion PASSED                [ 50%]
+tests/test_hitman.py::test_escalation_gate PASSED                      [ 66%]
+tests/test_hitman.py::test_a2ui_card_render PASSED                     [ 83%]
+tests/test_hitman.py::test_agent_response PASSED                       [100%]
+
+============================== 6 passed in 1.58s ==============================`,
+
+    "T-5": `【ステップ T-5: Cloud Run 本番デプロイ 完了ログ】
+$ gcloud run deploy my-hitman --source altx-agent-workspace/my_hitman --region asia-northeast1 --allow-unauthenticated
+Building Container... DONE
+Creating Revision... DONE
+Service [my-hitman] has been deployed and is serving 100 percent of traffic.
+Service URL: https://my-hitman-1070367799384.asia-northeast1.run.app`,
+
+    "T-6": `【ステップ T-6: 個人GitHub公開＆修了証発行 完了ログ】
+$ gh auth status
+✓ Logged in to github.com as shunpei-suzuki
+
+$ git push origin main
+To https://github.com/shunpei-suzuki/my-hitman-clone.git
+ * [new branch]      main -> main`
+  },
+
+  normal: {
+    "1-1": `Filesystem      Size  Used Avail Use% Mounted on
+/dev/sda1        50G   22G   28G  44% /backup`,
+    "1-2": `tar: removing leading '/' from member names
+/var/www/app/
+/var/www/app/index.html
+/var/www/app/.env
+/backup/app_20260906.tar.gz created successfully. 0 error.`,
+    "2-1": `HTTP/1.1 503 Service Unavailable
+Content-Length: 0
+Connection: close`,
+    "2-2": `● my-app.service - Main Web Application
+     Loaded: loaded (/etc/systemd/system/my-app.service)
+     Active: inactive (dead) since Sun 2026-09-06 14:05:00 JST`,
+    "3-1": "`/var/www/app/.env' -> `/backup/.env.bak'",
+    "3-2": `my-app-v2.1.0/bin/app
+my-app-v2.1.0/conf/settings.json
+Release package extracted successfully. 0 error.`,
+    "3-3": `+----+-----------+--------+------------+
+| id | tenant_id | status | plan       |
++----+-----------+--------+------------+
+| 10 | T100      | TRIAL  | STANDARD   |
++----+-----------+--------+------------+
+1 row in set (0.00 sec)`,
+    "3-4": `Query OK, 1 row affected (0.01 sec)
+Rows matched: 1  Changed: 1  Warnings: 0`,
+    "4-1": `● my-app.service - Main Web Application
+     Loaded: loaded (/etc/systemd/system/my-app.service)
+     Active: active (running) since Sun 2026-09-06 14:15:00 JST
+   Main PID: 12345 (python3)`,
+    "4-2": `HTTP/1.1 200 OK
+Content-Type: application/json
+{"status":"healthy","version":"2.1.0"}`
+  }
+};
+
+function escapeHtml(str) {
+  if (!str) return "";
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+function getCourseCardsHtml(isChat = false) {
+  const isB = appState.trainingCourse === "hitman_clone";
+  return `
+    <div class="course-showcase-box" style="${isChat ? 'margin:0.6rem 0;border:1px solid #cbd5e1;background:#ffffff;' : ''}">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.4rem;">
+        <div style="display:flex;align-items:center;gap:0.4rem;">
+          <span class="material-symbols-outlined" style="font-size:20px;color:#d97706;">school</span>
+          <strong style="font-size:0.86rem;color:#92400e;">研修受講コース選択（あなたはどっちで受講する？）</strong>
+        </div>
+        <span style="font-size:0.72rem;background:${isB ? '#ede9fe' : '#fef3c7'};color:${isB ? '#6d28d9' : '#b45309'};padding:0.2rem 0.55rem;border-radius:4px;font-weight:700;">
+          現在: ${isB ? 'コースB (HITMANクローン)' : 'コースA (自作AI開発)'}
+        </span>
+      </div>
+      <div class="course-showcase-grid">
+        <!-- Course A -->
+        <div class="course-item-card ${!isB ? 'active' : ''}">
+          <div>
+            <span class="course-pill course-pill-a">自由創作コース</span>
+            <div class="course-item-title">🚀 【コースA】オリジナルAIツール開発</div>
+            <div class="course-sec-heading">💡 こんな受講生におすすめ！</div>
+            <ul class="course-item-list">
+              <li>普段の定型業務や運用タスクを楽にしたい</li>
+              <li>「こんな社内ボットを作りたい」アイデアがある</li>
+              <li>AIと壁打ちしながら独自仕様を作りたい</li>
+            </ul>
+            <div class="course-sec-heading">🛠️ つくる成果物の例</div>
+            <ul class="course-item-list">
+              <li>システム障害ログ自動要約＆原因推定エージェント</li>
+              <li>社内申請・総務手続きFAQボット (RAG連携)</li>
+              <li>日報からタスク自動抽出ツール</li>
+            </ul>
+          </div>
+          <button type="button" class="btn-course-action course-a ${!isB ? 'is-selected' : ''}" onclick="switchTrainingCourse('original')">
+            ${!isB ? '✓ コースA 選択中' : '🚀 コースAを選択して進む'}
+          </button>
+        </div>
+
+        <!-- Course B -->
+        <div class="course-item-card recommend ${isB ? 'active' : ''}">
+          <div>
+            <span class="course-pill course-pill-b">王道お手本コース ★ 迷ったら推奨！</span>
+            <div class="course-item-title">🛡️ 【コースB】HITMANクローン構築</div>
+            <div class="course-sec-heading">💡 こんな受講生におすすめ！</div>
+            <ul class="course-item-list">
+              <li>プログラミングやAI開発にまだ自信がない</li>
+              <li>何を作ればいいかパッとアイデアがない</li>
+              <li>完成版のお手本を真似して100%成功したい</li>
+            </ul>
+            <div class="course-sec-heading">🛠️ つくる成果物（完全な正解設計図あり！）</div>
+            <ul class="course-item-list">
+              <li>Excel手順書（.xlsm）の解析エンジン</li>
+              <li>作業ミスを客観的に見抜く「Wチェック判定」</li>
+              <li>A2UIリッチカード表示を備えた本格AIオペレーター</li>
+            </ul>
+          </div>
+          <button type="button" class="btn-course-action course-b ${isB ? 'is-selected' : ''}" onclick="switchTrainingCourse('hitman_clone')">
+            ${isB ? '✓ コースB (推奨) 選択中' : '🛡️ コースBを選択して進む (推奨)'}
+          </button>
+        </div>
+      </div>
+      <div class="course-bottom-tip">
+        💡 <strong>迷ったら「コースB」が断然おすすめ！</strong> 一本道で迷わず 100% 成功できます！
+      </div>
+    </div>
+  `;
+}
+
+function updateCourseSelectionUI() {
+  const trainingCard = document.getElementById("training-course-card");
+  if (trainingCard) {
+    if (appState.mode === "TRAINING") {
+      trainingCard.style.display = "block";
+      trainingCard.innerHTML = getCourseCardsHtml(false);
+    } else {
+      trainingCard.style.display = "none";
+    }
+  }
+
+  document.querySelectorAll(".chat-course-showcase-container").forEach(el => {
+    el.innerHTML = getCourseCardsHtml(true);
+  });
+}
+
+let currentEvidencesCourse = "original";
+
+function openTestEvidencesModal() {
+  currentEvidencesCourse = appState.trainingCourse || "original";
+  switchTestEvidencesCourse(currentEvidencesCourse);
+  document.getElementById("modal-test-evidences").classList.add("show");
+}
+
+function closeTestEvidencesModal() {
+  document.getElementById("modal-test-evidences").classList.remove("show");
+}
+
+function switchTestEvidencesCourse(course) {
+  currentEvidencesCourse = course;
+  const tabOrig = document.getElementById("ev-tab-orig");
+  const tabHitman = document.getElementById("ev-tab-hitman");
+  if (tabOrig && tabHitman) {
+    if (course === "hitman_clone") {
+      tabOrig.classList.remove("active");
+      tabHitman.classList.add("active");
+    } else {
+      tabOrig.classList.add("active");
+      tabHitman.classList.remove("active");
+    }
+  }
+  renderTestEvidencesList();
+}
+
+function renderTestEvidencesList() {
+  const container = document.getElementById("test-evidences-list");
+  if (!container) return;
+  const evs = TEST_EVIDENCES[currentEvidencesCourse] || TEST_EVIDENCES.original;
+  const stepTitles = {
+    "T-1": "Step T-1: 開発環境構築とスキル同期 (Git clone & Python 3.12)",
+    "T-2": currentEvidencesCourse === "hitman_clone" ? "Step T-2: 仕様設計 (hitman_spec.md)" : "Step T-2: 要件定義 (project_brief.md)",
+    "T-3": "Step T-3: エージェントコア＆A2UI実装 (ADK Agent & a2ui_utils.py)",
+    "T-4": "Step T-4: ローカル単体テスト (Pytest 5 passed / 6 passed)",
+    "T-5": "Step T-5: Google Cloud Run 本番デプロイ (Service URL: https://...run.app)",
+    "T-6": "Step T-6: 個人GitHub公開 ＆ 修了証発行 (Git push & Repo URL)",
+  };
+
+  let html = "";
+  for (const [stepId, title] of Object.entries(stepTitles)) {
+    const log = evs[stepId] || "";
+    const isCur = appState.currentStep === stepId;
+    html += `
+      <div style="border:1px solid ${isCur ? '#3b82f6' : '#cbd5e1'};border-radius:8px;padding:0.65rem 0.85rem;background:${isCur ? '#eff6ff' : '#ffffff'};">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.4rem;flex-wrap:wrap;gap:0.3rem;">
+          <div style="display:flex;align-items:center;gap:0.4rem;">
+            <strong style="font-size:0.83rem;color:${isCur ? '#1d4ed8' : '#1e293b'};">${title}</strong>
+            ${isCur ? '<span style="font-size:0.68rem;background:#2563eb;color:#fff;padding:0.1rem 0.4rem;border-radius:4px;font-weight:700;">進行中</span>' : ''}
+          </div>
+          <div style="display:flex;gap:0.35rem;">
+            <button type="button" class="course-btn" style="padding:0.3rem 0.65rem;font-size:0.75rem;background:#7c3aed;color:#fff;border:none;border-radius:5px;" onclick="injectEvidencesLog('${stepId}', '${currentEvidencesCourse}')">
+              📥 入力欄にセット
+            </button>
+            <button type="button" class="course-btn" style="padding:0.3rem 0.65rem;font-size:0.75rem;border-radius:5px;" onclick="copyEvidencesLog('${stepId}', '${currentEvidencesCourse}')">
+              📄 コピー
+            </button>
+          </div>
+        </div>
+        <pre style="margin:0;background:#0f172a;color:#38bdf8;padding:0.5rem 0.65rem;border-radius:6px;font-size:0.73rem;max-height:85px;overflow-y:auto;white-space:pre-wrap;word-break:break-all;">${escapeHtml(log.substring(0, 320))}${log.length > 320 ? '\n...(省略)...' : ''}</pre>
+      </div>
+    `;
+  }
+  container.innerHTML = html;
+}
+
+function injectEvidencesLog(stepId, course) {
+  const evs = TEST_EVIDENCES[course] || TEST_EVIDENCES.original;
+  const log = evs[stepId] || "";
+  const inputEl = document.getElementById("input");
+  if (inputEl) {
+    inputEl.value = log;
+    autoResizeTextarea();
+    appState.rawLog = log;
+    inputEl.focus();
+    closeTestEvidencesModal();
+    showToast(`✓ ステップ ${stepId} の合格ログを入力欄にセットしました！ [送信] を押してください。`);
+  }
+}
+
+function copyEvidencesLog(stepId, course) {
+  const evs = TEST_EVIDENCES[course] || TEST_EVIDENCES.original;
+  const log = evs[stepId] || "";
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(log).then(() => {
+      showToast(`📋 ステップ ${stepId} の合格ログをコピーしました！`);
+    });
+  }
+}
+
+function injectStepDummyLog(stepId) {
+  const course = appState.trainingCourse || "original";
+  const evs = TEST_EVIDENCES[course] || TEST_EVIDENCES.original;
+  const log = evs[stepId] || "";
+  const inputEl = document.getElementById("input");
+  if (inputEl) {
+    inputEl.value = log;
+    autoResizeTextarea();
+    appState.rawLog = log;
+    inputEl.focus();
+    showToast(`🛠️ ステップ ${stepId} の合格ログを入力欄にセットしました！ [送信] を押してください。`);
+  }
+}
+
+function pasteTestDummyLog() {
+  const step = (appState.mode === "TRAINING" && (!appState.currentStep || !appState.currentStep.startsWith("T-"))) 
+    ? "T-1" 
+    : (appState.currentStep || (appState.mode === "TRAINING" ? "T-1" : "1-1"));
+  injectStepDummyLog(step);
+}
+
+function toggleTrainerDebugMode(enabled) {
+  appState.trainerDebugMode = enabled;
+  localStorage.setItem("hitman_trainer_debug", enabled ? "true" : "false");
+  updateModeUI();
+  showToast(enabled ? "🛠️ 講師検証用デバッグモードを有効化しました（テストログ集ボタン表示）" : "🔒 デバッグモードを無効化しました（受講生向け標準UI）");
 }
 
 function openSupervisorSkipModal() {
@@ -3511,7 +4139,10 @@ function renderFlowChart() {
           <span class="step-title-text">${step.title}</span>
         </div>
         <div class="step-cmd-preview">${resolveStepVariables(step.cmd).substring(0, 45)}...</div>
-        ${step.agy_prompt ? `<div style="margin-top:0.35rem;"><button type="button" class="btn-copy-agy" onclick="event.stopPropagation(); copyAgyPrompt('${step.id}')" title="AntiGravity投入用プロンプトをクリップボードにコピー"><span class="material-symbols-outlined" style="font-size:14px;vertical-align:middle;">content_copy</span><span>AGYプロンプトをコピー</span></button></div>` : ""}
+        <div style="margin-top:0.35rem;display:flex;gap:0.35rem;flex-wrap:wrap;">
+          ${step.agy_prompt ? `<button type="button" class="btn-copy-agy" onclick="event.stopPropagation(); copyAgyPrompt('${step.id}')" title="AntiGravity投入用プロンプトをクリップボードにコピー"><span class="material-symbols-outlined" style="font-size:14px;vertical-align:middle;">content_copy</span><span>AGYプロンプト</span></button>` : ""}
+          ${appState.mode === "TRAINING" ? `<button type="button" class="btn-step-test-log" onclick="event.stopPropagation(); injectStepDummyLog('${step.id}')" title="このステップの合格テストログを入力欄に注入"><span class="material-symbols-outlined" style="font-size:14px;vertical-align:middle;">science</span><span>🧪 ログ注入</span></button>` : ""}
+        </div>
       </div>
       <div class="step-status-icon">${icon}</div>
     `;
@@ -3651,8 +4282,11 @@ function renderSopTable() {
   });
 
   const normalTotal = SOP_ITEMS.filter(s => !s.isRollback && !s.isEscalation).length;
-  const pct = Math.round((completedCount / normalTotal) * 100);
-  document.getElementById("sop-progress-label").textContent = `進捗: ${completedCount} / ${normalTotal} 完了 (${pct}%)`;
+  const pct = Math.round((completedCount / (normalTotal || 1)) * 100);
+  const progLabel = document.getElementById("sop-progress-label");
+  if (progLabel) {
+    progLabel.textContent = `進捗: ${completedCount} / ${normalTotal} 完了 (${pct}%)`;
+  }
 }
 
 function exportSopMarkdown() {
@@ -3924,19 +4558,86 @@ function renderSurface(messages, container) {
 function detectStepTransitions(text, parts) {
   const now = new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
   
-  // Autonomous W-Check and branching detection
-  if (text.includes("BRANCH_ROLLBACK") || text.includes("ロールバック必須") || text.includes("【ロールバック】")) {
+  // 0. Course selection sync (independent event, not a step completion)
+  const isCourseSelected = text.includes("COURSE_SELECTED") ||
+                           text.includes("受講コース確定") ||
+                           text.includes("コース確定") ||
+                           text.includes("【コース確定") ||
+                           text.includes("コースB（HITMANクローン構築）") ||
+                           text.includes("コースB: HITMANクローン") ||
+                           text.includes("コースA（オリジナルAIツール開発）") ||
+                           text.includes("コースA: オリジナル");
+
+  if (isCourseSelected) {
+    if (text.includes("コースB") || text.includes("hitman_clone") || text.includes("HITMANクローン")) {
+      appState.trainingCourse = "hitman_clone";
+    } else if (text.includes("コースA") || text.includes("original") || text.includes("オリジナルAI")) {
+      appState.trainingCourse = "original";
+    }
+    // If T-1 is already done, keep currentStep at T-2 (do not rewind)
+    if (appState.sopResults["T-1"] && appState.sopResults["T-1"].verdict === "SUCCESS") {
+      appState.currentStep = "T-2";
+    }
+    updateModeUI();
+    renderFlowChart();
+    renderSopTable();
+    saveState();
+    return;
+  }
+
+  // 1. Success / Approved verification check
+  const isApproved = text.includes("VERIFIED_APPROVED") ||
+                     text.includes("Wチェック承認") ||
+                     text.includes("【AI確認者 有識者Wチェック承認") ||
+                     text.includes("【判定: 合格】") ||
+                     text.includes("判定: 合格") ||
+                     text.includes("【判定：合格】") ||
+                     text.includes("【合格承認】") ||
+                     text.includes("合格承認") ||
+                     text.includes("【Wチェック合格承認】") ||
+                     text.includes("Wチェック合格承認") ||
+                     text.includes("修了認定") ||
+                     text.includes("正常に完了") ||
+                     text.includes("正常完了") ||
+                     text.includes("実行ログを確認いたしました") ||
+                     text.includes("実行結果ログの確認が完了") ||
+                     text.includes("環境構築の実行ログを確認") ||
+                     text.includes("準備が正常に完了") ||
+                     text.includes("正常に確認できました") ||
+                     text.includes("確認できました") ||
+                     text.includes("スキル読み込み完了") ||
+                     text.includes("環境構築・スキル読み込み完了") ||
+                     (text.includes("どちらのコース") && text.includes("コースA") && text.includes("コースB")) ||
+                     text.includes("【受講コースの選択をお願いします】") ||
+                     text.includes("正しく実装されています") ||
+                     text.includes("コードを確認しました") ||
+                     text.includes("設定完了") ||
+                     text.includes("基礎が完成しています") ||
+                     text.includes("エージェントの起動・動作確認テスト");
+
+  // 2. Rollback verdict check (strict)
+  const isRollback = text.includes("BRANCH_ROLLBACK") ||
+                     text.includes("【自律判定: ロールバック発動】") ||
+                     text.includes("旧バージョン復元手順（R-1）へ自律分岐");
+
+  // 3. Escalation verdict check (strict - never trigger on descriptive mentions of escalation)
+  const isEscalation = (text.includes("BRANCH_ESCALATION") ||
+                        text.includes("【自律判定: エスカレーション発動】") ||
+                        text.includes("ゲート（E-1）へ自律分岐") ||
+                        text.includes("【要エスカレーション対応】")) && !isApproved;
+
+  if (isRollback) {
     appState.currentStep = "R-1";
     appState.errorStep = appState.currentStep;
     appState.escalationActive = true;
     appState.escalationReason = text.substring(0, 140);
     appState.sopResults[appState.currentStep] = { verdict: "FAILED", timestamp: now, logSnippet: text.substring(0, 100) };
-  } else if (text.includes("BRANCH_ESCALATION") || text.includes("エスカレーション必須") || text.includes("エスカレーション") || text.includes("E-1")) {
+  } else if (isEscalation) {
     appState.currentStep = "E-1";
     appState.errorStep = appState.currentStep;
     appState.escalationActive = true;
     appState.escalationReason = text.substring(0, 140);
-  } else if (text.includes("VERIFIED_APPROVED") || text.includes("Wチェック承認") || text.includes("【判定: 合格】")) {
+  } else if (isApproved) {
     appState.sopResults[appState.currentStep] = {
       verdict: "SUCCESS",
       timestamp: now,
@@ -3944,28 +4645,47 @@ function detectStepTransitions(text, parts) {
     };
     appState.errorStep = null;
     appState.escalationActive = false;
+    appState.escalationReason = "";
     // Auto advance to next step in sequence
     const curIdx = STEP_SEQUENCE.indexOf(appState.currentStep);
     if (curIdx >= 0 && curIdx + 1 < STEP_SEQUENCE.length) {
       appState.currentStep = STEP_SEQUENCE[curIdx + 1];
     }
-  } else if (text.includes("BLOCKED_RETRY") || text.includes("進行ブロック") || text.includes("【判定: 不合格】") || text.includes("エラー")) {
+    // Check if text explicitly mentions the next target step
+    const nextMatch = text.match(/次[へはの]?(?:ステップ)?(?:手順(?:として)?)?(?:の)?\s*ステップ\s*(T-[0-9]+|[0-9]-[0-9]+)/i) ||
+                      text.match(/次のステップ\s*[:：➔➔→]?\s*(T-[0-9]+|[0-9]-[0-9]+)/i);
+    if (nextMatch) {
+      let candidate = nextMatch[1];
+      if (candidate.length === 1 && !candidate.includes("-")) candidate += "-1";
+      const access = canAccessStep(candidate);
+      if (access.allowed) {
+        appState.currentStep = candidate;
+      }
+    }
+  } else if (text.includes("BLOCKED_RETRY") || text.includes("【自律判定: 再投入ブロック】") || text.includes("【判定: 不合格】")) {
     appState.sopResults[appState.currentStep] = {
       verdict: "FAILED",
       timestamp: now,
       logSnippet: text.substring(0, 100)
     };
     appState.errorStep = appState.currentStep;
-  }
-
-  // Detect which step was presented next
-  const stepMatch = text.match(/ステップ\s*(T-[0-9]+|[0-9]-[0-9]+|R-[0-9]+|E-[0-9]+|[0-9]+)/i);
-  if (stepMatch) {
-    let nextStep = stepMatch[1];
-    if (nextStep.length === 1 && !nextStep.includes("-")) nextStep += "-1";
-    const access = canAccessStep(nextStep);
-    if (access.allowed || nextStep.startsWith("R-") || nextStep.startsWith("E-")) {
-      appState.currentStep = nextStep;
+  } else {
+    // Detect which step was presented next for general inquiries or instructions
+    const matches = Array.from(text.matchAll(/ステップ\s*(T-[0-9]+|[0-9]-[0-9]+|R-[0-9]+|E-[0-9]+|[0-9]+)/gi));
+    for (let i = matches.length - 1; i >= 0; i--) {
+      let candidate = matches[i][1];
+      if (candidate.length === 1 && !candidate.includes("-")) candidate += "-1";
+      if (appState.sopResults[candidate] && appState.sopResults[candidate].verdict === "SUCCESS") {
+        continue;
+      }
+      if (appState.mode === "TRAINING" && candidate === "T-1" && (appState.currentStep === "T-2" || (appState.sopResults["T-1"] && appState.sopResults["T-1"].verdict === "SUCCESS"))) {
+        continue;
+      }
+      const access = canAccessStep(candidate);
+      if (access.allowed || candidate.startsWith("R-") || candidate.startsWith("E-")) {
+        appState.currentStep = candidate;
+        break;
+      }
     }
   }
 
@@ -3973,6 +4693,45 @@ function detectStepTransitions(text, parts) {
   renderFlowChart();
   renderSopTable();
   saveState();
+}
+
+function formatMarkdownToHtml(src) {
+  if (!src) return "";
+  let html = src.trim();
+  
+  // Escape HTML tags for security
+  html = html.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  
+  // Headers
+  html = html.replace(/^#### (.*$)/gim, '<h5 style="margin:0.5rem 0 0.2rem;color:#1e293b;font-size:0.9rem;font-weight:700;">$1</h5>');
+  html = html.replace(/^### (.*$)/gim, '<h4 style="margin:0.6rem 0 0.3rem;color:#1e3a8a;font-size:0.98rem;font-weight:700;display:flex;align-items:center;gap:0.3rem;">$1</h4>');
+  html = html.replace(/^## (.*$)/gim, '<h3 style="margin:0.7rem 0 0.4rem;color:#0f172a;font-size:1.05rem;font-weight:700;border-bottom:1px solid #e2e8f0;padding-bottom:0.2rem;">$1</h3>');
+  html = html.replace(/^# (.*$)/gim, '<h2 style="margin:0.8rem 0 0.5rem;color:#0f172a;font-size:1.15rem;font-weight:800;">$1</h2>');
+  
+  // Horizontal rules
+  html = html.replace(/^---$/gim, '<hr style="border:none;border-top:1px solid #e2e8f0;margin:0.8rem 0;">');
+  
+  // Bold & Italic & Code
+  html = html.replace(/\*\*(.*?)\*\*/g, '<strong style="color:#0f172a;font-weight:700;">$1</strong>');
+  html = html.replace(/\*(.*?)\*/g, '<em>$1</em>');
+  html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+  
+  // Blockquotes
+  html = html.replace(/^\s*&gt;\s+(.*$)/gim, '<blockquote style="border-left:3px solid #38bdf8;background:#f0f9ff;margin:0.5rem 0;padding:0.4rem 0.8rem;border-radius:0 6px 6px 0;color:#0369a1;font-size:0.9em;">$1</blockquote>');
+
+  // Numbered List items (1. 2. 3.)
+  html = html.replace(/^\s*([0-9]+)\.\s+(.*$)/gim, '<li value="$1">$2</li>');
+  html = html.replace(/(<li value="[0-9]+".*<\/li>\n?)+/g, (m) => `<ol>${m}</ol>`);
+
+  // Bullet List items (- *)
+  html = html.replace(/^\s*[-*]\s+(.*$)/gim, '<li>$1</li>');
+  html = html.replace(/(<li>.*<\/li>\n?)+/g, (m) => `<ul>${m}</ul>`);
+
+  // Paragraph breaks
+  html = html.replace(/\n\n/g, '<br><br>');
+  html = html.replace(/\n/g, '<br>');
+  
+  return html;
 }
 
 function renderReply(b, parts, saveHistory = true) {
@@ -3988,13 +4747,29 @@ function renderReply(b, parts, saveHistory = true) {
   const textStr = texts.join("\n").trim();
 
   // Autonomous W-Check Verdict Banners
-  if (textStr.includes("Wチェック承認") || textStr.includes("VERIFIED_APPROVED")) {
+  if (textStr.includes("COURSE_SELECTED") || textStr.includes("受講コース確定")) {
+    const banner = el("div", "pair-check-box");
+    banner.style.background = "#f0fdf4";
+    banner.style.borderColor = "#86efac";
+    banner.style.color = "#15803d";
+    banner.style.marginBottom = "0.6rem";
+    banner.innerHTML = `<span class="material-symbols-outlined" style="font-size:18px;color:#16a34a;">verified</span><span><strong>【AI講師 受講コース確定 ✓】</strong> 受講コースを確定しました。仕様・要件定義ステップ（T-2）へ進んでください。</span>`;
+    b.appendChild(banner);
+  } else if (textStr.includes("Wチェック承認") || textStr.includes("VERIFIED_APPROVED") || textStr.includes("修了認定")) {
     const banner = el("div", "pair-check-box");
     banner.style.background = "#f0fdf4";
     banner.style.borderColor = "#86efac";
     banner.style.color = "#15803d";
     banner.style.marginBottom = "0.6rem";
     banner.innerHTML = `<span class="material-symbols-outlined" style="font-size:18px;color:#16a34a;">verified</span><span><strong>【AI確認者 有識者Wチェック承認 ✓】</strong> 期待結果ログとの整合性を自律検証しました。次手順へ進行してください。</span>`;
+    b.appendChild(banner);
+  } else if (textStr.includes("TRAINING_GUIDANCE") || textStr.includes("【研修モード") || textStr.includes("教育ガイダンス") || textStr.includes("なぜ「自己申告」では承認できないのか")) {
+    const banner = el("div", "pair-check-box");
+    banner.style.background = "#f0f9ff";
+    banner.style.borderColor = "#7dd3fc";
+    banner.style.color = "#0369a1";
+    banner.style.marginBottom = "0.6rem";
+    banner.innerHTML = `<span class="material-symbols-outlined" style="font-size:18px;color:#0284c7;">school</span><span><strong>【AI講師 教育ガイダンス 🎓】</strong> 自己申告のみによる進行を検知しました。現場で自分自身を守る『客観エビデンス必須ルール』を学んで再実行してください。</span>`;
     b.appendChild(banner);
   } else if (textStr.includes("ロールバック必須") || textStr.includes("BRANCH_ROLLBACK")) {
     const banner = el("div", "pair-check-box");
@@ -4023,7 +4798,16 @@ function renderReply(b, parts, saveHistory = true) {
   }
 
   if (textStr) {
-    b.appendChild(el("div", null, textStr));
+    const textDiv = el("div", "formatted-markdown-body");
+    textDiv.style.lineHeight = "1.55";
+    textDiv.innerHTML = formatMarkdownToHtml(textStr);
+    b.appendChild(textDiv);
+
+    if (appState.mode === "TRAINING" && ((textStr.includes("コースA") && textStr.includes("コースB")) || textStr.includes("2つのコース") || textStr.includes("HITMANクローン構築"))) {
+      const courseBox = el("div", "chat-course-showcase-container");
+      courseBox.innerHTML = getCourseCardsHtml(true);
+      b.appendChild(courseBox);
+    }
   }
 
   if (a2ui.length) {
@@ -4056,11 +4840,22 @@ async function sendMessage(text) {
   const b = bubble("agent");
   b.innerHTML = `<span style="color:#64748b;">HITMANが手順とログを検証中…</span>`;
 
+  const sendBtn = document.getElementById("send-btn");
+  const pasteBtn = document.getElementById("btn-trainer-paste-log");
+  if (sendBtn) sendBtn.disabled = true;
+  if (pasteBtn) pasteBtn.disabled = true;
+
   try {
     const res = await fetch("/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message: text, user_id: appState.userId })
+      body: JSON.stringify({
+        message: text,
+        user_id: appState.userId,
+        mode: appState.mode || "NORMAL",
+        course: appState.trainingCourse || "original",
+        current_step: appState.currentStep || "T-1"
+      })
     });
     const data = await res.json();
     if (data.metrics) {
@@ -4069,6 +4864,9 @@ async function sendMessage(text) {
     renderReply(b, data.parts || []);
   } catch (e) {
     b.textContent = "通信エラーが発生しました: " + e.message;
+  } finally {
+    if (sendBtn) sendBtn.disabled = false;
+    if (pasteBtn) pasteBtn.disabled = false;
   }
 }
 
@@ -4151,19 +4949,21 @@ async function processUploadedFile(file) {
     if (isSql) {
       appState.sqlContent = content;
       appState.sqlFileName = file.name;
-      document.getElementById("sql-viewer").textContent = content;
-      document.getElementById("sql-stat-label").textContent = `SQLファイル: ${file.name} (${content.split('\n').length}行)`;
+      const sv = document.getElementById("sql-viewer") || document.getElementById("log-viewer-content");
+      if (sv) sv.textContent = content;
+      const ssl = document.getElementById("sql-stat-label");
+      if (ssl) ssl.textContent = `SQLファイル: ${file.name} (${content.split('\n').length}行)`;
       switchTab('logs');
-      switchLogSubTab('sql');
       showToast(`📎 更新SQL「${file.name}」を読み込みました`);
     } else {
       input.value = content;
       autoResizeTextarea();
       appState.rawLog = content;
-      document.getElementById("raw-log-viewer").textContent = content;
-      document.getElementById("log-stat-label").textContent = `ログファイル: ${file.name} (${content.split('\n').length}行)`;
+      const lv = document.getElementById("raw-log-viewer") || document.getElementById("log-viewer-content");
+      if (lv) lv.textContent = content;
+      const lsl = document.getElementById("log-stat-label");
+      if (lsl) lsl.textContent = `ログファイル: ${file.name} (${content.split('\n').length}行)`;
       switchTab('logs');
-      switchLogSubTab('log');
       showToast(`📎 ログ「${file.name}」を読み込みました (${content.split('\n').length}行)`);
       input.focus();
     }
@@ -4209,7 +5009,18 @@ form.addEventListener("submit", (ev) => {
 
 // --- Initializer & Session Restore ---
 window.addEventListener("DOMContentLoaded", () => {
+  const urlParams = new URLSearchParams(window.location.search);
+  const modeParam = urlParams.get("mode");
+  const debugParam = urlParams.get("debug");
+
   const hasSaved = loadState();
+
+  if (modeParam && modeParam.toUpperCase() === "TRAINING") {
+    appState.mode = "TRAINING";
+  }
+  if (debugParam === "true") {
+    appState.trainerDebugMode = true;
+  }
 
   // Sync SOP from backend
   const curMode = appState.mode || "NORMAL";
@@ -4240,20 +5051,28 @@ window.addEventListener("DOMContentLoaded", () => {
       }
     });
     if (appState.rawLog) {
-      document.getElementById("raw-log-viewer").textContent = appState.rawLog;
-      document.getElementById("log-stat-label").textContent = `直近ログ (${appState.rawLog.split('\n').length}行)`;
+      const lv = document.getElementById("raw-log-viewer") || document.getElementById("log-viewer-content");
+      if (lv) lv.textContent = appState.rawLog;
+      const lsl = document.getElementById("log-stat-label");
+      if (lsl) lsl.textContent = `直近ログ (${appState.rawLog.split('\n').length}行)`;
     }
     if (appState.sqlContent) {
-      document.getElementById("sql-viewer").textContent = appState.sqlContent;
-      document.getElementById("sql-stat-label").textContent = `SQL: ${appState.sqlFileName || "db_update.sql"} (${appState.sqlContent.split('\n').length}行)`;
+      const sv = document.getElementById("sql-viewer") || document.getElementById("log-viewer-content");
+      if (sv) sv.textContent = appState.sqlContent;
+      const ssl = document.getElementById("sql-stat-label");
+      if (ssl) ssl.textContent = `SQL: ${appState.sqlFileName || "db_update.sql"} (${appState.sqlContent.split('\n').length}行)`;
     }
     showToast("✓ 前回の作業状態を復元しました（途中から再開可能です）");
   } else {
-    // Default initial agent greeting
-    const b = bubble("agent");
-    b.innerHTML = `こんにちは！Excel手順書AIペアオペレーター「HITMAN」です。<br>
+    if (appState.mode === "TRAINING") {
+      switchTrainingModeManual(true);
+    } else {
+      // Default initial agent greeting
+      const b = bubble("agent");
+      b.innerHTML = `こんにちは！Excel手順書AIペアオペレーター「HITMAN」です。<br>
 既存の手順書をインポートして安全にコマンドを抽出し、<strong>作業者＆AI有識者（確認者）のWチェック体制</strong>で自律判断・分岐制御・エビデンス保全を行います。<br><br>
-上部の「<strong>📤 手順書インポート</strong>」から自社手順書（Excel表コピー/Markdown/CSV）を取り込むか、または「<strong>▶ ステップ1開始</strong>」で標準リリース手順を開始してください。`;
+上部の「<strong>🎓 研修モード(T-1〜T-6)へ切替</strong>」または「<strong>▶ ステップ1開始</strong>」で作業を開始してください。`;
+    }
   }
 
   updateModeUI();

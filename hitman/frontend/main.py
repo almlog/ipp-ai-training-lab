@@ -16,7 +16,7 @@ import uuid
 from dotenv import load_dotenv
 import httpx
 from fastapi import FastAPI, File, Request, UploadFile
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 load_dotenv()
@@ -269,12 +269,32 @@ async def _chat_direct(user_id: str, message: str) -> list[dict]:
     return parts
 
 
+@app.get("/favicon.ico")
+async def favicon():
+    return Response(status_code=204)
+
+
 @app.post("/chat")
 async def chat(req: Request):
     t0 = time.perf_counter()
     body = await req.json()
     message = body.get("message", "").strip()
     user_id = body.get("user_id") or "web-user"
+    mode = body.get("mode")
+    course = body.get("course")
+    current_step = body.get("current_step")
+
+    if mode or course or current_step:
+        try:
+            import app.agent as agent_module
+            if mode:
+                agent_module.ACTIVE_OPERATION_MODE = mode
+            if course:
+                agent_module.ACTIVE_TRAINING_COURSE = course
+            if current_step:
+                agent_module.CURRENT_STEP = current_step
+        except Exception as ex:
+            logger.warning(f"Failed to sync agent state: {ex}")
 
     if not message:
         return JSONResponse({"parts": [], "metrics": None})
@@ -348,7 +368,10 @@ async def get_sop(mode: str = None, course: str = None, workspace: str = None, a
         get_active_parameters,
         get_active_sop,
         get_active_step_sequence,
+        set_operation_mode,
     )
+    if mode:
+        set_operation_mode(mode)
     custom_params = {}
     if workspace:
         custom_params["WORKSPACE_DIR"] = workspace
@@ -668,10 +691,19 @@ async def api_training_guidance(req: Request):
 
 
 
-# Static UI mount
+# Static UI mount with no-cache headers for index.html
 static_dir = os.path.join(os.path.dirname(__file__), "static")
 if not os.path.exists(static_dir):
     os.makedirs(static_dir, exist_ok=True)
+
+@app.get("/")
+async def serve_index():
+    idx_path = os.path.join(static_dir, "index.html")
+    response = FileResponse(idx_path)
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    return response
 
 app.mount("/", StaticFiles(directory=static_dir, html=True), name="static")
 

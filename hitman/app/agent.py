@@ -413,6 +413,7 @@ TRAINING_PARAMETERS = {
     "FALLBACK_MODEL": "gemini-3.6-flash",
     "REPO_URL": "https://github.com/almlog/altx-ai-training-lab.git",
 }
+DEFAULT_TRAINING_PARAMETERS = dict(TRAINING_PARAMETERS)
 
 TRAINING_APPROVAL_METADATA = {
     "author": "鈴木 駿平 (AltX Inc.)",
@@ -462,7 +463,7 @@ def set_training_course(course_type: str) -> dict:
     """研修モードの受講コース（'original': オリジナルAIツール, 'hitman_clone': HITMANクローン）を設定する。"""
     global ACTIVE_TRAINING_COURSE
     c = (course_type or "").strip().lower()
-    if "hitman" in c or "clone" in c or "クローン" in c:
+    if any(k in c for k in ("hitman", "clone", "クローン", "コースb", "コース b", "course_b", "course b", "b")):
         ACTIVE_TRAINING_COURSE = "hitman_clone"
     else:
         ACTIVE_TRAINING_COURSE = "original"
@@ -505,7 +506,7 @@ def set_training_environment(workspace_dir: str = "", agent_name: str = "", pyth
 def get_training_sop(course_type: str = None, params: dict = None) -> dict:
     """研修モードの指定コース用SOPを取得し、動的パラメータ（WORKSPACE_DIR, AGENT_NAME, PYTHON_ENV等）を展開して返却する。"""
     c = (course_type or ACTIVE_TRAINING_COURSE).lower()
-    is_hitman = "hitman" in c or "clone" in c or "クローン" in c
+    is_hitman = any(k in c for k in ("hitman", "clone", "クローン", "コースb", "コース b", "course_b", "course b", "b"))
     base_sop = copy.deepcopy(TRAINING_SOP_HITMAN_CLONE if is_hitman else TRAINING_SOP_ORIGINAL)
 
     p = dict(TRAINING_PARAMETERS)
@@ -648,6 +649,7 @@ def set_active_sop(
 
 def reset_active_sop() -> dict:
     global ACTIVE_SOP_DATABASE, ACTIVE_STEP_SEQUENCE, ACTIVE_PARAMETERS, ACTIVE_APPROVAL_METADATA, ACTIVE_BRANCH_RULES
+    global ACTIVE_OPERATION_MODE, ACTIVE_TRAINING_COURSE, TRAINING_PARAMETERS, ACTIVE_SUPERVISOR_NAME, ACTIVE_SUPERVISOR_ROLE
     ACTIVE_SOP_DATABASE = copy.deepcopy(DEFAULT_SOP_DATABASE)
     ACTIVE_STEP_SEQUENCE = list(STEP_SEQUENCE)
     ACTIVE_PARAMETERS = {}
@@ -660,6 +662,11 @@ def reset_active_sop() -> dict:
         "is_approved": True,
     }
     ACTIVE_BRANCH_RULES = {}
+    ACTIVE_OPERATION_MODE = MODE_NORMAL
+    ACTIVE_TRAINING_COURSE = "original"
+    TRAINING_PARAMETERS = dict(DEFAULT_TRAINING_PARAMETERS)
+    ACTIVE_SUPERVISOR_NAME = ""
+    ACTIVE_SUPERVISOR_ROLE = ""
     return ACTIVE_SOP_DATABASE
 
 
@@ -669,6 +676,8 @@ def import_excel_sop_procedure(file_input: str | bytes | io.BytesIO) -> dict:
     res = parse_excel_sop(file_input)
     if res.get("status") == "error":
         return res
+    global ACTIVE_OPERATION_MODE
+    ACTIVE_OPERATION_MODE = MODE_NORMAL
     set_active_sop(
         new_sop=res["sop_database"],
         new_seq=res["step_sequence"],
@@ -850,7 +859,25 @@ def get_procedure_step(step_number: int | str) -> dict:
     step_str = str(step_number).strip().upper()
     db = get_active_sop()
 
-    # トップレベル直接キー（例: 'T-1', 'T-2', 文字列キー）の検索
+    # 自動モード同期 & ロバスト検索: T-1 〜 T-6 等の研修ステップが要求された場合は、訓練用SOPを自動参照
+    if (step_str.startswith("T-") or "T-" in step_str) and step_str not in db:
+        global ACTIVE_OPERATION_MODE
+        ACTIVE_OPERATION_MODE = MODE_TRAINING
+        db = get_training_sop(ACTIVE_TRAINING_COURSE)
+
+    # 研修モード時のステップ番号エイリアス変換 (例: '1' -> 'T-1', '1-1' -> 'T-1')
+    if ACTIVE_OPERATION_MODE == MODE_TRAINING or ("T-1" in db and step_str not in db):
+        step_alias = {
+            "1": "T-1", "1-1": "T-1", "STEP1": "T-1", "STEP 1": "T-1",
+            "2": "T-2", "2-1": "T-2", "STEP2": "T-2", "STEP 2": "T-2",
+            "3": "T-3", "3-1": "T-3", "STEP3": "T-3", "STEP 3": "T-3",
+            "4": "T-4", "4-1": "T-4", "STEP4": "T-4", "STEP 4": "T-4",
+            "5": "T-5", "5-1": "T-5", "STEP5": "T-5", "STEP 5": "T-5",
+            "6": "T-6", "6-1": "T-6", "STEP6": "T-6", "STEP 6": "T-6",
+        }
+        if step_str in step_alias:
+            step_str = step_alias[step_str]
+
     if step_str in db:
         step = db[step_str]
         return {
@@ -954,6 +981,10 @@ def is_pure_assertion_without_log(raw: str) -> bool:
 
     clean = sanitize_terminal_log(raw).strip()
     clean_lower = clean.lower()
+
+    # 研修コース選択フレーズは口頭自己申告の判定対象外とする
+    if any(k in clean_lower for k in ("コースa", "コース a", "course a", "コースb", "コース b", "course b", "hitmanクローン", "hitman clone", "オリジナルツール", "自作ai", "hitman作成", "クローン構築")):
+        return False
 
     # 自己申告でよく使われるフレーズ
     assertion_phrases = [
@@ -1068,6 +1099,54 @@ def verify_step_output(step_number: int | str, command_output: str) -> dict:
     output_lower = compressed.lower()
     step_str = str(step_number).upper()
 
+    # 0. 研修モードにおける受講コース選択・変更要求の自動判別（自己申告差し戻し回避）
+    is_spec_or_code_log = any(k in output_lower for k in (
+        "hitman_spec.md", "project_brief.md", "cat ", "mkdir ", "git clone", "pytest",
+        "def ", "class ", "## 1.", "drwx", "-rw-r--r--", "filesystem", "total "
+    ))
+    is_explicit_course_btn = "【受講コース選択" in command_output or "受講コース確定" in command_output
+    is_course_switch_intent = any(k in output_lower for k in ("に変更", "に切替", "へ切替", "を選びます", "を選択します", "に進みます", "に進む", "で進める", "で行く", "でいきます"))
+
+    is_course_b_choice = not is_spec_or_code_log and (
+        is_explicit_course_btn and any(k in output_lower for k in ("コースb", "course b", "course_b", "hitman"))
+        or (step_str in ("T-1", "1-1", "1", "") and any(k in output_lower for k in ("コースb", "コース b", "hitmanクローン", "hitman clone", "クローン作成", "クローン構築", "hitman作成", "クローンへ", "クローンに", "コースbに進む")))
+        or (is_course_switch_intent and any(k in output_lower for k in ("コースb", "hitman")))
+    )
+    is_course_a_choice = not is_spec_or_code_log and (
+        is_explicit_course_btn and any(k in output_lower for k in ("コースa", "course a", "course_a", "オリジナル"))
+        or (step_str in ("T-1", "1-1", "1", "") and any(k in output_lower for k in ("コースa", "コース a", "オリジナル", "自作ai", "オリジナルツール", "自作アプリ", "コースaに進む")))
+        or (is_course_switch_intent and any(k in output_lower for k in ("コースa", "オリジナル", "自作")))
+    )
+
+    if is_course_b_choice:
+        set_training_course("hitman_clone")
+        return {
+            "verdict": "SUCCESS",
+            "w_check_status": "COURSE_SELECTED",
+            "step_id": "T-2",
+            "autonomous_verdict": "【AI講師 Wチェック承認 ✓】研修コースを「コースB: HITMANクローン構築」に確定しました。",
+            "message": (
+                "【受講コース確定: コースB（HITMANクローン構築）】\n"
+                "コースB（HITMANクローン構築体験）を選択いただきました！\n"
+                "HITMAN自身のExcel手順書パーサー、A2UIカード生成、および客観Wチェック判定ロジックを自律構築・デプロイします。\n"
+                "続いて『ステップ T-2: 仕様設計（hitman_spec.md策定）』へ進んでください。"
+            ),
+        }
+    elif is_course_a_choice:
+        set_training_course("original")
+        return {
+            "verdict": "SUCCESS",
+            "w_check_status": "COURSE_SELECTED",
+            "step_id": "T-2",
+            "autonomous_verdict": "【AI講師 Wチェック承認 ✓】研修コースを「コースA: オリジナルAIツール開発」に確定しました。",
+            "message": (
+                "【受講コース確定: コースA（オリジナルAIツール開発）】\n"
+                "コースA（オリジナルAIツール開発）を選択いただきました！\n"
+                "受講生ご自身の現場課題を解決する自作エージェントを企画・開発します。\n"
+                "続いて『ステップ T-2: 要件定義（project_brief.md策定）』へ進んでください。"
+            ),
+        }
+
     # 1. 致命的システム障害（データ破損・カーネルパニック・OOM） -> 緊急ロールバック (BRANCH_ROLLBACK -> R-1)
     fatal_keywords = [
         "segmentation fault", "kernel panic", "out of memory", "oom-killer",
@@ -1143,9 +1222,11 @@ def verify_step_output(step_number: int | str, command_output: str) -> dict:
                 "step_id": "T-1",
                 "autonomous_verdict": f"【AI確認者 Wチェック承認 ✓】作業ディレクトリ（{ws_cur}）の作成、リポジトリクローン、および環境構築を確認しました。",
                 "message": (
-                    "【判定: 合格】開発環境の準備、リポジトリクローン、スキル同期を客観確認しました！\n"
-                    f"作業フォルダ（{ws_cur}）とスキル群が正しくセットアップされています。\n"
-                    "続いて『ステップ T-2: 要件定義（Project Brief策定）』へ進んでください。"
+                    "【判定: 合格】（Wチェック承認: VERIFIED_APPROVED）\n"
+                    "開発環境の準備、リポジトリクローン、スキル同期を客観確認しました！\n"
+                    f"作業フォルダ（{ws_cur}）とスキル群が正しくセットアップされています（合格承認）。\n\n"
+                    "次のステップ ➔ ステップ T-2: アイデア策定・要件定義\n"
+                    "作成したいオリジナルAIツール（例: ログ解析Bot、障害要約ツール、ルービックキューブ解析AIなど）のアイデアを教えてください。アイデアが未定の場合は、HITMAN（ペアオペレーター）自身を自作するコースへの変更も可能です。"
                 ),
             }
 
@@ -1502,8 +1583,13 @@ def guide_training_app_creation(idea: str = "", course_type: str = "custom") -> 
             "status": "success",
             "course": "コースB: HITMAN作成コース（HITMANクローン構築体験）",
             "concept": "HITMAN自身のアーキテクチャ（Excel手順書パーサー、A2UIカード、客観Wチェック判定、エスカレーションゲート）を自ら構築・デプロイする王道コースです。",
+            "current_step": "T-2",
+            "step_id": "T-2",
+            "title": "ステップ T-2: HITMAN仕様設計＆SOP定義",
+            "command": "cat altx-agent-workspace/hitman_spec.md",
+            "objective": "Excel/CSV手順書データ構造、客観Wチェック判定、エスカレーション制御の仕様書 hitman_spec.md を作成する。",
             "recommended_steps": [
-                "T-1. 開発環境構築とスキル同期（モデル選定3.8/3.6、作業フォルダ作成、リポジトリクローン）",
+                "T-1. 開発環境構築とスキル同期（完了済）",
                 "T-2. HITMAN仕様設計（Excel手順書データ構造、客観Wチェック判定、エスカレ仕様）",
                 "T-3. 判定コア＆A2UI実装（手順書パーサー、ログ検証ロジック、A2UIカード生成）",
                 "T-4. 単体テスト＆Wチェック（自己申告差し戻しテスト、Pytest全件PASSED確認）",
@@ -1511,25 +1597,21 @@ def guide_training_app_creation(idea: str = "", course_type: str = "custom") -> 
                 "T-6. 個人GitHub公開＆修了証発行（publish-to-github、個人リポジトリ公開）",
             ],
             "prompt_for_antigravity": (
-                "【AntiGravity投入用プロンプト: コースB（HITMANクローン構築）】\n"
+                "【AntiGravity投入用プロンプト: Step T-2 (HITMANクローン構築)】\n"
                 "あなたは株式会社AltXのAI研修専属メンターです。\n"
-                "1. モデル選定: チャットのモデル設定でまず「gemini-3.8-flash」を選択してください。エラーや利用不可の場合は「gemini-3.6-flash」を選択してください。\n"
-                "2. 作業ディレクトリ: 「altx-agent-workspace」を作成し、以後のファイル作成や作業はすべてこのフォルダ内で行ってください。\n"
-                "3. リポジトリクローン:\n"
-                "   git clone https://github.com/almlog/altx-ai-training-lab.git\n"
-                "   を実行し、リポジトリ内の .agents/skills/ にある研修スキル群（pick-your-agent-project, build-agent-frontend, enable-a2ui 等）を読み込んで自己学習してください。\n"
-                "4. HITMANクローン作成:\n"
-                "   - Excel/CSV手順書の読み込みとA2UIカード出力\n"
-                "   - ターミナルログの客観Wチェック判定（自己申告は厳格差し戻し、エラー検知、合格承認）\n"
-                "   - Cloud Run へのデプロイ準備とPytest単体テスト\n"
-                "上記を伴走支援してください。"
+                "AIペアオペレーター「HITMAN」クローンの仕様を設計します。\n"
+                "1. Excel/CSV手順書を読み込むデータ構造\n"
+                "2. ターミナルログを検証するWチェック判定ルール（正常合格、エラー検知、自己申告遮断）\n"
+                "3. 上長協議エスカレーションゲートの仕様\n"
+                "以上の設計を「altx-agent-workspace/hitman_spec.md」として作成し、内容を出力してください。"
             ),
             "message": (
-                "【研修モード: コースB（HITMANクローン構築コース）へようこそ！】\n"
-                "アイデアがまだ浮かばなくても全く問題ありません！まずはこのHITMAN（AIペアオペレーター）自身を"
-                "自分の手で作成・デプロイしてみましょう。手順書パーサー、A2UI表示、客観Wチェック判定の仕組みを"
-                "体験することで、実践的なAIエージェント開発の神髄をマスターできます。\n"
-                "画面左側の手順ステップ『T-1: 開発環境構築とスキル同期』から順に進めてください。"
+                "【コース確定: コースB（HITMANクローン構築コース）へようこそ！】\n"
+                "HITMAN（AIペアオペレーター）自身を自分の手で作成・デプロイする王道コースを開始します！\n"
+                "手順書パーサー、A2UIカード生成、客観Wチェック判定ロジックを実装していきましょう。\n\n"
+                "【次のアクション（ステップ T-2: HITMAN仕様設計＆SOP定義）】\n"
+                "AntiGravityの開発環境にて上記のプロンプトを投入し、仕様書「altx-agent-workspace/hitman_spec.md」を作成してください。\n"
+                "作成後、ターミナルで `cat altx-agent-workspace/hitman_spec.md` を実行したログを本チャットに貼り付けてください。客観Wチェック後にステップ T-3 へ進みます！"
             ),
         }
 
@@ -1538,6 +1620,11 @@ def guide_training_app_creation(idea: str = "", course_type: str = "custom") -> 
         "status": "success",
         "course": "コースA: オリジナルアプリ開発コース（自作AIツール開発）",
         "user_idea": idea_clean or "現場課題を解決するオリジナルAIエージェント",
+        "current_step": "T-2",
+        "step_id": "T-2",
+        "title": "ステップ T-2: オリジナル企画＆要件定義（Project Brief策定）",
+        "command": "cat altx-agent-workspace/project_brief.md",
+        "objective": f"企画『{idea_clean or '現場課題を解決する自作エージェント'}』の要件定義書 project_brief.md を作成し、catログを提出する。",
         "recommended_architecture": {
             "framework": "Google ADK (Agent Development Kit) + Python",
             "model": "gemini-3.8-flash (未提供・エラー時は gemini-3.6-flash)",
@@ -1546,22 +1633,25 @@ def guide_training_app_creation(idea: str = "", course_type: str = "custom") -> 
             "skills": "pick-your-agent-project, build-agent-frontend, enable-a2ui, publish-to-github",
         },
         "prompt_for_antigravity": (
-            f"【AntiGravity投入用プロンプト: コースA（オリジナルAI開発）】\n"
+            f"【AntiGravity投入用プロンプト: Step T-2（企画『{idea_clean or '自作エージェント'}』要件定義）】\n"
             f"受講生オリジナル企画: 『{idea_clean or '現場課題を解決する自作エージェント'}』\n"
             f"あなたは株式会社AltXのAI研修専属メンターです。\n"
-            f"1. モデル選定: チャットのモデル設定でまず「gemini-3.8-flash」を選択してください。エラーや利用不可の場合は「gemini-3.6-flash」を選択してください。\n"
-            f"2. 作業ディレクトリ: 「altx-agent-workspace」を作成し、以後のファイル作成や作業はすべてこのフォルダ内で行ってください。\n"
-            f"3. リポジトリクローン:\n"
-            f"   git clone https://github.com/almlog/altx-ai-training-lab.git\n"
-            f"   を実行し、リポジトリ内の .agents/skills/ にある研修スキル群（pick-your-agent-project, build-agent-frontend, enable-a2ui 等）を読み込んで自己学習してください。\n"
-            f"4. エージェント開発:\n"
-            f"   スキル「pick-your-agent-project」を活用して要件定義（project_brief.md）を作成し、自作関数ツール、A2UIカード表示、テスト、Cloud Runデプロイまでを伴走支援してください。"
+            f".agents/skills/ にある pick-your-agent-project スキルを活用し、受講生の企画『{idea_clean or '自作エージェント'}』の要件定義書「altx-agent-workspace/project_brief.md」を作成してください。\n"
+            f"以下の項目を必ず含めてください：\n"
+            f"1. エージェント名と目的（解決する課題: {idea_clean or '自作エージェント'}）\n"
+            f"2. 使用するモデル（gemini-3.8-flash または 3.6-flash）\n"
+            f"3. 必要な関数ツール定義（自作ツール最低1つ）\n"
+            f"4. A2UIカード表示仕様（カードレイアウト）\n"
+            f"5. 長期記憶（Memory Bank）活用方針\n"
+            f"作成完了後、ファイルの内容を出力してください。"
         ),
         "message": (
-            f"【研修モード: コースA（オリジナルアプリ企画『{idea_clean or '自作エージェント'}』）】\n"
-            f"素晴らしいアイデアです！この課題を解決するAIエージェントを構築していきましょう。\n"
-            f"HITMANの構造（事前確認ゲート、客観ログ検証、A2UI表示）を取り入れることで、"
-            f"現場で安全に使える実用的なツールが完成します。画面左側の手順ステップ『T-1: 開発環境構築とスキル同期』から進めてください。"
+            f"【コース確定: コースA（オリジナルアプリ企画『{idea_clean or '自作エージェント'}』）】\n"
+            f"素晴らしいアイデアですね！「{idea_clean or '自作エージェント'}」の企画・要件定義を進めていきましょう。\n"
+            f"現場で役立つ実用的なAIエージェントとして形にしていくため、まずは要件定義書（project_brief.md）を策定します。\n\n"
+            f"【次のアクション（ステップ T-2: アイデア策定＆要件定義）】\n"
+            f"AntiGravityの開発環境にて、提示されたプロンプトを投入して「altx-agent-workspace/project_brief.md」を作成してください。\n"
+            f"作成後、ターミナルで `cat altx-agent-workspace/project_brief.md` を実行し、その出力ログを本チャットに貼り付けてください。客観Wチェック後にステップ T-3（エージェント実装）へ進みます！"
         ),
     }
 
@@ -1892,8 +1982,12 @@ a2ui_instruction = schema_manager.generate_system_prompt(
         "ただし現場のやむを得ない事情でスキップする場合、利用者の責任において『上長氏名・役職』『具体的理由』『リスク受容の同意』が明文化された指示があった場合に限り、`request_supervisor_step_skip` ツールで例外スキップとして監査ログに記録してください。"
         "3. 【研修モード (TRAINING)】: 株式会社ＡｌｔＸのAI実践研修用特別モード。"
         "受講生がHITMANの手順書を活用しながら、現場課題を解決するオリジナルアプリ（AIエージェント・自動化ツール）を作成・デプロイする体験を熱心に伴走支援してください。"
-        "自作アプリのアイデアがまだ思いつかない受講生には、`guide_training_app_creation` を呼び出し、『HITMAN（ペアオペレーター）自身の作成・デプロイ』を体験するコースを案内してください。"
         "受講生が自己申告を入力した際は、なぜ本番運用で客観証拠が必要なのかを教育的に解説し、指定コマンドの実行を優しく促してください。"
+        "【重要: 研修コース選択および自作アプリ企画・アイデア入力時の規程】"
+        "受講生から『コースA』『コースB』『HITMANクローン』『オリジナル開発』などのコース選択や進路、あるいは『〜〜を作りたい』『〜〜のアプリ』などのオリジナル企画・アイデアが入力された場合は、決して `verify_step_output` で自己申告違反として差し戻してはなりません。"
+        "直ちに `guide_training_app_creation` ツールを呼び出してアイデアを承認・具体化し、選択されたコースの『ステップ T-2: 要件定義・仕様策定』の手順カード（A2UI: コースAなら command='cat altx-agent-workspace/project_brief.md', コースBなら command='cat altx-agent-workspace/hitman_spec.md'）を必ず提示してください。"
+        "【重要禁則事項】受講生は既にステップ T-1（環境構築・スキル同期）を完了・合格しています。受講生のアイデアに対して決してステップ T-1 へ巻き戻したり、「環境構築を行ってください」「ステップ T-1 を実施してください」と指示してはなりません！必ず『ステップ T-2: アイデア策定・要件定義』として前進させてください。"
+        "【重要: 研修ステップ提出時の客観Wチェック規程】受講生からステップ T-1〜T-6 の各コードや実行ログ（ファイル内容・コマンド実行結果等）が提出された際は、必ず `verify_step_output` ツールを呼び出して客観検証を行い、その判定結果（【判定: 合格】（Wチェック承認: VERIFIED_APPROVED））をメッセージ冒頭に明記して、次のステップの手順カード（A2UI）を提示してください。"
         "【手順進行・運用ルール】"
         "4. 手順は原則 1-1 -> 1-2 -> 2-1 -> 2-2 -> 3-1 -> 3-2 -> 3-3 -> 3-4 -> 4-1 -> 4-2 の厳格な順序で1つずつ進めなければなりません。"
         "直前手順が合格していない状態での後続要求は『直前の手順が未完了です』と差し戻してください（ロールバック R-1/R-2、エスカレ E-1、上長責任スキップを除く）。"
