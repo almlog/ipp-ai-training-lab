@@ -39,20 +39,36 @@
   header {
     background: #0f172a;
     color: #fff;
-    padding: 0.65rem 1.2rem;
+    padding: 0.45rem 1rem;
     display: flex;
     align-items: center;
     justify-content: space-between;
     border-bottom: 1px solid #334155;
     height: 52px;
     flex-shrink: 0;
+    gap: 0.6rem;
+    box-sizing: border-box;
   }
   .header-brand {
     display: flex;
     align-items: center;
-    gap: 0.6rem;
+    gap: 0.5rem;
     font-size: 1.05rem;
     font-weight: 700;
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+  .header-copyright {
+    font-size: 0.7rem;
+    color: #94a3b8;
+    font-weight: 400;
+    margin-left: 0.4rem;
+    white-space: nowrap;
+  }
+  @media (max-width: 1400px) {
+    .header-copyright {
+      display: none;
+    }
   }
   .header-badge {
     background: #2563eb;
@@ -60,46 +76,71 @@
     padding: 0.2rem 0.6rem;
     border-radius: 9999px;
     font-weight: 500;
+    white-space: nowrap;
+    flex-shrink: 0;
   }
   
-.cost-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  padding: 0.3rem 0.65rem;
-  background: rgba(234, 179, 8, 0.14);
-  border: 1px solid rgba(234, 179, 8, 0.4);
-  border-radius: 9999px;
-  font-size: 0.76rem;
-  font-weight: 600;
-  color: #fef08a;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  white-space: nowrap;
-}
-.cost-badge:hover {
-  background: rgba(234, 179, 8, 0.24);
-  border-color: #facc15;
-  transform: translateY(-1px);
-}
+  .cost-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.25rem 0.55rem;
+    background: rgba(234, 179, 8, 0.14);
+    border: 1px solid rgba(234, 179, 8, 0.4);
+    border-radius: 9999px;
+    font-size: 0.74rem;
+    font-weight: 600;
+    color: #fef08a;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .cost-badge:hover {
+    background: rgba(234, 179, 8, 0.24);
+    border-color: #facc15;
+    transform: translateY(-1px);
+  }
 
-.header-actions {
+  .header-actions {
     display: flex;
     align-items: center;
-    gap: 0.8rem;
+    gap: 0.45rem;
+    flex-shrink: 0;
+    white-space: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
   }
+  .header-actions > * {
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+  .header-actions .hdr-btn-txt-short {
+    display: none;
+  }
+  @media (max-width: 1350px) {
+    .header-actions .hdr-btn-txt-long {
+      display: none;
+    }
+    .header-actions .hdr-btn-txt-short {
+      display: inline;
+    }
+  }
+
   .btn-reset {
     background: #334155;
     color: #f1f5f9;
     border: 1px solid #475569;
     border-radius: 6px;
-    padding: 0.35rem 0.75rem;
-    font-size: 0.8rem;
+    padding: 0.32rem 0.65rem;
+    font-size: 0.78rem;
     cursor: pointer;
-    display: flex;
+    display: inline-flex;
     align-items: center;
     gap: 0.3rem;
     transition: all 0.2s;
+    white-space: nowrap;
+    flex-shrink: 0;
   }
   .btn-reset:hover {
     background: #dc2626;
@@ -107,11 +148,13 @@
     border-color: #ef4444;
   }
   .header-status {
-    display: flex;
+    display: inline-flex;
     align-items: center;
-    gap: 0.4rem;
-    font-size: 0.8rem;
+    gap: 0.35rem;
+    font-size: 0.78rem;
     color: #94a3b8;
+    white-space: nowrap;
+    flex-shrink: 0;
   }
   .status-dot {
     width: 8px;
@@ -119,17 +162,20 @@
     background: #22c55e;
     border-radius: 50%;
     box-shadow: 0 0 8px #22c55e;
+    flex-shrink: 0;
   }
   .mode-badge {
     padding: 0.25rem 0.65rem;
     border-radius: 9999px;
     font-size: 0.76rem;
     font-weight: 700;
-    display: flex;
+    display: inline-flex;
     align-items: center;
     gap: 0.35rem;
     letter-spacing: 0.02em;
     transition: all 0.3s;
+    white-space: nowrap;
+    flex-shrink: 0;
   }
   .mode-normal {
     background: #065f46;
@@ -149,22 +195,19 @@
     box-shadow: 0 0 10px rgba(245, 158, 11, 0.4);
     animation: specialPulse 2s infinite;
   }
-  .cost-badge {
-    padding: 0.25rem 0.45rem;
-    font-size: 0.72rem;
-    max-width: 145px;
-  }
   .mode-select-hdr {
     background: #1e293b;
     color: #f1f5f9;
     border: 1px solid #475569;
     border-radius: 6px;
-    padding: 0.3rem 0.6rem;
-    font-size: 0.78rem;
+    padding: 0.28rem 0.5rem;
+    font-size: 0.76rem;
     font-weight: 600;
     cursor: pointer;
     outline: none;
     transition: all 0.2s;
+    white-space: nowrap;
+    flex-shrink: 0;
   }
   .mode-select-hdr:hover, .mode-select-hdr:focus {
     border-color: #38bdf8;
@@ -179,14 +222,16 @@
     color: #38bdf8;
     border: 1px solid #0284c7;
     border-radius: 6px;
-    padding: 0.35rem 0.75rem;
-    font-size: 0.8rem;
+    padding: 0.32rem 0.65rem;
+    font-size: 0.78rem;
     font-weight: 600;
     cursor: pointer;
-    display: flex;
+    display: inline-flex;
     align-items: center;
-    gap: 0.35rem;
+    gap: 0.3rem;
     transition: all 0.2s;
+    white-space: nowrap;
+    flex-shrink: 0;
   }
   .btn-report-hdr:hover {
     background: #0284c7;
@@ -685,6 +730,11 @@
     background: #fef3c7;
     border-color: #fcd34d;
     color: #92400e;
+  }
+  .flow-banner.success {
+    background: #f0fdf4;
+    border-color: #86efac;
+    color: #166534;
   }
 
   .two-person-banner {
@@ -1382,7 +1432,7 @@
   .sop-meta-card {
     background: #ffffff;
     border-bottom: 1px solid var(--border);
-    padding: 0.65rem 0.85rem;
+    padding: 0.55rem 0.85rem;
     font-size: 0.78rem;
   }
   .approval-card-row {
@@ -1390,12 +1440,14 @@
     align-items: center;
     justify-content: space-between;
     gap: 0.6rem;
+    flex-wrap: wrap;
   }
   .approval-stamp-group {
     display: flex;
     align-items: center;
     gap: 0.6rem;
     min-width: 0;
+    flex: 1 1 auto;
   }
   .seal-stamp {
     width: 44px;
@@ -1428,14 +1480,14 @@
     flex-direction: column;
     gap: 0.15rem;
     min-width: 0;
+    flex: 1 1 auto;
   }
   .approval-title-txt {
     font-weight: 700;
     color: #0f172a;
-    font-size: 0.82rem;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    font-size: 0.84rem;
+    line-height: 1.35;
+    word-break: break-word;
   }
   .approval-sub-txt {
     font-size: 0.72rem;
@@ -1443,32 +1495,86 @@
     display: flex;
     gap: 0.5rem;
     flex-wrap: wrap;
+    line-height: 1.3;
   }
   .param-badge-resolved {
     background: #dcfce7;
     color: #15803d;
-    font-size: 0.7rem;
-    padding: 0.15rem 0.5rem;
+    font-size: 0.72rem;
+    padding: 0.2rem 0.55rem;
     border-radius: 9999px;
     font-weight: 700;
     border: 1px solid #bbf7d0;
     display: inline-flex;
     align-items: center;
-    gap: 0.2rem;
+    gap: 0.25rem;
     white-space: nowrap;
+    flex-shrink: 0;
   }
   .param-badge-warning {
     background: #fef3c7;
     color: #b45309;
-    font-size: 0.7rem;
-    padding: 0.15rem 0.5rem;
+    font-size: 0.72rem;
+    padding: 0.2rem 0.55rem;
     border-radius: 9999px;
     font-weight: 700;
     border: 1px solid #fde68a;
     display: inline-flex;
     align-items: center;
-    gap: 0.2rem;
+    gap: 0.25rem;
     white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  /* Training mode header in Left Panel */
+  .training-meta-card-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+  }
+  .training-meta-left {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    min-width: 0;
+  }
+  .training-lab-icon-box {
+    width: 38px;
+    height: 38px;
+    border-radius: 8px;
+    background: #eff6ff;
+    border: 1px solid #bfdbfe;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .training-lab-text {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+  }
+  .training-lab-title {
+    font-size: 0.86rem;
+    font-weight: 800;
+    color: #1e3a8a;
+    letter-spacing: -0.01em;
+  }
+  .training-lab-sub {
+    font-size: 0.72rem;
+    color: #64748b;
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    flex-wrap: wrap;
+  }
+  .training-meta-right {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    flex-shrink: 0;
   }
   .params-accordion {
     margin-top: 0.45rem;
@@ -1952,7 +2058,7 @@ html, body {
     <span class="material-symbols-outlined" style="color:#60a5fa;">terminal</span>
     <span>HITMAN</span>
     <span class="header-badge">SOP AI Pair Operator</span>
-    <span style="font-size:0.7rem; color:#94a3b8; font-weight:400; margin-left:0.5rem;">© 2026 Shunpei Suzuki (AltX Inc.)</span>
+    <span class="header-copyright">© 2026 Shunpei Suzuki (AltX Inc.)</span>
   </div>
   <div class="header-actions">
     <div id="cost-badge" class="cost-badge" onclick="openReportModal()" title="現在のセッションにおける推定利用料金（Gemini 2.5 Flash + Cloud Run）。クリックで詳細レポートを表示">
@@ -1966,7 +2072,7 @@ html, body {
     </select>
     <div id="mode-badge" class="mode-badge mode-normal">
       <span class="material-symbols-outlined" style="font-size:15px;" id="mode-badge-icon">check_circle</span>
-      <span id="mode-badge-text">通常モード（1名体制）</span>
+      <span id="mode-badge-text">🟢 現場Wチェック体制</span>
     </div>
     <div id="header-training-course-badge" class="header-course-badge" style="display:none;" onclick="toggleCourseCardCollapse()" title="受講コース（クリックでメニュー開閉）">
       <span class="material-symbols-outlined" style="font-size:15px;" id="header-course-badge-icon">rocket_launch</span>
@@ -1975,15 +2081,18 @@ html, body {
     </div>
     <button class="btn-report-hdr" style="border-color:#3b82f6;color:#93c5fd;" onclick="openImportModal()" title="自社や既存のExcel/CSV/Markdown手順書を取り込んでAIペア作業を開始">
       <span class="material-symbols-outlined" style="font-size:16px;">upload_file</span>
-      <span>手順書インポート</span>
+      <span class="hdr-btn-txt-long">手順書インポート</span>
+      <span class="hdr-btn-txt-short">インポート</span>
     </button>
     <button class="btn-report-hdr" onclick="openReportModal()" title="作業前後の結果比較・所要時間・成果物評価レポートを表示">
       <span class="material-symbols-outlined" style="font-size:16px;">assessment</span>
-      <span>最終評価レポート</span>
+      <span class="hdr-btn-txt-long">最終評価レポート</span>
+      <span class="hdr-btn-txt-short">最終レポート</span>
     </button>
     <button type="button" class="btn-test-log-hdr" id="btn-hdr-test-log" onclick="openTestEvidencesModal()" title="講師・検証用: T-1〜T-6の合格生ログを確認・入力欄に注入">
       <span class="material-symbols-outlined" style="font-size:16px;color:#c084fc;">terminal</span>
-      <span>🧪 テストログ集</span>
+      <span class="hdr-btn-txt-long">🧪 テストログ集</span>
+      <span class="hdr-btn-txt-short">🧪 ログ集</span>
     </button>
     <div class="header-status">
       <div class="status-dot"></div>
@@ -1991,7 +2100,8 @@ html, body {
     </div>
     <button class="btn-reset" onclick="resetSessionConfirm()" title="現在の作業状態と履歴をリセットして新規開始">
       <span class="material-symbols-outlined" style="font-size:16px;">restart_alt</span>
-      <span>新規作業開始</span>
+      <span class="hdr-btn-txt-long">新規作業開始</span>
+      <span class="hdr-btn-txt-short">リセット</span>
     </button>
   </div>
 </header>
@@ -2015,7 +2125,8 @@ html, body {
   <div id="left-panel">
     <!-- Human Approval Record & Resolved Parameters Header -->
     <div id="sop-meta-card" class="sop-meta-card">
-      <div class="approval-card-row">
+      <!-- Standard Approval View for Normal and Special Modes -->
+      <div id="meta-view-normal" class="approval-card-row">
         <div class="approval-stamp-group">
           <div id="seal-stamp" class="seal-stamp">
             <span id="seal-stamp-status">承認済</span>
@@ -2037,6 +2148,34 @@ html, body {
           <span id="meta-param-badge-text">全パラメータ解決済</span>
         </div>
       </div>
+
+      <!-- Dedicated Clean View for Training Mode -->
+      <div id="meta-view-training" class="training-meta-card-row" style="display:none;">
+        <div class="training-meta-left">
+          <div class="training-lab-icon-box">
+            <span class="material-symbols-outlined" style="font-size:22px;color:#2563eb;">school</span>
+          </div>
+          <div class="training-lab-text">
+            <div class="training-lab-title">AltX AI実践研修 開発ラボ</div>
+            <div class="training-lab-sub">
+              <span>メンター: <strong>AntiGravity</strong></span>
+              <span>｜</span>
+              <span>客観検証: <strong>HITMAN (AI有識者)</strong></span>
+            </div>
+          </div>
+        </div>
+        <div class="training-meta-right">
+          <div class="param-badge-resolved" title="研修環境パラメータが自動展開されています">
+            <span class="material-symbols-outlined" style="font-size:14px;">task_alt</span>
+            <span>パラメータ <span id="training-meta-param-count">7</span>件 ✓</span>
+          </div>
+          <button type="button" class="btn-config-env" onclick="openTrainingEnvModal()" title="作業フォルダ・パス・エージェント名・仮想環境設定を変更">
+            <span class="material-symbols-outlined" style="font-size:13px;">settings</span>
+            <span>⚙️ 研修環境設定</span>
+          </button>
+        </div>
+      </div>
+
       <!-- Collapsible Parameters -->
       <details class="params-accordion" id="params-details">
         <summary>
@@ -2949,6 +3088,21 @@ function renderApprovalAndParameters() {
   const params = appState.parameters || {};
   const pKeys = Object.keys(params);
 
+  // Toggle between Normal and Training views in left panel top card
+  const viewNormal = document.getElementById("meta-view-normal");
+  const viewTraining = document.getElementById("meta-view-training");
+  if (viewNormal && viewTraining) {
+    if (appState.mode === "TRAINING") {
+      viewNormal.style.display = "none";
+      viewTraining.style.display = "flex";
+      const trainingParamCountEl = document.getElementById("training-meta-param-count");
+      if (trainingParamCountEl) trainingParamCountEl.textContent = pKeys.length;
+    } else {
+      viewNormal.style.display = "flex";
+      viewTraining.style.display = "none";
+    }
+  }
+
   const sealEl = document.getElementById("seal-stamp");
   const sealStatusEl = document.getElementById("seal-stamp-status");
   const titleEl = document.getElementById("meta-work-title");
@@ -2977,10 +3131,7 @@ function renderApprovalAndParameters() {
   }
 
   if (badgeEl && badgeTextEl) {
-    if (appState.mode === "TRAINING") {
-      badgeEl.className = "param-badge-resolved";
-      badgeTextEl.innerHTML = `<span style="margin-right:4px;">全パラメータ設定済 (${pKeys.length}件) ✓</span> <button type="button" class="btn-config-env" onclick="openTrainingEnvModal()" title="作業フォルダ・パス・エージェント名・仮想環境設定を変更"><span class="material-symbols-outlined" style="font-size:13px;">settings</span><span>⚙️ 研修環境設定</span></button>`;
-    } else if (pKeys.length > 0) {
+    if (pKeys.length > 0) {
       badgeEl.className = "param-badge-resolved";
       badgeTextEl.textContent = `全パラメータ解決済 (${pKeys.length}件) ✓`;
     } else {
@@ -3128,9 +3279,12 @@ function updateModeUI() {
   const isDebugEnabled = appState.trainerDebugMode !== false;
 
   if (appState.mode === "SPECIAL_PAIR") {
-    badge.className = "mode-badge mode-special";
-    badgeIcon.textContent = "group";
-    badgeText.textContent = `特別モード: 2人体制（ペア: ${appState.userId} / ${appState.supervisorName || "上長"}）`;
+    if (badge) {
+      badge.style.display = "inline-flex";
+      badge.className = "mode-badge mode-special";
+      if (badgeIcon) badgeIcon.textContent = "group";
+      if (badgeText) badgeText.textContent = "👥 特別2人体制";
+    }
     twoPersonBanner.style.display = "flex";
     twoPersonText.textContent = `【特別モード: 2人体制（上長ペア作業中）】上長: ${appState.supervisorName || "上長"} / 作業者: ${appState.userId}。後続の全コマンド投入は相互ダブルチェックを行ってください。`;
     if (chipTrainingIdea) chipTrainingIdea.style.display = "none";
@@ -3138,19 +3292,21 @@ function updateModeUI() {
     if (chipTrainingDummyLog) chipTrainingDummyLog.style.display = "none";
     if (chipSupervisorSkip) chipSupervisorSkip.style.display = "inline-flex";
   } else if (appState.mode === "TRAINING") {
-    badge.className = "mode-badge mode-training";
-    badgeIcon.textContent = "school";
-    const cLabel = appState.trainingCourse === "hitman_clone" ? "コースB: HITMANクローン" : "コースA: 自作AI開発";
-    badgeText.textContent = `研修モード（${cLabel}）`;
+    // In Training mode, #header-training-course-badge is displayed right next to mode select,
+    // so hide #mode-badge to eliminate duplicate redundant pill!
+    if (badge) badge.style.display = "none";
     twoPersonBanner.style.display = "none";
     if (chipTrainingIdea) chipTrainingIdea.style.display = "inline-flex";
     if (chipTrainingHitman) chipTrainingHitman.style.display = "inline-flex";
     if (chipTrainingDummyLog) chipTrainingDummyLog.style.display = isDebugEnabled ? "inline-flex" : "none";
     if (chipSupervisorSkip) chipSupervisorSkip.style.display = "none";
   } else {
-    badge.className = "mode-badge mode-normal";
-    badgeIcon.textContent = "check_circle";
-    badgeText.textContent = "通常モード（1名体制・Wチェック）";
+    if (badge) {
+      badge.style.display = "inline-flex";
+      badge.className = "mode-badge mode-normal";
+      if (badgeIcon) badgeIcon.textContent = "check_circle";
+      if (badgeText) badgeText.textContent = "🟢 現場Wチェック体制";
+    }
     twoPersonBanner.style.display = "none";
     if (chipTrainingIdea) chipTrainingIdea.style.display = "none";
     if (chipTrainingHitman) chipTrainingHitman.style.display = "none";
@@ -3196,6 +3352,7 @@ function updateModeUI() {
       ? "🎓 研修モード: 質問、自作アプリの相談、または実行ログを送信…"
       : "メッセージ、またはTeraTermログを貼り付けて送信…";
   }
+  renderApprovalAndParameters();
 }
 
 async function changeOperationModeFromHdr(newMode) {
@@ -3290,11 +3447,19 @@ async function switchTrainingCourse(course) {
 // --- Training Environment Customization Logic ---
 function resolveStepVariables(text) {
   if (!text) return "";
-  const ws = (appState.parameters && appState.parameters["WORKSPACE_DIR"]) || "altx-agent-workspace";
-  const agentName = (appState.parameters && appState.parameters["AGENT_NAME"]) || (appState.trainingCourse === "hitman_clone" ? "my_hitman" : "my_agent");
-  const pyEnv = (appState.parameters && appState.parameters["PYTHON_ENV"]) || "uv (自動管理)";
+  let res = text;
+  const params = appState.parameters || {};
+  for (const [k, v] of Object.entries(params)) {
+    if (v != null) {
+      res = res.replaceAll("${" + k + "}", String(v));
+    }
+  }
 
-  let res = text
+  const ws = params["WORKSPACE_DIR"] || "altx-agent-workspace";
+  const agentName = params["AGENT_NAME"] || (appState.trainingCourse === "hitman_clone" ? "my_hitman" : "my_agent");
+  const pyEnv = params["PYTHON_ENV"] || "uv (自動管理)";
+
+  res = res
     .replaceAll("${WORKSPACE_DIR}", ws)
     .replaceAll("${AGENT_NAME}", agentName)
     .replaceAll("${PYTHON_ENV}", pyEnv);
@@ -4125,10 +4290,27 @@ async function triggerAnalyzeSqlImpact() {
 
 // --- Final Evaluation Report View & Export ---
 function renderFinalReportView() {
-  const sTime = appState.startTime || "2026-09-06 00:00:00";
-  const eTime = appState.endTime || new Date().toLocaleString('ja-JP');
-  const duration = appState.startTime ? Math.max(1, Math.round((new Date() - new Date(appState.startTime)) / 60000)) : 18;
+  const formatTime = (t) => {
+    if (!t) return new Date().toLocaleString('ja-JP');
+    if (typeof t === 'number') return new Date(t).toLocaleString('ja-JP');
+    return t;
+  };
+  const sTime = formatTime(appState.startTime);
+  const eTime = formatTime(appState.endTime);
+  let duration = 18;
+  if (appState.startTime) {
+    const diff = Math.round((new Date() - new Date(appState.startTime)) / 60000);
+    if (!isNaN(diff) && diff > 0) duration = diff;
+  }
   const isSpecial = appState.mode === "SPECIAL_PAIR";
+  const isTraining = appState.mode === "TRAINING";
+  const courseLabel = appState.trainingCourse === "hitman_clone" ? "コースB: HITMANクローン構築" : "コースA: オリジナルAIツール開発";
+
+  const targetSteps = SOP_ITEMS.filter(s => !s.isRollback && !s.isEscalation);
+  const totalCount = targetSteps.length;
+  const completedCount = targetSteps.filter(s => appState.sopResults[s.id] && appState.sopResults[s.id].verdict === "SUCCESS").length;
+  const isAllDone = totalCount > 0 && completedCount === totalCount;
+  const pct = Math.round((completedCount / (totalCount || 1)) * 100);
 
   const cm = appState.costMetrics || {
     totalPromptTokens: 0,
@@ -4149,17 +4331,159 @@ function renderFinalReportView() {
   const humanCost = Math.round(duration * (5000 / 60));
   const savedCost = Math.max(0, humanCost - Math.ceil(totCost));
 
+  let scoreTitle = "総合評価スコア";
+  let scoreVal = "";
+  let scoreDesc = "";
+  let scoreIcon = "workspace_premium";
+  let scoreColor = "#16a34a";
+
+  if (isTraining) {
+    if (isAllDone) {
+      scoreVal = "S+ ランク（全工程自律完走・客観Wチェック全件承認・Cloud Run本番公開）";
+      scoreDesc = "現場課題の要件定義からADKエージェント実装、単体テスト、Cloud Runコンテナデプロイ、GitHub公開までの全6ステップを客観判定クリアし完全習得されました。";
+      scoreIcon = "school";
+      scoreColor = "#2563eb";
+    } else {
+      scoreVal = `進行中（${completedCount} / ${totalCount} ステップ完了・進捗 ${pct}%）`;
+      scoreDesc = `現在ステップ ${appState.currentStep} を実践中。AntiGravityと連携して各ステップを完走してください。`;
+      scoreIcon = "pending_actions";
+      scoreColor = "#0284c7";
+    }
+  } else if (isSpecial) {
+    scoreVal = "A ランク（特別対応2人体制による安全完遂）";
+    scoreDesc = "想定外事象に対し、エスカレーションゲートにて客観的判断根拠を確定の上、上長とのペア作業で安全に完遂しました。";
+    scoreIcon = "verified_user";
+    scoreColor = "#7c3aed";
+  } else {
+    if (isAllDone) {
+      scoreVal = "S ランク（手順書完全準拠・ノーエラー・安全完了）";
+      scoreDesc = "全サブステップの事前確認およびログ検証をクリアし、手順書通り安全にリリースを完了しました。";
+    } else {
+      scoreVal = `進行中（${completedCount} / ${totalCount} ステップ完了・進捗 ${pct}%）`;
+      scoreDesc = `現在の作業位置: ステップ ${appState.currentStep}。手順に沿って安全に作業を進めてください。`;
+      scoreIcon = "pending_actions";
+      scoreColor = "#0284c7";
+    }
+  }
+
+  let modeText = "通常モード（1名体制）";
+  let modeColor = "#059669";
+  if (isTraining) {
+    modeText = `研修モード（${courseLabel}）`;
+    modeColor = "#0284c7";
+  } else if (isSpecial) {
+    modeText = "特別モード（2人体制）";
+    modeColor = "#7c3aed";
+  }
+
+  let approverText = "なし";
+  if (isTraining) {
+    approverText = "メンター: AntiGravity ｜ 客観判定: HITMAN";
+  } else if (isSpecial) {
+    approverText = appState.supervisorName || "上長";
+  }
+
+  let comparisonTable = "";
+  if (isTraining) {
+    comparisonTable = `
+      <tr>
+        <td><strong>開発環境</strong></td>
+        <td>事前準備なし / 空フォルダ</td>
+        <td>ADK & 研修スキル同期完了</td>
+        <td><span class="badge-status badge-success">PASSED ✓</span></td>
+      </tr>
+      <tr>
+        <td><strong>仕様・要件定義</strong></td>
+        <td>アイデア段階 / 未定義</td>
+        <td>${appState.trainingCourse === 'hitman_clone' ? 'hitman_spec.md' : 'project_brief.md'} 策定済</td>
+        <td><span class="badge-status badge-success">PASSED ✓</span></td>
+      </tr>
+      <tr>
+        <td><strong>エージェント実装</strong></td>
+        <td>未実装</td>
+        <td>Google ADK + A2UIリッチカード 実装完了</td>
+        <td><span class="badge-status badge-success">PASSED ✓</span></td>
+      </tr>
+      <tr>
+        <td><strong>品質・単体テスト</strong></td>
+        <td>未検証</td>
+        <td>pytest全テストPASS ＆ 自律Wチェック合格</td>
+        <td><span class="badge-status badge-success">PASSED ✓</span></td>
+      </tr>
+      <tr>
+        <td><strong>クラウド本番環境</strong></td>
+        <td>未デプロイ</td>
+        <td>Google Cloud Run 本番サービス稼働中</td>
+        <td><span class="badge-status badge-success">PASSED ✓</span></td>
+      </tr>
+      <tr>
+        <td><strong>オープンソース公開</strong></td>
+        <td>ローカルのみ</td>
+        <td>個人GitHubリポジトリへコミット・公開完了</td>
+        <td><span class="badge-status badge-success">PASSED ✓</span></td>
+      </tr>
+    `;
+  } else {
+    comparisonTable = `
+      <tr>
+        <td><strong>アプリバージョン</strong></td>
+        <td>v2.0.4 (旧現行環境)</td>
+        <td>v2.1.0 (パッケージ同期完了)</td>
+        <td><span class="badge-status badge-success">正常更新 ✓</span></td>
+      </tr>
+      <tr>
+        <td><strong>データベース (users)</strong></td>
+        <td>tenant_id: T100<br>status: PENDING, plan: STANDARD</td>
+        <td>tenant_id: T100<br><strong>status: ACTIVE, plan: ENTERPRISE</strong></td>
+        <td><span class="badge-status badge-success">依頼元要件100%合致 ✓</span></td>
+      </tr>
+      <tr>
+        <td><strong>サービス稼働状況</strong></td>
+        <td>HTTP 200 OK (停止前確認)</td>
+        <td>HTTP 200 OK (新バージョン再起動後)</td>
+        <td><span class="badge-status badge-success">健全性確認完了 ✓</span></td>
+      </tr>
+    `;
+  }
+
+  let evidenceItems = "";
+  if (isTraining) {
+    const isT1 = !!(appState.sopResults["T-1"] && appState.sopResults["T-1"].verdict === "SUCCESS");
+    const isT2 = !!(appState.sopResults["T-2"] && appState.sopResults["T-2"].verdict === "SUCCESS");
+    const isT3 = !!(appState.sopResults["T-3"] && appState.sopResults["T-3"].verdict === "SUCCESS");
+    const isT4 = !!(appState.sopResults["T-4"] && appState.sopResults["T-4"].verdict === "SUCCESS");
+    const isT5 = !!(appState.sopResults["T-5"] && appState.sopResults["T-5"].verdict === "SUCCESS");
+    const isT6 = !!(appState.sopResults["T-6"] && appState.sopResults["T-6"].verdict === "SUCCESS");
+
+    evidenceItems = `
+      <li><strong style="color:${isT1 ? '#16a34a' : '#94a3b8'};">[${isT1 ? '同期済 ✓' : '未着手'}]</strong> T-1: 開発環境構築 ＆ HITMAN研修スキル同期 (<code>altx-ai-training-lab</code>)</li>
+      <li><strong style="color:${isT2 ? '#16a34a' : '#94a3b8'};">[${isT2 ? '策定済 ✓' : '未着手'}]</strong> T-2: 仕様・要件定義 (<code>${appState.trainingCourse === 'hitman_clone' ? 'hitman_spec.md' : 'project_brief.md'}</code>)</li>
+      <li><strong style="color:${isT3 ? '#16a34a' : '#94a3b8'};">[${isT3 ? '実装済 ✓' : '未着手'}]</strong> T-3: Google ADK AIエージェント ＋ A2UIリッチカード表示 (<code>agent.py</code>, <code>a2ui_utils.py</code>)</li>
+      <li><strong style="color:${isT4 ? '#16a34a' : '#94a3b8'};">[${isT4 ? '合格済 ✓' : '未着手'}]</strong> T-4: pytest 単体テスト ＆ 客観Wチェック自律検証証跡</li>
+      <li><strong style="color:${isT5 ? '#16a34a' : '#94a3b8'};">[${isT5 ? '稼働済 ✓' : '未着手'}]</strong> T-5: Dockerコンテナ化 ＆ Google Cloud Run 本番デプロイ</li>
+      <li><strong style="color:${isT6 ? '#16a34a' : '#94a3b8'};">[${isT6 ? '公開済 ✓' : '未着手'}]</strong> T-6: 個人GitHubリポジトリへのコード公開 ＆ 修了証発行</li>
+    `;
+  } else {
+    evidenceItems = `
+      <li><strong style="color:#16a34a;">[格納済 ✓]</strong> 現行アプリ完全バックアップ: <code>/backup/app_$(date +%Y%m%d).tar.gz</code></li>
+      <li><strong style="color:#16a34a;">[格納済 ✓]</strong> 環境設定ファイルバックアップ: <code>/backup/.env.bak</code></li>
+      <li><strong style="color:#16a34a;">[格納済 ✓]</strong> 適用データベース更新SQL: <code>${appState.sqlFileName || '/release/v2.1.0/db_update.sql'}</code></li>
+      <li><strong style="color:#16a34a;">[保全済 ✓]</strong> TeraTermターミナル実行ログ証跡: <code>teraterm_session.log</code></li>
+      ${appState.escalationRecord ? `<li><strong style="color:#7c3aed;">[記録済 ✓]</strong> エスカレーション協議・判断根拠証跡: <code>承認者: ${appState.escalationRecord.supervisor || '山田部長'} / 根拠: ${appState.escalationRecord.grounds}</code></li>` : ''}
+    `;
+  }
+
   let html = `
     <div class="report-score-card">
       <div>
-        <div class="report-score-title">総合評価スコア</div>
-        <div class="report-score-val">${isSpecial ? 'A ランク（特別対応2人体制による安全完遂）' : 'S ランク（手順書完全準拠・ノーエラー・安全完了）'}</div>
+        <div class="report-score-title">${scoreTitle}</div>
+        <div class="report-score-val">${scoreVal}</div>
         <div style="font-size:0.78rem;color:#475569;margin-top:4px;">
-          ${isSpecial ? '想定外事象に対し、エスカレーションゲートにて客観的判断根拠を確定の上、上長とのペア作業で安全に完遂しました。' : '全サブステップの事前確認およびログ検証をクリアし、手順書通り安全にリリースを完了しました。'}
+          ${scoreDesc}
         </div>
       </div>
-      <span class="material-symbols-outlined" style="font-size:48px;color:${isSpecial ? '#7c3aed' : '#16a34a'};">
-        ${isSpecial ? 'verified_user' : 'workspace_premium'}
+      <span class="material-symbols-outlined" style="font-size:48px;color:${scoreColor};">
+        ${scoreIcon}
       </span>
     </div>
 
@@ -4214,60 +4538,39 @@ function renderFinalReportView() {
       </h4>
       <div style="display:grid;grid-template-columns:repeat(3, 1fr);gap:0.6rem;background:#f8fafc;padding:0.8rem;border-radius:6px;border:1px solid #e2e8f0;font-size:0.8rem;">
         <div><strong>作業開始:</strong> <span style="color:#64748b;">${sTime}</span></div>
-        <div><strong>作業完了:</strong> <span style="color:#64748b;">${eTime}</span></div>
+        <div><strong>作業完了 / 最新:</strong> <span style="color:#64748b;">${eTime}</span></div>
         <div><strong>所要時間:</strong> <span style="color:#2563eb;font-weight:700;">約 ${duration} 分</span></div>
-        <div><strong>担当オペレーター:</strong> <span style="color:#64748b;">${appState.userId}</span></div>
-        <div><strong>運用モード:</strong> <span style="color:${isSpecial ? '#7c3aed' : '#059669'};font-weight:700;">${isSpecial ? '特別モード（2人体制）' : '通常モード（1名体制）'}</span></div>
-        <div><strong>上長（承認者）:</strong> <span style="color:#64748b;">${isSpecial ? (appState.supervisorName || '上長') : 'なし'}</span></div>
+        <div><strong>担当者:</strong> <span style="color:#64748b;">${appState.userId}</span></div>
+        <div><strong>運用モード:</strong> <span style="color:${modeColor};font-weight:700;">${modeText}</span></div>
+        <div><strong>確認体制 / 承認:</strong> <span style="color:#64748b;">${approverText}</span></div>
       </div>
     </div>
 
     <div>
       <h4 style="margin:0.8rem 0 0.4rem;color:#1e3a8a;display:flex;align-items:center;gap:0.4rem;">
-        <span class="material-symbols-outlined" style="font-size:18px;">compare_arrows</span> 作業前（Before）と作業後（After）の結果比較
+        <span class="material-symbols-outlined" style="font-size:18px;">compare_arrows</span> ${isTraining ? '研修成果物・環境変化比較 (Before vs After)' : '作業前（Before）と作業後（After）の結果比較'}
       </h4>
       <table class="sop-table" style="font-size:0.78rem;">
         <thead>
           <tr>
             <th>確認対象</th>
-            <th>作業前の状態 (Before)</th>
-            <th>作業後の状態 (After)</th>
+            <th>${isTraining ? '開始前の状態 (Before)' : '作業前の状態 (Before)'}</th>
+            <th>${isTraining ? '現在の到達状態 (After)' : '作業後の状態 (After)'}</th>
             <th style="width:110px;">要件合致判定</th>
           </tr>
         </thead>
         <tbody>
-          <tr>
-            <td><strong>アプリバージョン</strong></td>
-            <td>v2.0.4 (旧現行環境)</td>
-            <td>v2.1.0 (パッケージ同期完了)</td>
-            <td><span class="badge-status badge-success">正常更新 ✓</span></td>
-          </tr>
-          <tr>
-            <td><strong>データベース (users)</strong></td>
-            <td>tenant_id: T100<br>status: PENDING, plan: STANDARD</td>
-            <td>tenant_id: T100<br><strong>status: ACTIVE, plan: ENTERPRISE</strong></td>
-            <td><span class="badge-status badge-success">依頼元要件100%合致 ✓</span></td>
-          </tr>
-          <tr>
-            <td><strong>サービス稼働状況</strong></td>
-            <td>HTTP 200 OK (停止前確認)</td>
-            <td>HTTP 200 OK (新バージョン再起動後)</td>
-            <td><span class="badge-status badge-success">健全性確認完了 ✓</span></td>
-          </tr>
+          ${comparisonTable}
         </tbody>
       </table>
     </div>
 
     <div>
       <h4 style="margin:0.8rem 0 0.4rem;color:#1e3a8a;display:flex;align-items:center;gap:0.4rem;">
-        <span class="material-symbols-outlined" style="font-size:18px;">inventory_2</span> 格納成果物・エビデンス保全
+        <span class="material-symbols-outlined" style="font-size:18px;">inventory_2</span> ${isTraining ? '研修成果物・修了証跡保全' : '格納成果物・エビデンス保全'}
       </h4>
       <ul style="margin:0;padding-left:1.2rem;line-height:1.7;color:#334155;font-size:0.8rem;">
-        <li><strong style="color:#16a34a;">[格納済 ✓]</strong> 現行アプリ完全バックアップ: <code>/backup/app_$(date +%Y%m%d).tar.gz</code></li>
-        <li><strong style="color:#16a34a;">[格納済 ✓]</strong> 環境設定ファイルバックアップ: <code>/backup/.env.bak</code></li>
-        <li><strong style="color:#16a34a;">[格納済 ✓]</strong> 適用データベース更新SQL: <code>${appState.sqlFileName || '/release/v2.1.0/db_update.sql'}</code></li>
-        <li><strong style="color:#16a34a;">[保全済 ✓]</strong> TeraTermターミナル実行ログ証跡: <code>teraterm_session.log</code></li>
-        ${appState.escalationRecord ? `<li><strong style="color:#7c3aed;">[記録済 ✓]</strong> エスカレーション協議・判断根拠（こんきょ）証跡: <code>承認者: ${appState.escalationRecord.supervisor || '山田部長'} / 根拠: ${appState.escalationRecord.grounds}</code></li>` : ''}
+        ${evidenceItems}
       </ul>
     </div>
   `;
@@ -4288,15 +4591,54 @@ function closeReportModal() {
 }
 
 function exportReportMarkdown() {
-  const sTime = appState.startTime || "2026-09-06 00:00:00";
-  const eTime = appState.endTime || new Date().toLocaleString('ja-JP');
+  const formatTime = (t) => {
+    if (!t) return new Date().toLocaleString('ja-JP');
+    if (typeof t === 'number') return new Date(t).toLocaleString('ja-JP');
+    return t;
+  };
+  const sTime = formatTime(appState.startTime);
+  const eTime = formatTime(appState.endTime);
+  let duration = 18;
+  if (appState.startTime) {
+    const diff = Math.round((new Date() - new Date(appState.startTime)) / 60000);
+    if (!isNaN(diff) && diff > 0) duration = diff;
+  }
   const isSpecial = appState.mode === "SPECIAL_PAIR";
+  const isTraining = appState.mode === "TRAINING";
+  const courseLabel = appState.trainingCourse === "hitman_clone" ? "コースB: HITMANクローン構築" : "コースA: オリジナルAIツール開発";
 
-  let md = `# Excel作業手順書 リリース作業最終評価・完了報告書\n\n`;
+  const targetSteps = SOP_ITEMS.filter(s => !s.isRollback && !s.isEscalation);
+  const totalCount = targetSteps.length;
+  const completedCount = targetSteps.filter(s => appState.sopResults[s.id] && appState.sopResults[s.id].verdict === "SUCCESS").length;
+  const isAllDone = totalCount > 0 && completedCount === totalCount;
+  const pct = Math.round((completedCount / (totalCount || 1)) * 100);
+
+  let scoreVal = "";
+  if (isTraining) {
+    scoreVal = isAllDone ? "S+ ランク（全工程自律完走・客観Wチェック全件承認・Cloud Run本番公開）" : `進行中（${completedCount} / ${totalCount} ステップ完了, ${pct}%）`;
+  } else if (isSpecial) {
+    scoreVal = "A ランク（特別対応2人体制による安全完遂）";
+  } else {
+    scoreVal = isAllDone ? "S ランク（手順書完全準拠・ノーエラー・安全完了）" : `進行中（${completedCount} / ${totalCount} ステップ完了, ${pct}%）`;
+  }
+
+  let modeText = "通常モード（1名体制・Wチェック）";
+  if (isTraining) {
+    modeText = `研修モード（${courseLabel}）`;
+  } else if (isSpecial) {
+    modeText = `特別モード 2人体制（上長ペア: ${appState.supervisorName || "上長"}）`;
+  }
+
+  let title = isTraining
+    ? `# 株式会社AltX AI実践研修 最終評価レポート ＆ 修了証跡\n\n`
+    : `# Excel作業手順書 リリース作業最終評価・完了報告書\n\n`;
+
+  let md = title;
   md += `- **作業日時**: ${sTime} 〜 ${eTime}\n`;
-  md += `- **担当オペレーター**: ${appState.userId}\n`;
-  md += `- **運用体制**: ${isSpecial ? `特別モード 2人体制（上長ペア: ${appState.supervisorName || '上長'}）` : '通常モード（1名体制）'}\n`;
-  md += `- **総合評価スコア**: **${isSpecial ? 'A ランク（特別対応2人体制による安全完遂）' : 'S ランク（手順書完全準拠・ノーエラー・安全完了）'}**\n\n`;
+  md += `- **担当者**: ${appState.userId}\n`;
+  md += `- **運用体制**: ${modeText}\n`;
+  md += `- **進捗状況**: ${completedCount} / ${totalCount} 完了 (${pct}%)\n`;
+  md += `- **総合評価スコア**: **${scoreVal}**\n\n`;
 
   const cm = appState.costMetrics || { totalPromptTokens: 0, totalCandidateTokens: 0, totalLatencyMs: 0, totalRequests: 0, geminiCostJpy: 0, cloudRunCostJpy: 0, totalCostJpy: 0 };
   const totCost = cm.totalCostJpy || 0;
@@ -4317,27 +4659,57 @@ function exportReportMarkdown() {
   md += `- **従来の人手作業換算コスト (所要${duration}分 × ¥5,000/h)**: ¥${humanCost.toLocaleString()}\n`;
   md += `- **推定コスト削減効果 (ROI)**: **¥${savedCost.toLocaleString()} 削減 (削減率: 約 99.9%)**\n\n`;
 
-  md += `## 2. 作業前後の状態比較 (Before vs After)\n\n`;
-  md += `| 確認項目 | 作業前 (Before) | 作業後 (After) | 要件合致判定 |\n`;
-  md += `| :--- | :--- | :--- | :---: |\n`;
-  md += `| アプリケーションバージョン | v2.0.4 (旧現行環境) | v2.1.0 (最新) | **正常更新 ✓** |\n`;
-  md += `| データベース (users) | tenant_id: T100, status: PENDING, plan: STANDARD | tenant_id: T100, status: ACTIVE, plan: ENTERPRISE | **依頼元要件100%合致 ✓** |\n`;
-  md += `| ヘルスチェック | HTTP 200 OK (停止前) | HTTP 200 OK (起動後) | **正常稼働 ✓** |\n\n`;
+  if (isTraining) {
+    md += `## 2. 研修成果物・環境変化比較 (Before vs After)\n\n`;
+    md += `| 確認項目 | 開始前 (Before) | 現在の到達状態 (After) | 要件合致判定 |\n`;
+    md += `| :--- | :--- | :--- | :---: |\n`;
+    md += `| 開発環境 | 事前準備なし / 空フォルダ | ADK & 研修スキル同期完了 | **PASSED ✓** |\n`;
+    md += `| 仕様・要件定義 | アイデア段階 / 未定義 | ${appState.trainingCourse === 'hitman_clone' ? 'hitman_spec.md' : 'project_brief.md'} 策定済 | **PASSED ✓** |\n`;
+    md += `| エージェント実装 | 未実装 | Google ADK + A2UIリッチカード 実装完了 | **PASSED ✓** |\n`;
+    md += `| 品質・単体テスト | 未検証 | pytest全テストPASS ＆ 自律Wチェック合格 | **PASSED ✓** |\n`;
+    md += `| クラウド本番環境 | 未デプロイ | Google Cloud Run 本番サービス稼働中 | **PASSED ✓** |\n`;
+    md += `| オープンソース公開 | ローカルのみ | 個人GitHubリポジトリへコミット・公開完了 | **PASSED ✓** |\n\n`;
 
-  md += `## 2. 格納成果物・エビデンス保全チェック\n\n`;
-  md += `- [x] 事前バックアップ: \`/backup/app_YYYYMMDD.tar.gz\`\n`;
-  md += `- [x] 設定ファイルバックアップ: \`/backup/.env.bak\`\n`;
-  md += `- [x] 適用SQLスクリプト: \`${appState.sqlFileName || '/release/v2.1.0/db_update.sql'}\`\n`;
-  md += `- [x] TeraTerm実行ログ: \`teraterm_session.log\`\n`;
-  if (appState.escalationRecord) {
-    md += `- [x] エスカレーション協議・判断根拠: \`承認者: ${appState.escalationRecord.supervisor || '上長'} / 根拠: ${appState.escalationRecord.grounds}\`\n`;
+    md += `## 3. 格納成果物・エビデンス保全チェック\n\n`;
+    const isT1 = !!(appState.sopResults["T-1"] && appState.sopResults["T-1"].verdict === "SUCCESS");
+    const isT2 = !!(appState.sopResults["T-2"] && appState.sopResults["T-2"].verdict === "SUCCESS");
+    const isT3 = !!(appState.sopResults["T-3"] && appState.sopResults["T-3"].verdict === "SUCCESS");
+    const isT4 = !!(appState.sopResults["T-4"] && appState.sopResults["T-4"].verdict === "SUCCESS");
+    const isT5 = !!(appState.sopResults["T-5"] && appState.sopResults["T-5"].verdict === "SUCCESS");
+    const isT6 = !!(appState.sopResults["T-6"] && appState.sopResults["T-6"].verdict === "SUCCESS");
+    md += `- [${isT1 ? 'x' : ' '}] T-1: 開発環境構築 ＆ HITMAN研修スキル同期 (\`altx-ai-training-lab\`)\n`;
+    md += `- [${isT2 ? 'x' : ' '}] T-2: 仕様・要件定義 (\`${appState.trainingCourse === 'hitman_clone' ? 'hitman_spec.md' : 'project_brief.md'}\`)\n`;
+    md += `- [${isT3 ? 'x' : ' '}] T-3: Google ADK AIエージェント ＋ A2UIリッチカード表示 (\`agent.py\`, \`a2ui_utils.py\`)\n`;
+    md += `- [${isT4 ? 'x' : ' '}] T-4: pytest 単体テスト ＆ 客観Wチェック客観検証証跡\n`;
+    md += `- [${isT5 ? 'x' : ' '}] T-5: Dockerコンテナ化 ＆ Google Cloud Run 本番デプロイ\n`;
+    md += `- [${isT6 ? 'x' : ' '}] T-6: 個人GitHubリポジトリへのコード公開 ＆ 修了証発行\n`;
+  } else {
+    md += `## 2. 作業前後の状態比較 (Before vs After)\n\n`;
+    md += `| 確認項目 | 作業前 (Before) | 作業後 (After) | 要件合致判定 |\n`;
+    md += `| :--- | :--- | :--- | :---: |\n`;
+    md += `| アプリケーションバージョン | v2.0.4 (旧現行環境) | v2.1.0 (最新) | **正常更新 ✓** |\n`;
+    md += `| データベース (users) | tenant_id: T100, status: PENDING, plan: STANDARD | tenant_id: T100, status: ACTIVE, plan: ENTERPRISE | **依頼元要件100%合致 ✓** |\n`;
+    md += `| ヘルスチェック | HTTP 200 OK (停止前) | HTTP 200 OK (起動後) | **正常稼働 ✓** |\n\n`;
+
+    md += `## 3. 格納成果物・エビデンス保全チェック\n\n`;
+    md += `- [x] 事前バックアップ: \`/backup/app_YYYYMMDD.tar.gz\`\n`;
+    md += `- [x] 設定ファイルバックアップ: \`/backup/.env.bak\`\n`;
+    md += `- [x] 適用SQLスクリプト: \`${appState.sqlFileName || '/release/v2.1.0/db_update.sql'}\`\n`;
+    md += `- [x] TeraTerm実行ログ: \`teraterm_session.log\`\n`;
+    if (appState.escalationRecord) {
+      md += `- [x] エスカレーション協議・判断根拠: \`承認者: ${appState.escalationRecord.supervisor || '上長'} / 根拠: ${appState.escalationRecord.grounds}\`\n`;
+    }
   }
+
+  const fileName = isTraining
+    ? `AltX_AI_Training_Final_Report_${appState.trainingCourse || 'course_a'}_${new Date().toISOString().slice(0,10)}.md`
+    : `Release_Final_Report_${new Date().toISOString().slice(0,10)}.md`;
 
   const blob = new Blob([md], { type: "text/markdown;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `Release_Final_Report_${new Date().toISOString().slice(0,10)}.md`;
+  a.download = fileName;
   a.click();
   showToast("最終評価レポート(Markdown)を出力しました！");
 }
@@ -4497,12 +4869,24 @@ function renderFlowChart() {
   // Update banner
   const banner = document.getElementById("flow-banner");
   const bannerText = document.getElementById("flow-banner-text");
+  const normalStepsList = SOP_ITEMS.filter(s => !s.isRollback && !s.isEscalation);
+  const completedList = normalStepsList.filter(s => appState.sopResults[s.id] && appState.sopResults[s.id].verdict === "SUCCESS");
+  const isAllStepsCompleted = normalStepsList.length > 0 && completedList.length === normalStepsList.length;
+
   if (appState.escalationActive) {
     banner.className = "flow-banner error";
     bannerText.textContent = `【要エスカレーション】想定外事象のため作業進行がロックされています。エスカレーションゲートから対応結果・根拠を入力してください。`;
   } else if (appState.errorStep) {
     banner.className = "flow-banner error";
     bannerText.textContent = `【想定外事象】ステップ ${appState.errorStep} で停止中。原因調査またはロールバック(R-1)を検討してください。`;
+  } else if (isAllStepsCompleted) {
+    banner.className = "flow-banner success";
+    if (appState.mode === "TRAINING") {
+      const courseLabel = appState.trainingCourse === "hitman_clone" ? "コースB: HITMANクローン構築" : "コースA: 自作AI開発";
+      bannerText.innerHTML = `🎓 <strong>全工程修了（全 ${normalStepsList.length} ステップ合格・修了認定完了 ✓）</strong> ｜ ${courseLabel}`;
+    } else {
+      bannerText.innerHTML = `✓ <strong>全工程完了（全 ${normalStepsList.length} ステップ合格・本番承認完了）</strong> ｜ 最終評価報告をご確認ください`;
+    }
   } else if (appState.mode === "TRAINING") {
     const courseLabel = appState.trainingCourse === "hitman_clone" ? "コースB (HITMANクローン構築)" : "コースA (オリジナルAIツール開発)";
     banner.className = "flow-banner training";
@@ -4547,16 +4931,56 @@ function renderSopTable() {
   const pct = Math.round((completedCount / (normalTotal || 1)) * 100);
   const progLabel = document.getElementById("sop-progress-label");
   if (progLabel) {
-    progLabel.textContent = `進捗: ${completedCount} / ${normalTotal} 完了 (${pct}%)`;
+    if (normalTotal > 0 && completedCount === normalTotal) {
+      progLabel.innerHTML = `<span style="color:#15803d;font-weight:700;">✓ 全工程完了: ${completedCount} / ${normalTotal} (100%)</span>`;
+    } else {
+      progLabel.textContent = `進捗: ${completedCount} / ${normalTotal} 完了 (${pct}%)`;
+    }
   }
 }
 
 function exportSopMarkdown() {
-  let md = `# Excel作業手順書 実行結果報告書\n\n`;
+  const isTraining = appState.mode === "TRAINING";
+  const isSpecial = appState.mode === "SPECIAL_PAIR";
+  const courseLabel = appState.trainingCourse === "hitman_clone" ? "コースB: HITMANクローン構築" : "コースA: オリジナルAIツール開発";
+
+  const targetSteps = SOP_ITEMS.filter(s => !s.isRollback && !s.isEscalation);
+  const totalCount = targetSteps.length;
+  const completedCount = targetSteps.filter(s => appState.sopResults[s.id] && appState.sopResults[s.id].verdict === "SUCCESS").length;
+  const isAllDone = totalCount > 0 && completedCount === totalCount;
+  const pct = Math.round((completedCount / (totalCount || 1)) * 100);
+
+  let overallStatus = "未着手";
+  if (appState.errorStep) {
+    overallStatus = `異常停止 (Step ${appState.errorStep})`;
+  } else if (appState.escalationActive) {
+    overallStatus = "エスカレーション対応中 (協議待ち)";
+  } else if (isAllDone) {
+    overallStatus = isTraining
+      ? `全工程修了（全 ${totalCount} ステップ 合格・修了認定完了 ✓）`
+      : `全工程完了（全 ${totalCount} ステップ 合格・本番承認完了 ✓）`;
+  } else if (completedCount > 0) {
+    overallStatus = `正常進行中 (${completedCount} / ${totalCount} 完了, ${pct}%)`;
+  }
+
+  let modeText = "通常モード（1名体制・Wチェック）";
+  if (isTraining) {
+    modeText = `研修モード（${courseLabel}）`;
+  } else if (isSpecial) {
+    modeText = `特別モード 2人体制（上長ペア: ${appState.supervisorName || "上長"}）`;
+  }
+
+  let title = isTraining
+    ? `# 株式会社AltX AI実践研修 実行結果報告書\n\n`
+    : `# Excel作業手順書 実行結果報告書\n\n`;
+
+  let md = title;
   md += `- **作業日時**: ${new Date().toLocaleString('ja-JP')}\n`;
   md += `- **担当オペレーター**: ${appState.userId}\n`;
-  md += `- **運用体制**: ${appState.mode === 'SPECIAL_PAIR' ? `特別モード 2人体制（上長ペア: ${appState.supervisorName || '上長'}）` : '通常モード（1名体制）'}\n`;
-  md += `- **全体ステータス**: ${appState.errorStep ? `異常停止 (Step ${appState.errorStep})` : (appState.escalationActive ? 'エスカレーション対応中' : '正常進行中')}\n\n`;
+  md += `- **運用体制**: ${modeText}\n`;
+  md += `- **進捗状況**: ${completedCount} / ${totalCount} 完了 (${pct}%)\n`;
+  md += `- **全体ステータス**: **${overallStatus}**\n\n`;
+
   md += `| 項番 | 作業内容 | 実行コマンド | 判定結果 | 実行日時 |\n`;
   md += `| :--- | :--- | :--- | :---: | :---: |\n`;
 
@@ -4564,14 +4988,19 @@ function exportSopMarkdown() {
     const res = appState.sopResults[s.id];
     const status = res ? (res.verdict === "SUCCESS" ? "合格 ✓" : "不合格 ✕") : "未実施";
     const time = res ? (res.timestamp || "-") : "-";
-    md += `| ${s.id} | ${s.title} | \`${s.cmd}\` | **${status}** | ${time} |\n`;
+    const resolvedCmd = resolveStepVariables(s.cmd);
+    md += `| ${s.id} | ${s.title} | \`${resolvedCmd}\` | **${status}** | ${time} |\n`;
   });
+
+  const fileName = isTraining
+    ? `AltX_AI_Training_Report_${appState.trainingCourse || 'course_a'}_${new Date().toISOString().slice(0,10)}.md`
+    : `SOP_Execution_Report_${new Date().toISOString().slice(0,10)}.md`;
 
   const blob = new Blob([md], { type: "text/markdown;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `SOP_Execution_Report_${new Date().toISOString().slice(0,10)}.md`;
+  a.download = fileName;
   a.click();
   showToast("手順書結果(Markdown)を出力しました！");
 }
@@ -4849,8 +5278,14 @@ function detectStepTransitions(text, parts) {
     return;
   }
 
-  // 1. Success / Approved verification check
-  const isApproved = text.includes("VERIFIED_APPROVED") ||
+  // 0. Security Blocked check (Highest Priority)
+  const isSecurityBlocked = text.includes("SECURITY_BLOCKED") ||
+                            text.includes("セキュリティ遮断") ||
+                            text.includes("重大セキュリティ警告");
+
+  // 1. Success / Approved verification check (Never approve if security blocked)
+  const isApproved = !isSecurityBlocked && (
+                     text.includes("VERIFIED_APPROVED") ||
                      text.includes("Wチェック承認") ||
                      text.includes("【AI確認者 有識者Wチェック承認") ||
                      text.includes("【判定: 合格】") ||
@@ -4877,7 +5312,7 @@ function detectStepTransitions(text, parts) {
                      text.includes("コードを確認しました") ||
                      text.includes("設定完了") ||
                      text.includes("基礎が完成しています") ||
-                     text.includes("エージェントの起動・動作確認テスト");
+                     text.includes("エージェントの起動・動作確認テスト"));
 
   // 2. Rollback verdict check (strict)
   const isRollback = text.includes("BRANCH_ROLLBACK") ||
@@ -4888,9 +5323,16 @@ function detectStepTransitions(text, parts) {
   const isEscalation = (text.includes("BRANCH_ESCALATION") ||
                         text.includes("【自律判定: エスカレーション発動】") ||
                         text.includes("ゲート（E-1）へ自律分岐") ||
-                        text.includes("【要エスカレーション対応】")) && !isApproved;
+                        text.includes("【要エスカレーション対応】")) && !isApproved && !isSecurityBlocked;
 
-  if (isRollback) {
+  if (isSecurityBlocked) {
+    appState.errorStep = appState.currentStep;
+    appState.sopResults[appState.currentStep] = {
+      verdict: "FAILED",
+      timestamp: now,
+      logSnippet: "【セキュリティ遮断】危険な操作またはプロンプトを検知"
+    };
+  } else if (isRollback) {
     appState.currentStep = "R-1";
     appState.errorStep = appState.currentStep;
     appState.escalationActive = true;
@@ -5012,7 +5454,15 @@ function renderReply(b, parts, saveHistory = true) {
   const textStr = texts.join("\n").trim();
 
   // Autonomous W-Check Verdict Banners
-  if (textStr.includes("COURSE_SELECTED") || textStr.includes("受講コース確定")) {
+  if (textStr.includes("SECURITY_BLOCKED") || textStr.includes("セキュリティ遮断") || textStr.includes("重大セキュリティ警告")) {
+    const banner = el("div", "pair-check-box");
+    banner.style.background = "#fef2f2";
+    banner.style.borderColor = "#ef4444";
+    banner.style.color = "#991b1b";
+    banner.style.marginBottom = "0.6rem";
+    banner.innerHTML = `<span class="material-symbols-outlined" style="font-size:18px;color:#dc2626;">security</span><span><strong>【AI確認者 セキュリティ遮断 🚨】</strong> 危険な破壊的コマンドまたは不正プロンプトを検知しました。安全保護規程に基づき、手順の進行を即時ロックしています。</span>`;
+    b.appendChild(banner);
+  } else if (textStr.includes("COURSE_SELECTED") || textStr.includes("受講コース確定")) {
     const banner = el("div", "pair-check-box");
     banner.style.background = "#f0fdf4";
     banner.style.borderColor = "#86efac";

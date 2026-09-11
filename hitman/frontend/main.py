@@ -299,15 +299,30 @@ async def chat(req: Request):
     if not message:
         return JSONResponse({"parts": [], "metrics": None})
 
+    # Construct context-enriched message for LLM to ensure accurate step identification
+    import app.agent as agent_module
+    effective_step = current_step or getattr(agent_module, "CURRENT_STEP", "1-1")
+    effective_mode = mode or getattr(agent_module, "ACTIVE_OPERATION_MODE", "NORMAL")
+    effective_course = course or getattr(agent_module, "ACTIVE_TRAINING_COURSE", "original")
+
+    if not message.startswith("[HITMAN 運用コンテキスト"):
+        context_header = (
+            f"[HITMAN 運用コンテキスト: モード={effective_mode}, "
+            f"コース={effective_course}, 現在進行中ステップ={effective_step}]\n"
+        )
+        llm_message = f"{context_header}{message}"
+    else:
+        llm_message = message
+
     if RESOURCE:
-        parts = await _chat_cloud(user_id, message)
+        parts = await _chat_cloud(user_id, llm_message)
     elif os.environ.get("USE_LOCAL_AGENT_SERVER", "false").lower() == "true":
         try:
-            parts = await _chat_local(user_id, message)
+            parts = await _chat_local(user_id, llm_message)
         except Exception:
-            parts = await _chat_direct(user_id, message)
+            parts = await _chat_direct(user_id, llm_message)
     else:
-        parts = await _chat_direct(user_id, message)
+        parts = await _chat_direct(user_id, llm_message)
 
     if not parts:
         parts = [{"kind": "text", "text": "(応答がありませんでした。もう一度お試しください。)"}]
