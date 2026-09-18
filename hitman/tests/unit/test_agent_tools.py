@@ -364,7 +364,7 @@ def test_verify_step_output_rejects_pure_assertion():
 
 
 def test_verify_step_output_training_mode_guidance():
-    """研修モードでは自己申告に対して教育的ガイダンスが返ることを検証。"""
+    """研修モードでは自己申告に対して受講生に寄り添う教育的ガイダンスが返ることを検証。"""
     set_operation_mode("TRAINING")
     user_assertion = "大丈夫でした。問題ないです"
     result = verify_step_output("1-1", user_assertion)
@@ -372,6 +372,7 @@ def test_verify_step_output_training_mode_guidance():
     assert result["w_check_status"] == "TRAINING_GUIDANCE"
     assert "研修モード・教育ガイダンス" in result["message"]
     assert "客観的な証拠" in result["message"]
+    assert "伴走" in result["message"] or "大変ですよね" in result["message"]
     # 通常モードに戻す
     set_operation_mode("NORMAL")
 
@@ -475,21 +476,33 @@ def test_guide_training_app_creation():
 def test_guide_training_app_creation_consultation_and_confirmation_gate():
     """ステップ T-2 のアイデア相談・壁打ちフェーズと確定ゲート制御の検証。"""
     # 1. 相談・壁打ちの質問（「え？自分で考えるの？そうだな、こういうアプリは作れるかな？」）
+    # 受講生の戸惑いを受け止め、ゼロから考えなくてよい安心メッセージと3大定番が提示されること
     res_consult_1 = guide_training_app_creation("え？自分で考えるの？そうだな、こういうアプリは作れるかな？")
     assert res_consult_1["status"] == "success"
     assert res_consult_1["confirmation_status"] == "consulting"
     assert res_consult_1["is_confirmed"] is False
     assert res_consult_1["command"] == ""  # ターミナルコマンドを出さない
-    assert "壁打ち" in res_consult_1["title"] or "相談" in res_consult_1["title"]
-    assert "これで決定！" in res_consult_1["message"]
+    assert "相談" in res_consult_1["title"] or "壁打ち" in res_consult_1["title"]
+    assert "ゼロから全部考えられなくても大丈夫" in res_consult_1["message"]
+    assert "障害ログ" in res_consult_1["message"]
+    assert "コースB" in res_consult_1["message"]
 
-    # 2. 特定アイデアの実現性相談（「日報自動要約AIって作れる？」）
+    # 2. 完全な困惑（「思いつかない、何を入力すればいい？」）でも安心スキャフォールディングが返ること
+    res_hesitant = guide_training_app_creation("思いつかない、何を入力すればいい？")
+    assert res_hesitant["confirmation_status"] == "consulting"
+    assert res_hesitant["is_confirmed"] is False
+    assert res_hesitant["command"] == ""
+    assert "ゼロから全部考えられなくても大丈夫" in res_hesitant["message"]
+    assert "社内規程" in res_hesitant["message"] or "マニュアル" in res_hesitant["message"]
+
+    # 3. 特定アイデアの実現性相談（「日報自動要約AIって作れる？」）
     res_consult_2 = guide_training_app_creation("日報自動要約AIって作れる？")
     assert res_consult_2["confirmation_status"] == "consulting"
     assert res_consult_2["command"] == ""
     assert "日報自動要約AI" in res_consult_2["user_idea"]
+    assert "これで決定！" in res_consult_2["message"]
 
-    # 3. 直前の相談アイデアを踏まえた確定（「これで決定！」）
+    # 4. 直前の相談アイデアを踏まえた確定（「これで決定！」）
     res_confirm = guide_training_app_creation("これで決定！")
     assert res_confirm["confirmation_status"] == "confirmed"
     assert res_confirm["is_confirmed"] is True
@@ -497,7 +510,7 @@ def test_guide_training_app_creation_consultation_and_confirmation_gate():
     assert "コース確定" in res_confirm["message"]
     assert "日報自動要約AI" in res_confirm["user_idea"] or "日報自動要約AI" in res_confirm["title"]
 
-    # 4. 明示的な is_confirmed フラグによる制御
+    # 5. 明示的な is_confirmed フラグによる制御
     res_explicit_consult = guide_training_app_creation("障害ログ解析Bot", is_confirmed=False)
     assert res_explicit_consult["confirmation_status"] == "consulting"
     assert res_explicit_consult["command"] == ""
@@ -506,11 +519,12 @@ def test_guide_training_app_creation_consultation_and_confirmation_gate():
     assert res_explicit_confirm["confirmation_status"] == "confirmed"
     assert res_explicit_confirm["command"] == "cat ipp-agent-workspace/project_brief.md"
 
-    # 5. コースB（HITMANクローン）の相談と確定
+    # 6. コースB（HITMANクローン）の相談と確定
     res_hitman_consult = guide_training_app_creation("HITMANクローンってどういうもの？")
     assert res_hitman_consult["confirmation_status"] == "consulting"
     assert res_hitman_consult["command"] == ""
     assert "コースB" in res_hitman_consult["course"]
+    assert "ゼロから全部考えられなくても大丈夫" in res_hitman_consult["message"]
 
     res_hitman_confirm = guide_training_app_creation("コースBで決定！")
     assert res_hitman_confirm["confirmation_status"] == "confirmed"

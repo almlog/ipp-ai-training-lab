@@ -5182,6 +5182,11 @@ function buildNode(id, comps, seen) {
         actionHeader.innerHTML = `<span class="material-symbols-outlined" style="font-size:18px; color:#0284c7;">chat</span><span>💬 アクション: チャットで相談・入力</span>`;
         actionBlock.appendChild(actionHeader);
 
+        const gentleBanner = el("div", "action-gentle-banner");
+        gentleBanner.style.cssText = "font-size:11.5px; color:#0369a1; background:#f0f9ff; border:1px dashed #7dd3fc; border-radius:6px; padding:6px 10px; margin-bottom:8px; display:flex; align-items:center; gap:6px;";
+        gentleBanner.innerHTML = `<span class="material-symbols-outlined" style="font-size:16px; color:#0284c7;">support_agent</span><span><strong>ゼロから全部考えられなくても大丈夫！</strong> AIが選択肢をご用意しています。下のボタンを押すか、お気軽に相談してください。</span>`;
+        actionBlock.appendChild(gentleBanner);
+
         const actionText = el("div", "action-prompt-text");
         actionText.style.cssText = "font-size:13px; color:#1e293b; line-height:1.5; margin-bottom:8px;";
         actionText.textContent = pureCmd;
@@ -5190,18 +5195,39 @@ function buildNode(id, comps, seen) {
         const chipsContainer = el("div", "ideation-chips-container");
         chipsContainer.style.cssText = "display:flex; flex-wrap:wrap; gap:6px; margin-top:8px;";
 
-        const chips = [
-          { label: "💡 ログ自動解析Bot", prompt: "障害ログを自動解析して原因と対処法を提示するAIツールを作りたい" },
-          { label: "💡 日報自動要約AI", prompt: "日報や業務報告を要約して重要インシデントを抽出するAIを作りたい" },
-          { label: "💡 規程・マニュアル問い合わせBot", prompt: "社内就業規則やITマニュアルを検索して回答するRAGエージェントを作りたい" },
-          { label: "💡 コースB（HITMANクローン）", prompt: "コースBのHITMANクローン構築コースにします" },
-          { label: "✅ これで決定！", prompt: "これで決定！このアイデアで進めます。" }
-        ];
+        const curStep = String(appState.currentStep || "").toUpperCase();
+        let chips = [];
+        if (curStep.includes("E-1") || pureCmd.includes("エスカレ") || pureCmd.includes("想定外")) {
+          chips = [
+            { label: "🛡️ 【推奨】方針A: 切り戻し（ロールバック）", prompt: "協議の結果、安全を最優先して方針A（ロールバック・切り戻し）を実施したいです。" },
+            { label: "🔧 方針B: 修正してペアで再試行", prompt: "協議の結果、修正クエリ・パッチを作成し、リーダー同席の特別モードで再試行したいです。" },
+            { label: "👥 方針C: 運用責任者に確認", prompt: "現在の方針について運用責任者（上長）へ確認し、指示を仰ぎたいです。" },
+            { label: "❓ どう判断すべきか相談", prompt: "このエラー状況で、どのような方針を取るべきかアドバイスをいただけますか？" }
+          ];
+        } else if (curStep.includes("R-1") || curStep.includes("R-2") || pureCmd.includes("切り戻し") || pureCmd.includes("ロールバック")) {
+          chips = [
+            { label: "🛡️ 切り戻し手順を開始", prompt: "切り戻し手順を開始します。手順を案内してください。" },
+            { label: "🔍 現状のバックアップ確認", prompt: "切り戻し対象のバックアップファイルの状態を確認したいです。" },
+            { label: "❓ 切り戻しの注意点を教えて", prompt: "切り戻しを実施するにあたって、注意すべき点や確認事項を教えてください。" }
+          ];
+        } else {
+          // デフォルト: T-2（企画・アイデア・壁打ち）
+          chips = [
+            { label: "💡 ログ自動解析Bot", prompt: "障害ログを自動解析して原因と対処法を提示するAIツールを作りたい" },
+            { label: "💡 規程・FAQ検索Bot", prompt: "社内就業規則やITマニュアルを検索して回答するRAGエージェントを作りたい" },
+            { label: "💡 日報自動要約AI", prompt: "日報や業務報告を要約して重要インシデントを抽出するAIを作りたい" },
+            { label: "⭐ おすすめ！HITMANクローン", prompt: "迷っているので、完成設計図があって確実に成功できるコースB（HITMANクローン構築）にしたいです" },
+            { label: "❓ おすすめのアイデアを教えて", prompt: "自分一人ではアイデアが思いつかないのですが、現場でよく作られるおすすめのアイデアを教えてもらえますか？" },
+            { label: "✅ これで決定！", prompt: "これで決定！このアイデアで進めます。" }
+          ];
+        }
 
         chips.forEach(chip => {
           const chipBtn = el("button", "ideation-chip-btn");
           chipBtn.style.cssText = "font-size:12px; font-weight:600; padding:4px 10px; border-radius:14px; border:1px solid #93c5fd; background:#ffffff; color:#1d4ed8; cursor:pointer; transition:all 0.15s ease; box-shadow:0 1px 2px rgba(0,0,0,0.05);";
           chipBtn.textContent = chip.label;
+          chipBtn.onmouseenter = () => { chipBtn.style.background = "#eff6ff"; chipBtn.style.borderColor = "#3b82f6"; };
+          chipBtn.onmouseleave = () => { chipBtn.style.background = "#ffffff"; chipBtn.style.borderColor = "#93c5fd"; };
           chipBtn.onclick = (e) => {
             e.stopPropagation();
             const inputEl = document.getElementById("input") || input;
@@ -5247,6 +5273,39 @@ function buildNode(id, comps, seen) {
           pairBox.innerHTML = `<span class="material-symbols-outlined" style="font-size:15px;color:#9333ea;">verified</span><span>【特別モード】上長（${appState.supervisorName || "上長"}）と相互確認後に投入</span>`;
           cmdBlock.appendChild(pairBox);
         }
+
+        // コマンドカードでの困った時の寄り添いヘルプチップ
+        const helpBox = el("div", "cmd-help-box");
+        helpBox.style.cssText = "margin-top:8px; padding-top:6px; border-top:1px dashed rgba(255,255,255,0.15); display:flex; flex-wrap:wrap; align-items:center; gap:6px;";
+
+        const helpLabel = el("span", "cmd-help-label");
+        helpLabel.style.cssText = "font-size:11px; color:#94a3b8; display:flex; align-items:center; gap:3px;";
+        helpLabel.innerHTML = `<span class="material-symbols-outlined" style="font-size:13px; color:#38bdf8;">support</span><span>困った時は:</span>`;
+        helpBox.appendChild(helpLabel);
+
+        const cmdHelpChips = [
+          { label: "❓ コマンドの打ち方を聞く", prompt: `【質問】このコマンド（${pureCmd.length > 25 ? pureCmd.slice(0, 25) + '...' : pureCmd}）はどこでどのように実行すればよいですか？操作手順を教えてください。` },
+          { label: "⚠️ エラーが出たので相談", prompt: "【相談】コマンドを実行したところエラーが発生してしまいました。画面のログを見て解決策を教えてください。" },
+          { label: "🔍 次に何をすればいい？", prompt: "【質問】このコマンドを実行した後は、どの出力結果をコピーして貼り付ければよいですか？" }
+        ];
+
+        cmdHelpChips.forEach(ch => {
+          const chBtn = el("button", "cmd-help-chip");
+          chBtn.style.cssText = "font-size:11px; padding:2px 8px; border-radius:10px; border:1px solid #475569; background:#1e293b; color:#94a3b8; cursor:pointer; transition:all 0.15s ease;";
+          chBtn.textContent = ch.label;
+          chBtn.onmouseenter = () => { chBtn.style.color = "#38bdf8"; chBtn.style.borderColor = "#38bdf8"; chBtn.style.background = "#0f172a"; };
+          chBtn.onmouseleave = () => { chBtn.style.color = "#94a3b8"; chBtn.style.borderColor = "#475569"; chBtn.style.background = "#1e293b"; };
+          chBtn.onclick = (e) => {
+            e.stopPropagation();
+            const inputEl = document.getElementById("input") || input;
+            if (inputEl) {
+              inputEl.value = ch.prompt;
+              inputEl.focus();
+            }
+          };
+          helpBox.appendChild(chBtn);
+        });
+        cmdBlock.appendChild(helpBox);
 
         return cmdBlock;
       }
