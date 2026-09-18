@@ -5163,9 +5163,60 @@ function buildNode(id, comps, seen) {
       const rawText = boundStr(props.text);
       const hint = String(props.usageHint || "body").toLowerCase();
 
-      // Command Box rendering
+      // Command Box vs Action Prompt rendering
       const pureCmd = extractPureCommand(rawText);
-      const isCommand = (hint === "h2") || /^(df |tar |systemctl |curl |rsync |cp |mv |ls |mysql )/i.test(pureCmd);
+      const isShellCmd = pureCmd && (/^(?:cat |mkdir |cd |git |pytest |python |uv |curl |tar |df |systemctl |cp |mv |ls |mysql |touch |pip |docker |gcloud |Get-Content |Test-Path )/i.test(pureCmd) ||
+                         (/^[a-z0-9_./\\-]+(?:\.py|\.sh|\.md|\.json|\.txt)?(?:\s+-[a-z0-9_-]+|\s+[a-z0-9_./\\-]+)*$/i.test(pureCmd) && !/[ぁ-んァ-ヶｱ-ﾝﾞﾟ一-龥]/.test(pureCmd)));
+
+      const isActionPrompt = pureCmd && !isShellCmd && (
+        /^(?:作成したい|チャット|メッセージ|入力|アイデア|相談|決定|お考え|教えて|下のチャット)/i.test(pureCmd) ||
+        (/[ぁ-んァ-ヶｱ-ﾝﾞﾟ一-龥]/.test(pureCmd) && (hint === "h2" || hint === "body"))
+      );
+
+      if (isActionPrompt) {
+        const actionBlock = el("div", "action-prompt-block");
+        actionBlock.style.cssText = "background:linear-gradient(135deg, #f0fdf4 0%, #e0f2fe 100%); border:1.5px solid #38bdf8; border-radius:10px; padding:12px 16px; margin:10px 0; box-shadow:0 2px 6px rgba(0,0,0,0.04);";
+
+        const actionHeader = el("div", "action-prompt-header");
+        actionHeader.style.cssText = "display:flex; align-items:center; gap:6px; font-weight:700; color:#0284c7; font-size:13px; margin-bottom:6px;";
+        actionHeader.innerHTML = `<span class="material-symbols-outlined" style="font-size:18px; color:#0284c7;">chat</span><span>💬 アクション: チャットで相談・入力</span>`;
+        actionBlock.appendChild(actionHeader);
+
+        const actionText = el("div", "action-prompt-text");
+        actionText.style.cssText = "font-size:13px; color:#1e293b; line-height:1.5; margin-bottom:8px;";
+        actionText.textContent = pureCmd;
+        actionBlock.appendChild(actionText);
+
+        const chipsContainer = el("div", "ideation-chips-container");
+        chipsContainer.style.cssText = "display:flex; flex-wrap:wrap; gap:6px; margin-top:8px;";
+
+        const chips = [
+          { label: "💡 ログ自動解析Bot", prompt: "障害ログを自動解析して原因と対処法を提示するAIツールを作りたい" },
+          { label: "💡 日報自動要約AI", prompt: "日報や業務報告を要約して重要インシデントを抽出するAIを作りたい" },
+          { label: "💡 規程・マニュアル問い合わせBot", prompt: "社内就業規則やITマニュアルを検索して回答するRAGエージェントを作りたい" },
+          { label: "💡 コースB（HITMANクローン）", prompt: "コースBのHITMANクローン構築コースにします" },
+          { label: "✅ これで決定！", prompt: "これで決定！このアイデアで進めます。" }
+        ];
+
+        chips.forEach(chip => {
+          const chipBtn = el("button", "ideation-chip-btn");
+          chipBtn.style.cssText = "font-size:12px; font-weight:600; padding:4px 10px; border-radius:14px; border:1px solid #93c5fd; background:#ffffff; color:#1d4ed8; cursor:pointer; transition:all 0.15s ease; box-shadow:0 1px 2px rgba(0,0,0,0.05);";
+          chipBtn.textContent = chip.label;
+          chipBtn.onclick = (e) => {
+            e.stopPropagation();
+            const inputEl = document.getElementById("input") || input;
+            if (inputEl) {
+              inputEl.value = chip.prompt;
+              inputEl.focus();
+            }
+          };
+          chipsContainer.appendChild(chipBtn);
+        });
+        actionBlock.appendChild(chipsContainer);
+        return actionBlock;
+      }
+
+      const isCommand = isShellCmd || ((hint === "h2") && pureCmd && !isActionPrompt && !/[ぁ-んァ-ヶｱ-ﾝﾞﾟ一-龥]/.test(pureCmd));
       if (isCommand) {
         const cmdBlock = el("div", "cmd-block");
         const cmdHeader = el("div", "cmd-header");

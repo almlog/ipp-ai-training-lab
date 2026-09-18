@@ -701,7 +701,8 @@ async def api_training_guidance(req: Request):
     body = await req.json()
     idea = body.get("idea", "")
     course_type = body.get("course_type", "custom")
-    res = guide_training_app_creation(idea, course_type)
+    is_confirmed = body.get("is_confirmed", False)
+    res = guide_training_app_creation(idea, course_type, is_confirmed=is_confirmed)
     return JSONResponse(content=res)
 
 

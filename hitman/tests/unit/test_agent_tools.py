@@ -472,6 +472,51 @@ def test_guide_training_app_creation():
     assert "setup-memory-bank" in res_memory["summoned_skills"]
 
 
+def test_guide_training_app_creation_consultation_and_confirmation_gate():
+    """ステップ T-2 のアイデア相談・壁打ちフェーズと確定ゲート制御の検証。"""
+    # 1. 相談・壁打ちの質問（「え？自分で考えるの？そうだな、こういうアプリは作れるかな？」）
+    res_consult_1 = guide_training_app_creation("え？自分で考えるの？そうだな、こういうアプリは作れるかな？")
+    assert res_consult_1["status"] == "success"
+    assert res_consult_1["confirmation_status"] == "consulting"
+    assert res_consult_1["is_confirmed"] is False
+    assert res_consult_1["command"] == ""  # ターミナルコマンドを出さない
+    assert "壁打ち" in res_consult_1["title"] or "相談" in res_consult_1["title"]
+    assert "これで決定！" in res_consult_1["message"]
+
+    # 2. 特定アイデアの実現性相談（「日報自動要約AIって作れる？」）
+    res_consult_2 = guide_training_app_creation("日報自動要約AIって作れる？")
+    assert res_consult_2["confirmation_status"] == "consulting"
+    assert res_consult_2["command"] == ""
+    assert "日報自動要約AI" in res_consult_2["user_idea"]
+
+    # 3. 直前の相談アイデアを踏まえた確定（「これで決定！」）
+    res_confirm = guide_training_app_creation("これで決定！")
+    assert res_confirm["confirmation_status"] == "confirmed"
+    assert res_confirm["is_confirmed"] is True
+    assert res_confirm["command"] == "cat ipp-agent-workspace/project_brief.md"
+    assert "コース確定" in res_confirm["message"]
+    assert "日報自動要約AI" in res_confirm["user_idea"] or "日報自動要約AI" in res_confirm["title"]
+
+    # 4. 明示的な is_confirmed フラグによる制御
+    res_explicit_consult = guide_training_app_creation("障害ログ解析Bot", is_confirmed=False)
+    assert res_explicit_consult["confirmation_status"] == "consulting"
+    assert res_explicit_consult["command"] == ""
+
+    res_explicit_confirm = guide_training_app_creation("障害ログ解析Bot", is_confirmed=True)
+    assert res_explicit_confirm["confirmation_status"] == "confirmed"
+    assert res_explicit_confirm["command"] == "cat ipp-agent-workspace/project_brief.md"
+
+    # 5. コースB（HITMANクローン）の相談と確定
+    res_hitman_consult = guide_training_app_creation("HITMANクローンってどういうもの？")
+    assert res_hitman_consult["confirmation_status"] == "consulting"
+    assert res_hitman_consult["command"] == ""
+    assert "コースB" in res_hitman_consult["course"]
+
+    res_hitman_confirm = guide_training_app_creation("コースBで決定！")
+    assert res_hitman_confirm["confirmation_status"] == "confirmed"
+    assert res_hitman_confirm["command"] == "cat ipp-agent-workspace/hitman_spec.md"
+
+
 
 def test_set_and_get_operation_mode():
     """運用モードの切り替えと情報取得の検証。"""
