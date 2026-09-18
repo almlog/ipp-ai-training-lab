@@ -1,8 +1,8 @@
 # My agent: hitman (HITMAN)
-Project: AltX AI Training Lab (株式会社ＡｌｔＸ 社内AIアプリ開発実践研修)
-Author: Shunpei Suzuki <suzuki.shunpei@altx.co.jp> (AltX Inc.)
-Copyright: Copyright (c) 2026 Shunpei Suzuki (AltX Inc.). All rights reserved.
-Reference: Built with reference to Google Cloud's "Build with Gemini World Tour (Track 3)" concepts, restructured and implemented as an original enterprise AI agent cockpit and training lab by Shunpei Suzuki for AltX Inc.
+Project: IPP AI Training Lab (IPP 社内AIアプリ開発実践研修)
+Author: Shunpei Suzuki <suzuki.shunpei@ipp.local> (IPP)
+Copyright: Copyright (c) 2026 Shunpei Suzuki (IPP). All rights reserved.
+Reference: Built with reference to Google Cloud's "Build with Gemini World Tour (Track 3)" concepts, restructured and implemented as an original enterprise AI agent cockpit and training lab by Shunpei Suzuki for IPP
 One-liner: A conversational agent named HITMAN that helps operators execute rigid legacy Excel SOPs step-by-step with interactive checklist cards and automated validation tools.
 
 Tool coverage:

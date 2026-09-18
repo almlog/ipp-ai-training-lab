@@ -1,5 +1,5 @@
-# Copyright (c) 2026 Shunpei Suzuki (suzuki.shunpei@altx.co.jp), AltX Inc.
-# Developed by Shunpei Suzuki <suzuki.shunpei@altx.co.jp>
+# Copyright (c) 2026 Shunpei Suzuki (suzuki.shunpei@ipp.local), IPP
+# Developed by Shunpei Suzuki <suzuki.shunpei@ipp.local>
 #
 from app.agent import (
     ACTIVE_STEP_SEQUENCE,
@@ -518,7 +518,7 @@ def test_training_sop_and_course_switching():
     assert "T-1" in sop_orig
     assert "T-6" in sop_orig
     assert "gemini-3.8-flash" in sop_orig["T-1"]["cautions"]
-    assert "altx-agent-workspace" in sop_orig["T-1"]["command"]
+    assert "ipp-agent-workspace" in sop_orig["T-1"]["command"]
 
     appr_orig = get_active_approval()
     assert "コースA" in appr_orig["work_title"]
@@ -545,7 +545,7 @@ def test_training_step_verification_t1_to_t6():
     from app.agent import verify_step_output
 
     # T-1: 正常合格 vs 自己申告差し戻し
-    t1_pass = verify_step_output("T-1", "mkdir altx-agent-workspace\ngit clone https://github.com/almlog/altx-ai-training-lab.git\nCloning into 'altx-ai-training-lab'...")
+    t1_pass = verify_step_output("T-1", "mkdir ipp-agent-workspace\ngit clone https://github.com/almlog/altx-ai-training-lab.git\nCloning into 'ipp-ai-training-lab'...")
     assert t1_pass["verdict"] == "SUCCESS"
     assert t1_pass["w_check_status"] == "VERIFIED_APPROVED"
 

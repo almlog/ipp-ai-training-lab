@@ -1,9 +1,9 @@
 # HITMAN: SOP Navigation & AI Pair Operator Cockpit
 
-**開発・設計**: 鈴木 駿平 (Shunpei Suzuki) <suzuki.shunpei@altx.co.jp>  
-**所属**: 株式会社ＡｌｔＸ (AltX Inc.)  
-**Copyright**: (c) 2026 Shunpei Suzuki (AltX Inc.) All Rights Reserved.  
-**本番稼働 URL (Cloud Run)**: [https://altx-hitman-cockpit-1070367799384.us-central1.run.app](https://altx-hitman-cockpit-1070367799384.us-central1.run.app)
+**開発・設計**: 鈴木 駿平 (Shunpei Suzuki) <suzuki.shunpei@ipp.local>  
+**所属**: IPP (IPP)  
+**Copyright**: (c) 2026 Shunpei Suzuki (IPP) All Rights Reserved.  
+**本番稼働 URL (Cloud Run)**: [https://ipp-hitman-cockpit-1070367799384.us-central1.run.app](https://ipp-hitman-cockpit-1070367799384.us-central1.run.app)
 
 ---
 
@@ -51,7 +51,7 @@
 `
 [Web Browser]
       │
-      ▼ (HTTPS: https://altx-hitman-cockpit-1070367799384.us-central1.run.app)
+      ▼ (HTTPS: https://ipp-hitman-cockpit-1070367799384.us-central1.run.app)
 ┌─────────────────────────────────────────────────────────────┐
 │ Cloud Run Container (FastAPI + Static Cockpit UI)           │
 │  ├─ / : 2画面操作コックピット (static/index.html)            │
@@ -92,7 +92,7 @@ uv run pytest
 - **【コースB】HITMANクローン構築コース**: アイデアが未定の受講生向けに、AIペアオペレーター（手順書パーサー・客観Wチェック・A2UI・エスカレ制御）自身を自作・デプロイ。
 - **AntiGravity 連携プロンプト**:
   - モデル選定: `gemini-3.8-flash` を優先選択、未提供・エラー時は `gemini-3.6-flash` へフォールバック。
-  - 専用作業フォルダ: `altx-agent-workspace`（デフォルト）。画面内の `[⚙️ 研修環境設定]` から特定ドライブ（D:\等）や社内規定パスへ自由に変更可能。
+  - 専用作業フォルダ: `ipp-agent-workspace`（デフォルト）。画面内の `[⚙️ 研修環境設定]` から特定ドライブ（D:\等）や社内規定パスへ自由に変更可能。
   - Python仮想環境: `uv run python`（推奨）のほか、Conda や既存の `.venv` など受講者個別の Python パスへ自由に変更可能。
   - リポジトリクローン: `git clone https://github.com/almlog/altx-ai-training-lab.git` により `.agents/skills/` の研修スキル群を自律習得。
   - 手順カード上の `[📋 AGYプロンプトをコピー]` ボタンからワンクリックでプロンプトを取得可能（設定したパスに自動置換）。
@@ -111,4 +111,4 @@ uv run python frontend/main.py
 ブラウザで http://127.0.0.1:3000 にアクセスすると、ローカル環境でコックピットが利用可能です。
 
 ---
-**© 2026 Shunpei Suzuki (AltX Inc.)**
+**© 2026 Shunpei Suzuki (IPP)**

@@ -1,7 +1,7 @@
 # 🛠️ 受講者 事前準備・前提スキル・PC環境ガイド
-## 〜 株式会社ＡｌｔＸ 社内AI実践研修（HITMAN & アンチグラビティ）〜
+## 〜 IPP 社内AI実践研修（HITMAN & アンチグラビティ）〜
 
-**監修・作成**: 株式会社ＡｌｔＸ（AltX Inc.） 鈴木 駿平 (Shunpei Suzuki) <suzuki.shunpei@altx.co.jp>  
+**監修・作成**: IPP 鈴木 駿平 (Shunpei Suzuki) <suzuki.shunpei@ipp.local>  
 **対象**: 本研修に参加するすべての受講生（研修当日の3日前までに必ず完了してください）
 
 ---
@@ -77,7 +77,7 @@
 いずれかの方法で API キーを発行し、安全な場所に控えておいてください。
 
 - **方法 A（推奨: Vertex AI Express Mode キー）**:
-  1. Google Cloud Console で新規プロジェクト（例: `altx-ai-training-<名前>`）を作成。
+  1. Google Cloud Console で新規プロジェクト（例: `ipp-ai-training-<名前>`）を作成。
   2. プロジェクトに上記で作成した「お支払い（Billing）」を紐付け。
   3. [Vertex AI Studio] ➡️ [APIキー] より新規キーを作成（先頭が `AQ...` で始まるキー）。
 - **方法 B（Google AI Studio キー）**:
@@ -108,7 +108,7 @@
 
 > [!TIP]
 > **初心者は何もしなくて大丈夫です（ゼロコンフィグ）！**  
-> 特別な理由がない場合は、デフォルトの `altx-agent-workspace` が自動的に作成・使用されますので、このステップをスキップして問題ありません。
+> 特別な理由がない場合は、デフォルトの `ipp-agent-workspace` が自動的に作成・使用されますので、このステップをスキップして問題ありません。
 
 本研修のオペレーター **HITMAN** は、受講生各自のPC環境や企業セキュリティ規程に合わせて、**作業フォルダのパスやPython仮想環境を完全に個別事前設定（カスタマイズ）できる機能** を備えています。  
 以下のような個別事情がある受講生は、事前に希望のフォルダパスやPythonコマンドを確認・決定しておいてください：
@@ -155,7 +155,7 @@ python3 -c "import urllib.request, json, os; key=os.getenv('GEMINI_API_KEY'); ur
 - [ ] `python --version` で 3.11 または 3.12+ が表示される
 - [ ] `git --version` で Git が認識されている
 - [ ] 個人GitHubアカウントにログインできる
-- [ ] HITMAN Cockpit（[https://altx-hitman-cockpit-1070367799384.us-central1.run.app](https://altx-hitman-cockpit-1070367799384.us-central1.run.app)）にブラウザでアクセスできる
+- [ ] HITMAN Cockpit（[https://ipp-hitman-cockpit-1070367799384.us-central1.run.app](https://ipp-hitman-cockpit-1070367799384.us-central1.run.app)）にブラウザでアクセスできる
 - [ ] （任意・個別カスタマイズしたい方のみ）使用したい作業フォルダの保存先パス（D:\や特定ディレクトリ）を決めた
 - [ ] （任意・個別カスタマイズしたい方のみ）使用したいPython仮想環境（Conda / venv等）の実行パスを確認した
 
@@ -180,4 +180,4 @@ python3 -c "import urllib.request, json, os; key=os.getenv('GEMINI_API_KEY'); ur
 
 ---
 
-事前準備に関してご不明な点がある場合は、研修前日までに講師（鈴木 駿平：`suzuki.shunpei@altx.co.jp`）までお気軽にお問い合わせください。
+事前準備に関してご不明な点がある場合は、研修前日までに講師（鈴木 駿平：`suzuki.shunpei@ipp.local`）までお気軽にお問い合わせください。

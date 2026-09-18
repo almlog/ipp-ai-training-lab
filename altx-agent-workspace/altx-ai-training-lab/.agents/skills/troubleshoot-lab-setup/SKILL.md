@@ -54,7 +54,7 @@ deploy/frontend/sandbox symptoms during preflight — those come up later.
 These are the usual culprits. Check all of them before deep-diving.
 
 **0. Is the user signed in with their individual Google account / API key?**
-In AltX training, participants use their **individual Google account** and their own paid API key (`GEMINI_API_KEY` via Google AI Studio) or personal GCP Project (Vertex AI Express Mode).
+In IPP training, participants use their **individual Google account** and their own paid API key (`GEMINI_API_KEY` via Google AI Studio) or personal GCP Project (Vertex AI Express Mode).
 - Confirm the participant has set their `GEMINI_API_KEY` or authenticated via `gcloud`:
   ```bash
   # If using API key:

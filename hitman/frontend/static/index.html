@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<meta name="author" content="Shunpei Suzuki <suzuki.shunpei@altx.co.jp>">
-<meta name="copyright" content="Copyright 2026 Shunpei Suzuki, AltX Inc.">
+<meta name="author" content="Shunpei Suzuki <suzuki.shunpei@ipp.local>">
+<meta name="copyright" content="Copyright 2026 Shunpei Suzuki, IPP">
 <title>HITMAN - 運用コンソール (SOP Pair Operator)</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200">
 <style>
@@ -2058,7 +2058,7 @@ html, body {
     <span class="material-symbols-outlined" style="color:#60a5fa;">terminal</span>
     <span>HITMAN</span>
     <span class="header-badge">SOP AI Pair Operator</span>
-    <span class="header-copyright">© 2026 Shunpei Suzuki (AltX Inc.)</span>
+    <span class="header-copyright">© 2026 Shunpei Suzuki (IPP)</span>
   </div>
   <div class="header-actions">
     <div id="cost-badge" class="cost-badge" onclick="openReportModal()" title="現在のセッションにおける推定利用料金（Gemini 2.5 Flash + Cloud Run）。クリックで詳細レポートを表示">
@@ -2138,7 +2138,7 @@ html, body {
             </div>
             <div class="approval-sub-txt">
               <span>承認者: <strong id="meta-approver">山田 太郎 (システム運用統括部長)</strong></span>
-              <span>ID: <code id="meta-appr-id" style="color:#0284c7;">APPR-20260906-ALTX-01</code></span>
+              <span>ID: <code id="meta-appr-id" style="color:#0284c7;">APPR-20260906-IPP-01</code></span>
               <span>日付: <span id="meta-appr-date">2026-09-06</span></span>
             </div>
           </div>
@@ -2156,7 +2156,7 @@ html, body {
             <span class="material-symbols-outlined" style="font-size:22px;color:#2563eb;">school</span>
           </div>
           <div class="training-lab-text">
-            <div class="training-lab-title">AltX AI実践研修 開発ラボ</div>
+            <div class="training-lab-title">IPP AI実践研修 開発ラボ</div>
             <div class="training-lab-sub">
               <span>メンター: <strong>AntiGravity</strong></span>
               <span>｜</span>
@@ -2588,8 +2588,8 @@ html, body {
 
       <div class="esc-form-group">
         <label>📁 作業ディレクトリ（フォルダ名またはフルパス）</label>
-        <input type="text" id="env-modal-workspace" class="esc-input" placeholder="例: altx-agent-workspace または C:\workspace\my_agent" value="altx-agent-workspace">
-        <span style="font-size:0.72rem;color:#64748b;">※空白の場合はデフォルト値 <code>altx-agent-workspace</code> が適用されます。</span>
+        <input type="text" id="env-modal-workspace" class="esc-input" placeholder="例: ipp-agent-workspace または C:\workspace\my_agent" value="ipp-agent-workspace">
+        <span style="font-size:0.72rem;color:#64748b;">※空白の場合はデフォルト値 <code>ipp-agent-workspace</code> が適用されます。</span>
       </div>
 
       <div class="esc-form-group">
@@ -2692,7 +2692,7 @@ let appState = {
   escalationReason: "",
   escalationRecord: null,
   parameters: {
-    "TARGET_HOST": "db-prd-01.internal.altx.jp",
+    "TARGET_HOST": "db-prd-01.internal.ipp.local",
     "HEALTH_PORT": "8080",
     "APP_VERSION": "v2.1.0",
     "BACKUP_DIR": "/backup/20260906_release",
@@ -2701,10 +2701,10 @@ let appState = {
     "DB_NAME": "app_db"
   },
   approval: {
-    author: "鈴木 駿平 (AltX Inc.)",
+    author: "鈴木 駿平 (IPP)",
     approver: "山田 太郎 (システム運用統括部長)",
     approval_date: "2026-09-06",
-    approval_id: "APPR-20260906-ALTX-01",
+    approval_id: "APPR-20260906-IPP-01",
     work_title: "基幹EC決済プラットフォーム (本番環境)",
     is_approved: true
   },
@@ -2919,7 +2919,7 @@ function resetSessionConfirm() {
 
 // --- SOP Importer Modal & Presets ---
 const SOP_PRESETS = {
-  web_release: `# 標準Webアプリケーション リリース手順書 (AltX Inc.)
+  web_release: `# 標準Webアプリケーション リリース手順書 (IPP)
 | 項番 | 作業項目・目的 | 投入コマンド | 期待ログ・合否基準 | 注意事項 |
 | :--- | :--- | :--- | :--- | :--- |
 | 1-1 | ディスク空き容量の事前確認 | df -h /backup | Avail >= 10GB | 空き容量10GB未満は中断 |
@@ -3455,7 +3455,7 @@ function resolveStepVariables(text) {
     }
   }
 
-  const ws = params["WORKSPACE_DIR"] || "altx-agent-workspace";
+  const ws = params["WORKSPACE_DIR"] || "ipp-agent-workspace";
   const agentName = params["AGENT_NAME"] || (appState.trainingCourse === "hitman_clone" ? "my_hitman" : "my_agent");
   const pyEnv = params["PYTHON_ENV"] || "uv (自動管理)";
 
@@ -3464,14 +3464,14 @@ function resolveStepVariables(text) {
     .replaceAll("${AGENT_NAME}", agentName)
     .replaceAll("${PYTHON_ENV}", pyEnv);
 
-  if (appState.mode === "TRAINING" && ws !== "altx-agent-workspace") {
-    res = res.replaceAll("altx-agent-workspace", ws);
+  if (appState.mode === "TRAINING" && ws !== "ipp-agent-workspace") {
+    res = res.replaceAll("ipp-agent-workspace", ws);
   }
   return res;
 }
 
 function openTrainingEnvModal() {
-  const ws = (appState.parameters && appState.parameters["WORKSPACE_DIR"]) || "altx-agent-workspace";
+  const ws = (appState.parameters && appState.parameters["WORKSPACE_DIR"]) || "ipp-agent-workspace";
   const agent = (appState.parameters && appState.parameters["AGENT_NAME"]) || (appState.trainingCourse === "hitman_clone" ? "my_hitman" : "my_agent");
   const pyenv = (appState.parameters && appState.parameters["PYTHON_ENV"]) || "uv (自動管理)";
 
@@ -3514,7 +3514,7 @@ function toggleCustomPyEnv(val) {
 }
 
 function resetTrainingEnvDefaults() {
-  document.getElementById("env-modal-workspace").value = "altx-agent-workspace";
+  document.getElementById("env-modal-workspace").value = "ipp-agent-workspace";
   document.getElementById("env-modal-agent").value = appState.trainingCourse === "hitman_clone" ? "my_hitman" : "my_agent";
   document.getElementById("env-modal-pyenv").value = "uv (自動管理)";
   document.getElementById("env-modal-custom-pyenv").style.display = "none";
@@ -3522,7 +3522,7 @@ function resetTrainingEnvDefaults() {
 }
 
 async function saveTrainingEnvModal() {
-  const ws = document.getElementById("env-modal-workspace").value.trim() || "altx-agent-workspace";
+  const ws = document.getElementById("env-modal-workspace").value.trim() || "ipp-agent-workspace";
   const agent = document.getElementById("env-modal-agent").value.trim() || (appState.trainingCourse === "hitman_clone" ? "my_hitman" : "my_agent");
   const selPy = document.getElementById("env-modal-pyenv").value;
   const customPy = document.getElementById("env-modal-custom-pyenv").value.trim();
@@ -3587,9 +3587,9 @@ function _fallbackCopy(text, stepId) {
 
 const TEST_EVIDENCES = {
   original: {
-    "T-1": `$ mkdir altx-agent-workspace && cd altx-agent-workspace
+    "T-1": `$ mkdir ipp-agent-workspace && cd ipp-agent-workspace
 $ git clone https://github.com/almlog/altx-ai-training-lab.git
-Cloning into 'altx-ai-training-lab'...
+Cloning into 'ipp-ai-training-lab'...
 remote: Enumerating objects: 125, done.
 remote: Total 125 (delta 40), reused 110 (delta 30)
 Resolving deltas: 100% (40/40), done.
@@ -3597,7 +3597,7 @@ Resolving deltas: 100% (40/40), done.
 $ python --version
 Python 3.12.2
 
-$ ls -la altx-ai-training-lab/.agents/skills/
+$ ls -la ipp-ai-training-lab/.agents/skills/
 drwxr-xr-x 2 user staff 4096 Sep 7 20:20 build-agent-frontend
 drwxr-xr-x 2 user staff 4096 Sep 7 20:20 enable-a2ui
 drwxr-xr-x 2 user staff 4096 Sep 7 20:20 memory-bank-setup
@@ -3617,11 +3617,11 @@ drwxr-xr-x 2 user staff 4096 Sep 7 20:20 novasmart-governance-lab`,
 - ツール: consult_policy_faq, request_human_approval`,
 
     "T-3": `【ステップ T-3: エージェントコア＆A2UI実装 完了ログ】
-$ ls -la altx-agent-workspace/my_agent/
+$ ls -la ipp-agent-workspace/my_agent/
 -rw-r--r-- 1 user staff 1850 Sep 7 20:22 agent.py
 -rw-r--r-- 1 user staff  920 Sep 7 20:22 a2ui_utils.py
 
-$ head -n 30 altx-agent-workspace/my_agent/agent.py
+$ head -n 30 ipp-agent-workspace/my_agent/agent.py
 from google.adk.agents import Agent
 from google.adk.models import Gemini
 from a2ui_utils import a2ui_callback
@@ -3630,7 +3630,7 @@ MODEL = "gemini-3.8-flash"
 root_agent = Agent(name="my_agent", model=Gemini(model=MODEL), after_model_callback=a2ui_callback)`,
 
     "T-4": `【ステップ T-4: 単体テスト＆自律Wチェック 完了ログ】
-$ pytest altx-agent-workspace/my_agent/tests/ -v
+$ pytest ipp-agent-workspace/my_agent/tests/ -v
 ============================= test session starts =============================
 collected 5 items
 
@@ -3643,7 +3643,7 @@ tests/test_agent.py::test_schema_validity PASSED                         [100%]
 ============================== 5 passed in 1.42s ==============================`,
 
     "T-5": `【ステップ T-5: Cloud Run 本番デプロイ 完了ログ】
-$ gcloud run deploy my-agent --source altx-agent-workspace/my_agent --region asia-northeast1 --allow-unauthenticated
+$ gcloud run deploy my-agent --source ipp-agent-workspace/my_agent --region asia-northeast1 --allow-unauthenticated
 Building Container... DONE
 Creating Revision... DONE
 Service [my-agent] has been deployed and is serving 100 percent of traffic.
@@ -3659,9 +3659,9 @@ To https://github.com/shunpei-suzuki/my-ai-agent.git
   },
 
   hitman_clone: {
-    "T-1": `$ mkdir altx-agent-workspace && cd altx-agent-workspace
+    "T-1": `$ mkdir ipp-agent-workspace && cd ipp-agent-workspace
 $ git clone https://github.com/almlog/altx-ai-training-lab.git
-Cloning into 'altx-ai-training-lab'...
+Cloning into 'ipp-ai-training-lab'...
 remote: Enumerating objects: 125, done.
 remote: Total 125 (delta 40), reused 110 (delta 30)
 Resolving deltas: 100% (40/40), done.
@@ -3669,7 +3669,7 @@ Resolving deltas: 100% (40/40), done.
 $ python --version
 Python 3.12.2
 
-$ ls -la altx-ai-training-lab/.agents/skills/
+$ ls -la ipp-ai-training-lab/.agents/skills/
 drwxr-xr-x 2 user staff 4096 Sep 7 20:20 build-agent-frontend
 drwxr-xr-x 2 user staff 4096 Sep 7 20:20 enable-a2ui
 drwxr-xr-x 2 user staff 4096 Sep 7 20:20 memory-bank-setup
@@ -3690,11 +3690,11 @@ drwxr-xr-x 2 user staff 4096 Sep 7 20:20 novasmart-governance-lab`,
 - 安全制御: evaluate_escalation_gate, analyze_sql_impact`,
 
     "T-3": `【ステップ T-3: HITMAN判定コア＆A2UI実装 完了ログ】
-$ ls -la altx-agent-workspace/my_hitman/
+$ ls -la ipp-agent-workspace/my_hitman/
 -rw-r--r-- 1 user staff 3200 Sep 7 20:25 agent.py
 -rw-r--r-- 1 user staff 1200 Sep 7 20:25 a2ui_utils.py
 
-$ head -n 30 altx-agent-workspace/my_hitman/agent.py
+$ head -n 30 ipp-agent-workspace/my_hitman/agent.py
 from google.adk.agents import Agent
 from google.adk.models import Gemini
 from a2ui_utils import a2ui_callback
@@ -3708,7 +3708,7 @@ root_agent = Agent(
 )`,
 
     "T-4": `【ステップ T-4: 単体テスト＆自律Wチェック 完了ログ】
-$ pytest altx-agent-workspace/my_hitman/tests/ -v
+$ pytest ipp-agent-workspace/my_hitman/tests/ -v
 ============================= test session starts =============================
 collected 6 items
 
@@ -3722,7 +3722,7 @@ tests/test_hitman.py::test_agent_response PASSED                       [100%]
 ============================== 6 passed in 1.58s ==============================`,
 
     "T-5": `【ステップ T-5: Cloud Run 本番デプロイ 完了ログ】
-$ gcloud run deploy my-hitman --source altx-agent-workspace/my_hitman --region asia-northeast1 --allow-unauthenticated
+$ gcloud run deploy my-hitman --source ipp-agent-workspace/my_hitman --region asia-northeast1 --allow-unauthenticated
 Building Container... DONE
 Creating Revision... DONE
 Service [my-hitman] has been deployed and is serving 100 percent of traffic.
@@ -4456,7 +4456,7 @@ function renderFinalReportView() {
     const isT6 = !!(appState.sopResults["T-6"] && appState.sopResults["T-6"].verdict === "SUCCESS");
 
     evidenceItems = `
-      <li><strong style="color:${isT1 ? '#16a34a' : '#94a3b8'};">[${isT1 ? '同期済 ✓' : '未着手'}]</strong> T-1: 開発環境構築 ＆ HITMAN研修スキル同期 (<code>altx-ai-training-lab</code>)</li>
+      <li><strong style="color:${isT1 ? '#16a34a' : '#94a3b8'};">[${isT1 ? '同期済 ✓' : '未着手'}]</strong> T-1: 開発環境構築 ＆ HITMAN研修スキル同期 (<code>ipp-ai-training-lab</code>)</li>
       <li><strong style="color:${isT2 ? '#16a34a' : '#94a3b8'};">[${isT2 ? '策定済 ✓' : '未着手'}]</strong> T-2: 仕様・要件定義 (<code>${appState.trainingCourse === 'hitman_clone' ? 'hitman_spec.md' : 'project_brief.md'}</code>)</li>
       <li><strong style="color:${isT3 ? '#16a34a' : '#94a3b8'};">[${isT3 ? '実装済 ✓' : '未着手'}]</strong> T-3: Google ADK AIエージェント ＋ A2UIリッチカード表示 (<code>agent.py</code>, <code>a2ui_utils.py</code>)</li>
       <li><strong style="color:${isT4 ? '#16a34a' : '#94a3b8'};">[${isT4 ? '合格済 ✓' : '未着手'}]</strong> T-4: pytest 単体テスト ＆ 客観Wチェック自律検証証跡</li>
@@ -4630,7 +4630,7 @@ function exportReportMarkdown() {
   }
 
   let title = isTraining
-    ? `# 株式会社AltX AI実践研修 最終評価レポート ＆ 修了証跡\n\n`
+    ? `# IPP AI実践研修 最終評価レポート ＆ 修了証跡\n\n`
     : `# Excel作業手順書 リリース作業最終評価・完了報告書\n\n`;
 
   let md = title;
@@ -4677,7 +4677,7 @@ function exportReportMarkdown() {
     const isT4 = !!(appState.sopResults["T-4"] && appState.sopResults["T-4"].verdict === "SUCCESS");
     const isT5 = !!(appState.sopResults["T-5"] && appState.sopResults["T-5"].verdict === "SUCCESS");
     const isT6 = !!(appState.sopResults["T-6"] && appState.sopResults["T-6"].verdict === "SUCCESS");
-    md += `- [${isT1 ? 'x' : ' '}] T-1: 開発環境構築 ＆ HITMAN研修スキル同期 (\`altx-ai-training-lab\`)\n`;
+    md += `- [${isT1 ? 'x' : ' '}] T-1: 開発環境構築 ＆ HITMAN研修スキル同期 (\`ipp-ai-training-lab\`)\n`;
     md += `- [${isT2 ? 'x' : ' '}] T-2: 仕様・要件定義 (\`${appState.trainingCourse === 'hitman_clone' ? 'hitman_spec.md' : 'project_brief.md'}\`)\n`;
     md += `- [${isT3 ? 'x' : ' '}] T-3: Google ADK AIエージェント ＋ A2UIリッチカード表示 (\`agent.py\`, \`a2ui_utils.py\`)\n`;
     md += `- [${isT4 ? 'x' : ' '}] T-4: pytest 単体テスト ＆ 客観Wチェック客観検証証跡\n`;
@@ -4971,7 +4971,7 @@ function exportSopMarkdown() {
   }
 
   let title = isTraining
-    ? `# 株式会社AltX AI実践研修 実行結果報告書\n\n`
+    ? `# IPP AI実践研修 実行結果報告書\n\n`
     : `# Excel作業手順書 実行結果報告書\n\n`;
 
   let md = title;

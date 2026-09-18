@@ -1,5 +1,5 @@
-# Copyright (c) 2026 Shunpei Suzuki (suzuki.shunpei@altx.co.jp), AltX Inc.
-# Developed by Shunpei Suzuki <suzuki.shunpei@altx.co.jp>
+# Copyright (c) 2026 Shunpei Suzuki (suzuki.shunpei@ipp.local), IPP
+# Developed by Shunpei Suzuki <suzuki.shunpei@ipp.local>
 #
 """Excel (.xlsm / .xlsx) SOP Parser for HITMAN.
 

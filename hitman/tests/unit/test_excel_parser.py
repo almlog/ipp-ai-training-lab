@@ -1,5 +1,5 @@
-# Copyright (c) 2026 Shunpei Suzuki (suzuki.shunpei@altx.co.jp), AltX Inc.
-# Developed by Shunpei Suzuki <suzuki.shunpei@altx.co.jp>
+# Copyright (c) 2026 Shunpei Suzuki (suzuki.shunpei@ipp.local), IPP
+# Developed by Shunpei Suzuki <suzuki.shunpei@ipp.local>
 #
 """Unit tests for Excel (.xlsm / .xlsx) SOP parsing and API endpoints."""
 
@@ -43,12 +43,12 @@ def test_parse_sample_xlsm():
     assert approval["is_approved"] is True
     assert "山田 太郎" in approval["approver"]
     assert "鈴木 駿平" in approval["author"]
-    assert "APPR-20260906-ALTX-01" in approval["approval_id"]
+    assert "APPR-20260906-IPP-01" in approval["approval_id"]
     assert "2026-09-06" in approval["approval_date"]
     
     # パラメータ抽出と変数置換検証
     params = res["parameters"]
-    assert params["TARGET_HOST"] == "db-prd-01.internal.altx.jp"
+    assert params["TARGET_HOST"] == "db-prd-01.internal.ipp.local"
     assert params["HEALTH_PORT"] == "8080"
     assert params["APP_VERSION"] == "v2.1.0"
     assert params["BACKUP_DIR"] == "/backup/20260906_release"
@@ -60,7 +60,7 @@ def test_parse_sample_xlsm():
     assert "${BACKUP_DIR}" not in step1["command"]
     
     step2 = res["sop_database"][2]["sub_steps"]["2-1"]
-    assert "http://db-prd-01.internal.altx.jp:8080/health" in step2["command"]
+    assert "http://db-prd-01.internal.ipp.local:8080/health" in step2["command"]
     assert "${TARGET_HOST}" not in step2["command"]
     
     # 分岐ルール検証 (R-1, E-1)
@@ -79,7 +79,7 @@ def test_import_excel_sop_agent_state():
     assert res["status"] == "success"
     
     active_params = get_active_parameters()
-    assert active_params.get("TARGET_HOST") == "db-prd-01.internal.altx.jp"
+    assert active_params.get("TARGET_HOST") == "db-prd-01.internal.ipp.local"
     assert active_params.get("BACKUP_DIR") == "/backup/20260906_release"
     
     active_approval = get_active_approval()
@@ -106,7 +106,7 @@ def test_api_sop_upload_excel_endpoint():
     data = response.json()
     assert data["result"]["status"] == "success"
     assert "parameters" in data
-    assert data["parameters"]["TARGET_HOST"] == "db-prd-01.internal.altx.jp"
+    assert data["parameters"]["TARGET_HOST"] == "db-prd-01.internal.ipp.local"
     assert data["approval"]["is_approved"] is True
     assert "山田 太郎" in data["approval"]["approver"]
     assert len(data["sequence"]) == 10

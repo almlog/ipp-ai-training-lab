@@ -1,4 +1,4 @@
-# 🧪 AltX AI実践研修 テスト用想定回答・エビデンス集 (Step T-1 〜 T-6)
+# 🧪 IPP AI実践研修 テスト用想定回答・エビデンス集 (Step T-1 〜 T-6)
 
 本ドキュメントは、HITMAN Cockpit および AntiGravity の研修フロー（ステップ T-1 〜 T-6）の検証・デモ・リハーサル時に、ターミナルで何度も `git clone` やデプロイを実行することなく、**即座に提出して Wチェック（合格承認）を獲得できるコピー用エビデンス（生ログ）集**です。
 
@@ -15,9 +15,9 @@
 ## 🛠️ Step T-1: 開発環境構築とスキル同期 (エビデンス)
 
 ```text
-$ mkdir altx-agent-workspace && cd altx-agent-workspace
+$ mkdir ipp-agent-workspace && cd ipp-agent-workspace
 $ git clone https://github.com/almlog/altx-ai-training-lab.git
-Cloning into 'altx-ai-training-lab'...
+Cloning into 'ipp-ai-training-lab'...
 remote: Enumerating objects: 125, done.
 remote: Counting objects: 100% (125/125), done.
 remote: Compressing objects: 100% (85/85), done.
@@ -28,7 +28,7 @@ Resolving deltas: 100% (40/40), done.
 $ python --version
 Python 3.12.2
 
-$ ls -la altx-ai-training-lab/.agents/skills/
+$ ls -la ipp-ai-training-lab/.agents/skills/
 total 0
 drwxr-xr-x 2 user staff 4096 Sep 7 20:20 build-agent-frontend
 drwxr-xr-x 2 user staff 4096 Sep 7 20:20 enable-a2ui
@@ -50,7 +50,7 @@ drwxr-xr-x 2 user staff 4096 Sep 7 20:20 novasmart-governance-lab
 ## 1. アプリ概要
 - アプリ名: my_agent (社内申請＆マニュアルQAアシスタント)
 - 目的: 社内申請手続きや各種規程に関する問い合わせに24時間自律回答する。
-- ターゲットユーザー: 株式会社AltX 全社員
+- ターゲットユーザー: IPP 全社員
 
 ## 2. アーキテクチャ＆ツール
 - フレームワーク: Google ADK (Agent Development Kit 1.5.0) + Python
@@ -69,7 +69,7 @@ drwxr-xr-x 2 user staff 4096 Sep 7 20:20 novasmart-governance-lab
 ## 🤖 Step T-3: エージェントコア＆A2UI実装 (エビデンス)
 
 ```python
-$ ls -la altx-agent-workspace/my_agent/
+$ ls -la ipp-agent-workspace/my_agent/
 total 24
 -rw-r--r-- 1 user staff 1850 Sep 7 20:22 agent.py
 -rw-r--r-- 1 user staff  920 Sep 7 20:22 a2ui_utils.py
@@ -77,7 +77,7 @@ total 24
 -rw-r--r-- 1 user staff  350 Sep 7 20:22 pyproject.toml
 drwxr-xr-x 2 user staff 4096 Sep 7 20:22 tests
 
-$ head -n 30 altx-agent-workspace/my_agent/agent.py
+$ head -n 30 ipp-agent-workspace/my_agent/agent.py
 # agent.py - Google ADK Agent for my_agent
 from google.adk.agents import Agent
 from google.adk.models import Gemini
@@ -102,10 +102,10 @@ root_agent = Agent(
 ## 🧪 Step T-4: ローカルテスト＆自律Wチェック (エビデンス)
 
 ```text
-$ pytest altx-agent-workspace/my_agent/tests/ -v
+$ pytest ipp-agent-workspace/my_agent/tests/ -v
 ============================= test session starts =============================
 platform win32 -- Python 3.12.2, pytest-8.1.1, pluggy-1.4.0
-rootdir: C:\workspace\altx-agent-workspace\my_agent
+rootdir: C:\workspace\ipp-agent-workspace\my_agent
 collected 5 items
 
 tests/test_agent.py::test_agent_initialization PASSED                   [ 20%]
@@ -122,7 +122,7 @@ tests/test_agent.py::test_schema_validity PASSED                         [100%]
 ## 🌐 Step T-5: Cloud Run 本番デプロイ (エビデンス)
 
 ```text
-$ gcloud run deploy my-agent --source altx-agent-workspace/my_agent --region asia-northeast1 --allow-unauthenticated
+$ gcloud run deploy my-agent --source ipp-agent-workspace/my_agent --region asia-northeast1 --allow-unauthenticated
 Building Container... DONE
 Uploading Sources... DONE
 Creating Revision... DONE

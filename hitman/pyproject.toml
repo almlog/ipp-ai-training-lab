@@ -3,7 +3,7 @@ name = "hitman"
 version = "0.1.0"
 description = "HITMAN - SOP Navigation & AI Pair Operator Cockpit"
 authors = [
-    {name = "Shunpei Suzuki", email = "suzuki.shunpei@altx.co.jp"},
+    {name = "Shunpei Suzuki", email = "suzuki.shunpei@ipp.local"},
 ]
 
 

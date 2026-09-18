@@ -1,10 +1,10 @@
-# 🔰 AltX 社内AI実践研修 公式ハンズオンマニュアル
+# 🔰 IPP 社内AI実践研修 公式ハンズオンマニュアル
 ## 〜 初心者でも絶対に迷わない！HITMAN Cockpit と AntiGravity で創る「A2UI駆動 自律型AIエージェント」開発・デプロイ実践 〜
 
-**開発・監修**: 株式会社ＡｌｔＸ（AltX Inc.） 鈴木 駿平 (Shunpei Suzuki) <suzuki.shunpei@altx.co.jp>  
-**著作権**: Copyright (c) 2026 Shunpei Suzuki (AltX Inc.) All Rights Reserved.  
-**プロジェクト名**: `altx-ai-training-lab`  
-**HITMAN Cockpit 公式本番URL**: [https://altx-hitman-cockpit-1070367799384.us-central1.run.app](https://altx-hitman-cockpit-1070367799384.us-central1.run.app)  
+**開発・監修**: IPP 鈴木 駿平 (Shunpei Suzuki) <suzuki.shunpei@ipp.local>  
+**著作権**: Copyright (c) 2026 Shunpei Suzuki (IPP) All Rights Reserved.  
+**プロジェクト名**: `ipp-ai-training-lab`  
+**HITMAN Cockpit 公式本番URL**: [https://ipp-hitman-cockpit-1070367799384.us-central1.run.app](https://ipp-hitman-cockpit-1070367799384.us-central1.run.app)  
 **公式GitHubリポジトリ**: [https://github.com/almlog/altx-ai-training-lab](https://github.com/almlog/altx-ai-training-lab)  
 **使用AIモデル**: `gemini-3.8-flash`（優先）または `gemini-3.6-flash`（安定版）  
 
@@ -173,8 +173,8 @@ HITMAN Cockpit は、受講生それぞれの PC ドライブ構成や会社セ�
 │ ⚙️ 研修環境設定（個別カスタマイズ）                       [✕]│
 ├─────────────────────────────────────────────────────────────┤
 │ 📁 作業ディレクトリ (Workspace Path)                        │
-│ [ altx-agent-workspace                                    ] │
-│ ※ 相対パス（altx-agent-workspace）または絶対パス            │
+│ [ ipp-agent-workspace                                    ] │
+│ ※ 相対パス（ipp-agent-workspace）または絶対パス            │
 │    例: D:\dev\my_lab, C:\workspace\agent, ~/dev/my_agent    │
 │                                                             │
 │ 🤖 エージェント名 (Agent Project Name)                      │
@@ -188,7 +188,7 @@ HITMAN Cockpit は、受講生それぞれの PC ドライブ構成や会社セ�
 │ [ 🔄 デフォルトに戻す ]                    [ 保存して反映 ] │
 └─────────────────────────────────────────────────────────────┘
 ```
-- **初心者はそのまま（ゼロコンフィグ）**: 何も変更しなければ、最も標準的な `altx-agent-workspace` / `uv run python` が自動適用されます。
+- **初心者はそのまま（ゼロコンフィグ）**: 何も変更しなければ、最も標準的な `ipp-agent-workspace` / `uv run python` が自動適用されます。
 - **個別設定**: フォルダパスや仮想環境を指定して「保存して反映」を押すと、Step T-1 〜 T-6 の**すべてのコマンド・プロンプト・判定ロジックがそのパスへ一瞬で連動・再計算**されます。
 
 ### ③ AntiGravity の見方
@@ -196,7 +196,7 @@ HITMAN Cockpit は、受講生それぞれの PC ドライブ構成や会社セ�
 ┌─────────────────────┬─────────────────────────────────────────────────────────┐
 │ 📁 ファイル一覧     │ 💬 AIチャット対話欄                                     │
 │                     │                                                         │
-│ altx-agent-workspace│  あなた: [HITMAN でコピーしたプロンプトを貼り付けて送信]  │
+│ ipp-agent-workspace│  あなた: [HITMAN でコピーしたプロンプトを貼り付けて送信]  │
 │  ├─ my_agent/       │                                                         │
 │  │   ├─ agent.py    │  AntiGravity:                                           │
 │  │   └─ tests/      │  「承知しました！リポジトリをクローンし、                 │
@@ -207,7 +207,7 @@ HITMAN Cockpit は、受講生それぞれの PC ドライブ構成や会社セ�
 │                     │  「ステップ T-1 の準備が完了しました！                   │
 │                     │   以下のエビデンスを HITMAN に提出してください：」      │
 │                     │  ┌──────────────────────────────────────────────────┐   │
-│                     │  │ Cloning into 'altx-ai-training-lab'...           │   │
+│                     │  │ Cloning into 'ipp-ai-training-lab'...           │   │
 │                     │  │ Python 3.12.10: OK                               │   │
 │                     │  │ Gemini API: SUCCESS                              │   │
 │                     │  └──────────────────────────────────────────────────┘   │
@@ -291,7 +291,7 @@ HITMAN Cockpit の画面左上にあるボタンで、いつでもコースを�
 受講生各自の PC ドライブ環境や企業のセキュリティ規程に合わせて、**作業フォルダの場所（ドライブ・パス・名前）** や **Python 仮想環境（venv / Conda / uv 等）** を事前に自由に個別設定できます。
 
 ### 💡 なぜ個別にカスタマイズができるの？
-- **社内PCのドライブ容量制約**: 「Cドライブの空き容量が逼迫しており、大容量の Dドライブ（例: `D:\AltX-Lab\`）で作業したい」
+- **社内PCのドライブ容量制約**: 「Cドライブの空き容量が逼迫しており、大容量の Dドライブ（例: `D:\IPP-Lab\`）で作業したい」
 - **社内標準プロジェクト配置**: 「会社の規程で、すべての開発成果物は `C:\dev\` や `~/workspace/` 配下に置く決まりがある」
 - **既存の仮想環境の再利用**: 「すでに業務で使用している Anaconda / Miniconda 環境（例: `conda activate py312`）や、既存の `.venv` をそのまま使いたい」
 
@@ -301,7 +301,7 @@ HITMAN Cockpit は、受講生が **`[⚙️ 研修環境設定]`** ボタンか
 
 | パラメータ | 役割 | 入力例（相対パス / 絶対パス / 各種環境） | デフォルト値（未指定時） |
 | :--- | :--- | :--- | :--- |
-| **作業ディレクトリ** (`WORKSPACE_DIR`) | リポジトリやエージェントコードを格納する親フォルダ | `altx-agent-workspace`<br>`D:\dev\altx-lab`<br>`C:\workspace\my_agent`<br>`~/workspace/altx-agent` | `altx-agent-workspace` |
+| **作業ディレクトリ** (`WORKSPACE_DIR`) | リポジトリやエージェントコードを格納する親フォルダ | `ipp-agent-workspace`<br>`D:\dev\ipp-lab`<br>`C:\workspace\my_agent`<br>`~/workspace/ipp-agent` | `ipp-agent-workspace` |
 | **エージェント名** (`AGENT_NAME`) | 開発するエージェントのフォルダ名・サービス名 | `my_agent`<br>`my_hitman`<br>`incident_bot` など | コースA: `my_agent`<br>コースB: `my_hitman` |
 | **Python実行環境** (`PYTHON_ENV`) | テストやスクリプトを実行する Python コマンドまたはパス | `uv run python`<br>`python` / `python3`<br>`conda run -n myenv python`<br>`C:\Users\xxx\.conda\envs\py312\python.exe` | `uv run python` (自動フォールバック) |
 
@@ -312,10 +312,10 @@ HITMAN Cockpit は、受講生が **`[⚙️ 研修環境設定]`** ボタンか
 | ステップ | 連動・波及する内容 | カスタマイズ時の挙動例（例: `D:\dev\my_lab`, `my_custom_bot`） |
 | :--- | :--- | :--- |
 | **Step T-1** | フォルダ作成・クローン先・Wチェック判定 | `mkdir D:\dev\my_lab && cd D:\dev\my_lab && git clone ...`<br>提出ログに指定フォルダやクローンログが含まれていれば即合格 |
-| **Step T-2** | 要件定義・設計書 Markdown パス | `D:\dev\my_lab/project_brief.md` に作成指示 |
-| **Step T-3** | エージェントコード生成・確認コマンド | `D:\dev\my_lab/my_custom_bot/agent.py` を作成・確認 |
-| **Step T-4** | 単体テスト（Pytest）実行コマンド | `<指定Python> -m pytest D:\dev\my_lab/my_custom_bot/tests/ -v` |
-| **Step T-5** | Cloud Run デプロイコマンド | `gcloud run deploy my_custom_bot --source D:\dev\my_lab/my_custom_bot ...` |
+| **Step T-2** | 要件定義・設計書 Markdown パス | `D:\dev\my_lab\project_brief.md` に作成指示 |
+| **Step T-3** | エージェントコード生成・確認コマンド | `D:\dev\my_lab\my_custom_bot\agent.py` を作成・確認 |
+| **Step T-4** | 単体テスト（Pytest）実行コマンド | `<指定Python> -m pytest D:\dev\my_lab\my_custom_bot\tests\ -v` |
+| **Step T-5** | Cloud Run デプロイコマンド | `gcloud run deploy my_custom_bot --source D:\dev\my_lab\my_custom_bot ...` |
 | **Step T-6** | GitHub プッシュ・事前安全スキャン | 指定フォルダ配下の機密情報スキャンと個人リポジトリ連携 |
 
 ---
@@ -333,7 +333,7 @@ HITMAN Cockpit は、受講生が **`[⚙️ 研修環境設定]`** ボタンか
 
 > [!TIP]
 > **作業フォルダやPython環境のカスタマイズ（任意）**:
-> 初めての方や指定がない方は**何も変更せずデフォルトのままで進めてOK**です（自動的に `altx-agent-workspace` が使われます）。  
+> 初めての方や指定がない方は**何も変更せずデフォルトのままで進めてOK**です（自動的に `ipp-agent-workspace` が使われます）。  
 > 「社内規定で特定ドライブ（D:\やC:\dev等）に置きたい」「フォルダ名を `my-ai-workspace` にしたい」「既存の特定Python/仮想環境（venv / conda 等）を使いたい」という方は、HITMAN 画面の **`[⚙️ 研修環境設定]`** ボタン（左パネル上部またはチップ）をクリックしてパスを設定できます。  
 > 設定すると、Step T-1〜T-6 の全コマンド・プロンプト・提出ログ判定ロジックが自動的にあなたの指定したパスに書き換わります！
 
@@ -344,9 +344,9 @@ HITMAN Cockpit は、受講生が **`[⚙️ 研修環境設定]`** ボタンか
 
 ```text
 【AntiGravityに貼り付けるプロンプト: Step T-1（デフォルト例）】
-あなたは株式会社AltXのAI研修専属メンターです。
+あなたはIPPのAI研修専属メンターです。
 1. モデル選定: チャットのモデル設定でまず「gemini-3.8-flash」を選択してください。エラーや利用不可の場合は「gemini-3.6-flash」を選択してください。
-2. 作業ディレクトリ: 「altx-agent-workspace」を作成し、以後のファイル作成や作業はすべてこのフォルダ内で行ってください。
+2. 作業ディレクトリ: 「ipp-agent-workspace」を作成し、以後のファイル作成や作業はすべてこのフォルダ内で行ってください。
 3. リポジトリクローン:
    git clone https://github.com/almlog/altx-ai-training-lab.git
    を実行し、リポジトリ内の .agents/skills/ にある研修スキル群（pick-your-agent-project, build-agent-frontend, enable-a2ui 等）および .agents/mcp_config.json を読み込んで自己学習してください。
@@ -359,7 +359,7 @@ HITMAN Cockpit は、受講生が **`[⚙️ 研修環境設定]`** ボタンか
 
 ```text
 【HITMANに貼り付けるエビデンスの例】
-Cloning into 'altx-ai-training-lab'...
+Cloning into 'ipp-ai-training-lab'...
 remote: Enumerating objects: 120, done.
 Python 3.12.10
 Gemini API Connection: SUCCESS (Model: gemini-3.8-flash)
@@ -386,7 +386,7 @@ Skills loaded: pick-your-agent-project, enable-a2ui, build-agent-frontend, memor
 【AntiGravityに貼り付けるプロンプト: Step T-2 (コースA)】
 スキル「pick-your-agent-project」を活用して、私が現場で抱える課題を解決するオリジナルAIエージェントの企画・要件定義を作成してください。
 私の課題・作りたいもの: （例: クラウドログ監視と異常検知ボット、社内申請FAQボット など）
-以下の項目を含む「altx-agent-workspace/project_brief.md」を作成し、内容を出力してください：
+以下の項目を含む「ipp-agent-workspace/project_brief.md」を作成し、内容を出力してください：
 1. エージェント名と目的（解決する現場課題）
 2. 使用するモデル（gemini-3.8-flash または 3.6-flash）
 3. 必要な関数ツール（自作ツール最低1つ）
@@ -402,7 +402,7 @@ AIペアオペレーター「HITMAN」クローンの仕様を設計します。
 1. Excel/CSV手順書を読み込むデータ構造
 2. ターミナルログを検証するWチェック判定ルール（正常合格、エラー検知、自己申告遮断）
 3. 上長協議エスカレーションゲートの仕様
-以上の設計を「altx-agent-workspace/hitman_spec.md」として作成し、内容を出力してください。
+以上の設計を「ipp-agent-workspace/hitman_spec.md」として作成し、内容を出力してください。
 【重要制約】今回は仕様書作成のみを行い、実装コードの生成はまだ待機してください。
 ```
 
@@ -423,7 +423,7 @@ AIペアオペレーター「HITMAN」クローンの仕様を設計します。
 ```text
 【AntiGravityに貼り付けるプロンプト: Step T-3】
 project_brief.md の定義に基づき、Google ADK (Python) で自作エージェントを実装してください。
-作業ディレクトリ: altx-agent-workspace/my_agent/
+作業ディレクトリ: ipp-agent-workspace/my_agent/
 スキル「enable-a2ui」および「google-agents-cli-adk-code-ja」を参照し、以下を構築してください：
 1. agent.py:
    - Google ADK Agent (MODEL: gemini-3.8-flash / 3.6-flash)
@@ -435,7 +435,7 @@ project_brief.md の定義に基づき、Google ADK (Python) で自作エージ�
 【重要制約】今回はコード実装のみを行ってください。テストの実行やデプロイはまだ行わないでください。
 ```
 
-3. **見守る**: AntiGravity が `altx-agent-workspace/my_agent/agent.py` などのファイルを次々と自動生成していきます。
+3. **見守る**: AntiGravity が `ipp-agent-workspace/my_agent/agent.py` などのファイルを次々と自動生成していきます。
 4. **HITMAN への提出**: AntiGravity が出力した `agent.py` のプログラムコード（先頭部分）をコピーして HITMAN に貼り付けます。
 5. 🟢 **合格判定** を受けて、Step T-4 へ進みます。
 
@@ -452,7 +452,7 @@ project_brief.md の定義に基づき、Google ADK (Python) で自作エージ�
 
 ```text
 【AntiGravityに貼り付けるプロンプト: Step T-4】
-altx-agent-workspace/my_agent/ に対する単体テスト（tests/test_agent.py）を作成し、pytest を実行してください。
+ipp-agent-workspace/my_agent/ に対する単体テスト（tests/test_agent.py）を作成し、pytest を実行してください。
 テスト項目:
 1. 正常系: 関数ツールの呼び出しと正しい戻り値の検証
 2. A2UIカード: after_model_callback による A2UI v0.8 カードの生成検証
@@ -492,7 +492,7 @@ tests/test_agent.py::test_agent_response PASSED                          [100%]
 1. frontend/ の配置: FastAPI プロキシ、チャットUI (static/index.html)、A2UI レンダラーの構築
 2. サービスアカウント権限: Cloud Run サービスアカウントに roles/aiplatform.user を付与
 3. デプロイコマンドの実行:
-   gcloud run deploy my-custom-agent --source altx-agent-workspace/my_agent --region us-central1 --allow-unauthenticated
+   gcloud run deploy my-custom-agent --source ipp-agent-workspace/my_agent --region us-central1 --allow-unauthenticated
 4. 発行された本番公開サービスURL（https://...run.app）を出力してください。
 ```
 
@@ -515,7 +515,7 @@ tests/test_agent.py::test_agent_response PASSED                          [100%]
 【AntiGravityに貼り付けるプロンプト: Step T-6】
 スキル「publish-to-github」を活用して、完成したエージェントのソースコードを私の個人GitHubリポジトリへ公開（Public）してください。
 1. gh auth login（デバイス認証）による個人GitHubログイン（ワンタイムコードを表示）
-2. リポジトリ作成: altx-ai-[アプリ名] として新規パブリックリポジトリを作成
+2. リポジトリ作成: ipp-ai-[アプリ名] として新規パブリックリポジトリを作成
 3. .gitignore の確認とシークレットスキャン（APIキー等の漏洩防止）
 4. コミット＆プッシュの実行
 5. 公開されたリポジトリURL（https://github.com/...）を出力してください。
@@ -591,5 +591,5 @@ HITMAN Cockpit の画面右上にある **「📊 最終評価レポート」** 
 
 ---
 
-**開発・監修**: 株式会社ＡｌｔＸ（AltX Inc.） 鈴木 駿平 (Shunpei Suzuki) <suzuki.shunpei@altx.co.jp>  
-**著作権**: Copyright (c) 2026 Shunpei Suzuki (AltX Inc.) All Rights Reserved.  
+**開発・監修**: IPP 鈴木 駿平 (Shunpei Suzuki) <suzuki.shunpei@ipp.local>  
+**著作権**: Copyright (c) 2026 Shunpei Suzuki (IPP) All Rights Reserved.  

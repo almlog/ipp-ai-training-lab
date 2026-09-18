@@ -1,11 +1,11 @@
-# AltX 社内AI実践研修カリキュラム
+# IPP 社内AI実践研修カリキュラム
 ## 〜 HITMAN（AIペアオペレーター）とアンチグラビティで拓く、自律型AIエージェント開発・デプロイ実践 〜
 
-**開発・監修**: 株式会社ＡｌｔＸ（AltX Inc.） 鈴木 駿平 (Shunpei Suzuki) <suzuki.shunpei@altx.co.jp>  
-**著作権**: Copyright (c) 2026 Shunpei Suzuki (AltX Inc.) All Rights Reserved.  
-**プロジェクト名**: `altx-ai-training-lab`  
+**開発・監修**: IPP 鈴木 駿平 (Shunpei Suzuki) <suzuki.shunpei@ipp.local>  
+**著作権**: Copyright (c) 2026 Shunpei Suzuki (IPP) All Rights Reserved.  
+**プロジェクト名**: `ipp-ai-training-lab`  
 **HITMAN 稼働エンジン**: `gemini-3.6-flash` (Vertex AI / Global)  
-**公式プラットフォーム URL**: [https://altx-hitman-cockpit-1070367799384.us-central1.run.app](https://altx-hitman-cockpit-1070367799384.us-central1.run.app)  
+**公式プラットフォーム URL**: [https://ipp-hitman-cockpit-1070367799384.us-central1.run.app](https://ipp-hitman-cockpit-1070367799384.us-central1.run.app)  
 **公式ハンズオンマニュアル（完全版）**: [`TRAINING_LAB_MANUAL.md`](./TRAINING_LAB_MANUAL.md)
 
 ---
@@ -14,7 +14,7 @@
 
 本研修の目的は、**「全員が同じHITMANをゼロから作ること」ではありません**。
 
-受講生は、鈴木 駿平（AltX Inc.）が設計・開発した公式AIペアオペレーター**「HITMAN」**をオペレーション基盤として活用し、HITMANから提供される検証済み手順・プロンプトを**「アンチグラビティ（Antigravity）」**に投入します。
+受講生は、鈴木 駿平（IPP）が設計・開発した公式AIペアオペレーター**「HITMAN」**をオペレーション基盤として活用し、HITMANから提供される検証済み手順・プロンプトを**「アンチグラビティ（Antigravity）」**に投入します。
 
 アンチグラビティは裏側に配備された高度な**Skills（AIガバナンス研修 M0〜M5、開発・デプロイスキル）**を自律的に活用し、受講者を強力に伴走します。受講生はセキュリティやガバナンスの勘所を実体験した上で、**「自分自身の現場課題を解決する、思い思いのオリジナルAIエージェントやツール」**を企画・開発し、Cloud Runへの本番デプロイまでを達成します。
 
@@ -68,7 +68,7 @@
 
 ### 【事前準備における作業環境・パスの個別最適化（任意）】
 受講生各自の PC 環境（ドライブ容量、会社セキュリティ規程、既存の仮想環境）に柔軟に適応するため、HITMAN は作業環境の完全個別設定に対応しています：
-- **作業フォルダの自由選択**: デフォルト（`altx-agent-workspace`）以外に、容量に余裕のある別ドライブ（例: `D:\dev\lab`）や社内標準ディレクトリ（例: `C:\workspace\`）、Mac/Linuxのホーム配下などを自由に事前決定できます。
+- **作業フォルダの自由選択**: デフォルト（`ipp-agent-workspace`）以外に、容量に余裕のある別ドライブ（例: `D:\dev\lab`）や社内標準ディレクトリ（例: `C:\workspace\`）、Mac/Linuxのホーム配下などを自由に事前決定できます。
 - **Python仮想環境の自由指定**: 高速パッケージマネージャー `uv`（推奨）のほか、社内業務ですでに構築済みの Conda 環境（`conda run -n py312 python`）や既存の `.venv` をそのまま活用できます。
 - **HITMAN での事前反映**: 研修当日、HITMAN Cockpit の **`[⚙️ 研修環境設定]`** に入力するだけで、全ステップ（T-1〜T-6）のプロンプト・コマンド・合否判定が受講生個別のパスへ一瞬で連動します。
 
@@ -81,7 +81,7 @@
 
 1. [Google Cloud Console](https://console.cloud.google.com/) に個人の Google アカウントでログイン。
 2. 画面上部のプロジェクト選択から **「新しいプロジェクト」** を作成。
-   - プロジェクト名: `altx-ai-training-<自分の名前>`（例: `altx-ai-training-tanaka`）
+   - プロジェクト名: `ipp-ai-training-<自分の名前>`（例: `ipp-ai-training-tanaka`）
 3. **お支払い（Billing）の紐付け（必須）**:
    - メニューから「お支払い（Billing）」を開き、有効なクレジットカードまたは無料トライアル枠をプロジェクトに紐付ける。
    - **注意**: 課金が未設定のプロジェクトでは Vertex AI の推論および Cloud Run のビルドが 403 Forbidden で遮断されます。
@@ -94,7 +94,7 @@
 2. 取得した個人キーを、ローカル環境の `.env` または環境変数に設定します：
    ```bash
    GOOGLE_API_KEY=AQ.xxxx...（あなたの個人キー）
-   GOOGLE_CLOUD_PROJECT=altx-ai-training-xxxx
+   GOOGLE_CLOUD_PROJECT=ipp-ai-training-xxxx
    GOOGLE_CLOUD_LOCATION=global
    GOOGLE_GENAI_USE_VERTEXAI=true
    ```
@@ -108,7 +108,7 @@ Cloud Shell またはローカルの gcloud CLI にて以下のコマンドを�
 gcloud auth login
 
 # プロジェクトの設定
-gcloud config set project altx-ai-training-xxxx
+gcloud config set project ipp-ai-training-xxxx
 
 # 必須APIの有効化
 gcloud services enable \
@@ -121,9 +121,9 @@ gcloud services enable \
 
 ### 【マイルストーン 4】HITMAN Cockpit を操作しプロンプトを取得する
 
-1. 鈴木 駿平がデプロイした **HITMAN Cockpit**（`https://altx-hitman-cockpit-1070367799384.us-central1.run.app`）をブラウザで開く。
+1. 鈴木 駿平がデプロイした **HITMAN Cockpit**（`https://ipp-hitman-cockpit-1070367799384.us-central1.run.app`）をブラウザで開く。
 2. 現場実務用Excel手順書（`.xlsm`）をアップロード、またはプリセットのSOP手順を選択（研修生は「🎓 研修モード」を選択）。
-3. 作業フォルダや仮想環境を独自指定したい場合は、画面内の **`[⚙️ 研修環境設定]`** から自由にパスを調整（指定がない場合は標準の `altx-agent-workspace` が自動適用）。
+3. 作業フォルダや仮想環境を独自指定したい場合は、画面内の **`[⚙️ 研修環境設定]`** から自由にパスを調整（指定がない場合は標準の `ipp-agent-workspace` が自動適用）。
 4. 画面に表示される **「安全チェック」「パラメータ置換」「Wチェック承認」** を確認。
 5. HITMAN が提示する **「アンチグラビティに投入する検証済みプロンプト」** をコピーする。
 
@@ -170,7 +170,7 @@ gcloud run deploy my-custom-agent \
   --source . \
   --region us-central1 \
   --allow-unauthenticated \
-  --set-env-vars "GOOGLE_API_KEY=AQ.xxx,GOOGLE_CLOUD_PROJECT=altx-ai-training-xxxx,GOOGLE_CLOUD_LOCATION=global,GOOGLE_GENAI_USE_VERTEXAI=true"
+  --set-env-vars "GOOGLE_API_KEY=AQ.xxx,GOOGLE_CLOUD_PROJECT=ipp-ai-training-xxxx,GOOGLE_CLOUD_LOCATION=global,GOOGLE_GENAI_USE_VERTEXAI=true"
 ```
 
 デプロイ完了後に出力される Service URL（`https://my-custom-agent-xxxx.run.app`）をブラウザで開けば、世界中からアクセス可能な受講生独自のAIツールが完成します！
@@ -191,4 +191,4 @@ gcloud run deploy my-custom-agent \
 | **Cloud Build のアップロードが遅い** | `.venv` や不要なファイルがアップロードに含まれている | `.dockerignore` に `.venv/` や `__pycache__/` を追加して除外 |
 
 ---
-**© 2026 Shunpei Suzuki (AltX Inc.)**
+**© 2026 Shunpei Suzuki (IPP)**

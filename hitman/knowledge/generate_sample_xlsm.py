@@ -1,5 +1,5 @@
-# Copyright (c) 2026 Shunpei Suzuki (suzuki.shunpei@altx.co.jp), AltX Inc.
-# Developed by Shunpei Suzuki <suzuki.shunpei@altx.co.jp>
+# Copyright (c) 2026 Shunpei Suzuki (suzuki.shunpei@ipp.local), IPP
+# Developed by Shunpei Suzuki <suzuki.shunpei@ipp.local>
 #
 """Generates a realistic enterprise parameterized .xlsm sample procedure workbook."""
 
@@ -37,7 +37,7 @@ def generate_sample_xlsm(output_path: str):
     ws_param.views.sheetView[0].showGridLines = True
 
     # Title
-    ws_param["A1"] = "【株式会社AltX 本番システム移行・リリース作業計画書（パラメータ定義・承認印）】"
+    ws_param["A1"] = "【IPP 本番システム移行・リリース作業計画書（パラメータ定義・承認印）】"
     ws_param["A1"].font = Font(name="Meiryo UI", size=13, bold=True, color="1E3A8A")
 
     # Section A: 承認情報
@@ -48,8 +48,8 @@ def generate_sample_xlsm(output_path: str):
     approval_values = [
         "承認済 (APPROVED)",
         "山田 太郎 (システム運用統括部長)",
-        "APPR-20260906-ALTX-01",
-        "鈴木 駿平 (AltX Inc.)",
+        "APPR-20260906-IPP-01",
+        "鈴木 駿平 (IPP)",
         "2026-09-06",
         "基幹EC決済プラットフォーム (本番環境)",
     ]
@@ -82,7 +82,7 @@ def generate_sample_xlsm(output_path: str):
         c.border = thin_border
 
     params_data = [
-        ("${TARGET_HOST}", "db-prd-01.internal.altx.jp", "本番接続先ホストFQDN", "検証完了 (OK)"),
+        ("${TARGET_HOST}", "db-prd-01.internal.ipp.local", "本番接続先ホストFQDN", "検証完了 (OK)"),
         ("${HEALTH_PORT}", "8080", "ヘルスチェックAPI監視ポート番号", "検証完了 (OK)"),
         ("${APP_VERSION}", "v2.1.0", "今回リリース対象の新パッケージバージョン", "検証完了 (OK)"),
         ("${BACKUP_DIR}", "/backup/20260906_release", "作業前完全バックアップ格納先ディレクトリ", "検証完了 (OK)"),
