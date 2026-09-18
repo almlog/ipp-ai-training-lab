@@ -545,7 +545,7 @@ def test_training_step_verification_t1_to_t6():
     from app.agent import verify_step_output
 
     # T-1: 正常合格 vs 自己申告差し戻し
-    t1_pass = verify_step_output("T-1", "mkdir ipp-agent-workspace\ngit clone https://github.com/almlog/altx-ai-training-lab.git\nCloning into 'ipp-ai-training-lab'...")
+    t1_pass = verify_step_output("T-1", "mkdir ipp-agent-workspace\ngit clone https://github.com/almlog/ipp-ai-training-lab.git\nCloning into 'ipp-ai-training-lab'...")
     assert t1_pass["verdict"] == "SUCCESS"
     assert t1_pass["w_check_status"] == "VERIFIED_APPROVED"
 

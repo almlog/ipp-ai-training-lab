@@ -94,7 +94,7 @@ uv run pytest
   - モデル選定: `gemini-3.8-flash` を優先選択、未提供・エラー時は `gemini-3.6-flash` へフォールバック。
   - 専用作業フォルダ: `ipp-agent-workspace`（デフォルト）。画面内の `[⚙️ 研修環境設定]` から特定ドライブ（D:\等）や社内規定パスへ自由に変更可能。
   - Python仮想環境: `uv run python`（推奨）のほか、Conda や既存の `.venv` など受講者個別の Python パスへ自由に変更可能。
-  - リポジトリクローン: `git clone https://github.com/almlog/altx-ai-training-lab.git` により `.agents/skills/` の研修スキル群を自律習得。
+  - リポジトリクローン: `git clone https://github.com/almlog/ipp-ai-training-lab.git` により `.agents/skills/` の研修スキル群を自律習得。
   - 手順カード上の `[📋 AGYプロンプトをコピー]` ボタンからワンクリックでプロンプトを取得可能（設定したパスに自動置換）。
 
 ---

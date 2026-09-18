@@ -6,12 +6,12 @@
 
 <br/>
 
-[![Project](https://img.shields.io/badge/Project-IPP%20AI%20Training%20Lab-0052CC)](https://github.com/almlog/altx-ai-training-lab)
+[![Project](https://img.shields.io/badge/Project-IPP%20AI%20Training%20Lab-0052CC)](https://github.com/almlog/ipp-ai-training-lab)
 [![Developer](https://img.shields.io/badge/Developer-Shunpei%20Suzuki%20(IPP)-blue)](https://github.com/almlog)
 [![Engine](https://img.shields.io/badge/Model-Gemini%203.6%20Flash-34A853?logo=googlecloud)](https://cloud.google.com/vertex-ai)
 [![Framework](https://img.shields.io/badge/Framework-Google%20ADK%201.5.0-FBBC05)](https://google.github.io/adk-docs/)
 [![Production URL](https://img.shields.io/badge/Production-Cloud%20Run%20(Live)-34A853?logo=googlecloud)](https://ipp-hitman-cockpit-1070367799384.us-central1.run.app)
-[![Tests](https://img.shields.io/badge/Tests-35%2F35%20Passed-brightgreen)](https://github.com/almlog/altx-ai-training-lab)
+[![Tests](https://img.shields.io/badge/Tests-35%2F35%20Passed-brightgreen)](https://github.com/almlog/ipp-ai-training-lab)
 
 <br/>
 

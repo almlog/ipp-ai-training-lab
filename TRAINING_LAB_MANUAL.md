@@ -5,7 +5,7 @@
 **著作権**: Copyright (c) 2026 Shunpei Suzuki (IPP) All Rights Reserved.  
 **プロジェクト名**: `ipp-ai-training-lab`  
 **HITMAN Cockpit 公式本番URL**: [https://ipp-hitman-cockpit-1070367799384.us-central1.run.app](https://ipp-hitman-cockpit-1070367799384.us-central1.run.app)  
-**公式GitHubリポジトリ**: [https://github.com/almlog/altx-ai-training-lab](https://github.com/almlog/altx-ai-training-lab)  
+**公式GitHubリポジトリ**: [https://github.com/almlog/ipp-ai-training-lab](https://github.com/almlog/ipp-ai-training-lab)  
 **使用AIモデル**: `gemini-3.8-flash`（優先）または `gemini-3.6-flash`（安定版）  
 
 ---
@@ -348,7 +348,7 @@ HITMAN Cockpit は、受講生が **`[⚙️ 研修環境設定]`** ボタンか
 1. モデル選定: チャットのモデル設定でまず「gemini-3.8-flash」を選択してください。エラーや利用不可の場合は「gemini-3.6-flash」を選択してください。
 2. 作業ディレクトリ: 「ipp-agent-workspace」を作成し、以後のファイル作成や作業はすべてこのフォルダ内で行ってください。
 3. リポジトリクローン:
-   git clone https://github.com/almlog/altx-ai-training-lab.git
+   git clone https://github.com/almlog/ipp-ai-training-lab.git
    を実行し、リポジトリ内の .agents/skills/ にある研修スキル群（pick-your-agent-project, build-agent-frontend, enable-a2ui 等）および .agents/mcp_config.json を読み込んで自己学習してください。
 4. 準備完了の確認: Pythonバージョン（3.11/3.12+）およびAPIキー疎通確認テストを行い、実行結果ログを出力してください。
 【重要制約】今回は環境構築とスキル同期のみを行ってください。エージェントの実装やデプロイはまだ行わず、準備完了ログを出力して待機してください。

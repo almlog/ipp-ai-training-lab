@@ -16,7 +16,7 @@
 
 ```text
 $ mkdir ipp-agent-workspace && cd ipp-agent-workspace
-$ git clone https://github.com/almlog/altx-ai-training-lab.git
+$ git clone https://github.com/almlog/ipp-ai-training-lab.git
 Cloning into 'ipp-ai-training-lab'...
 remote: Enumerating objects: 125, done.
 remote: Counting objects: 100% (125/125), done.

@@ -219,8 +219,8 @@ TRAINING_SOP_ORIGINAL = {
         "step_id": "T-1",
         "title": "ステップ T-1: 開発環境構築とスキル同期",
         "objective": "AntiGravityでモデルを選定（3.8 Flash優先、エラー時3.6 Flash）、専用フォルダを作成し、講師リポジトリをクローンして研修スキルを習得する。",
-        "command": "mkdir ipp-agent-workspace && cd ipp-agent-workspace && git clone https://github.com/almlog/altx-ai-training-lab.git",
-        "expected_check": "ipp-agent-workspace 内に altx-ai-training-lab が正常クローンされ、.agents/skills/ が認識されること",
+        "command": "mkdir ipp-agent-workspace && cd ipp-agent-workspace && git clone https://github.com/almlog/ipp-ai-training-lab.git",
+        "expected_check": "ipp-agent-workspace 内に ipp-ai-training-lab が正常クローンされ、.agents/skills/ が認識されること",
         "cautions": "AntiGravity のモデル設定で「gemini-3.8-flash」を選択してください（エラーや未提供時は「gemini-3.6-flash」へフォールバック）。以後の全作業は必ず専用フォルダ（ipp-agent-workspace）内で行ってください。",
         "agy_prompt": (
             "【AntiGravity投入用プロンプト: Step T-1（環境構築・スキル同期）】\n"
@@ -231,16 +231,16 @@ TRAINING_SOP_ORIGINAL = {
             "1. モデル選定確認: チャット設定で「gemini-3.8-flash」（エラー時は3.6-flash）が選択されていることを確認する。\n"
             "2. 作業ディレクトリ作成: 「ipp-agent-workspace」を作成し、以後の作業フォルダとする。\n"
             "3. リポジトリクローン:\n"
-            "   git clone https://github.com/almlog/altx-ai-training-lab.git\n"
+            "   git clone https://github.com/almlog/ipp-ai-training-lab.git\n"
             "   を実行し、リポジトリ内の .agents/skills/ を読み込んで自己学習する。\n"
             "4. 検証と生ログ出力:\n"
             "   ターミナルで以下を実行してください：\n"
-            "   python --version && ls -la altx-ai-training-lab/.agents/skills/\n\n"
+            "   python --version && ls -la ipp-ai-training-lab/.agents/skills/\n\n"
             "【重要: HITMAN提出用生ログ出力規程】\n"
             "「完了しました」等の自然言語による要約だけで回答を終わらせることは厳禁です。\n"
             "受講生がHITMANの客観Wチェックに提出できるよう、必ず回答の最末尾に実行コマンドとターミナル標準出力（生ログ）を、以下の通り```bashのコードブロック形式で逐語出力してください：\n\n"
             "```bash\n"
-            "$ python --version && ls -la altx-ai-training-lab/.agents/skills/\n"
+            "$ python --version && ls -la ipp-ai-training-lab/.agents/skills/\n"
             "(ターミナルの標準出力をそのまま全文出力)\n"
             "```\n\n"
             "出力後、受講生へ「上記コードブロック内のターミナルログをコピーして、HITMANのチャット欄に貼り付けてください。HITMANが客観Wチェックを行い、合格承認後にステップ T-2へ進みます！」と案内して待機してください。"
@@ -386,8 +386,8 @@ TRAINING_SOP_HITMAN_CLONE = {
         "step_id": "T-1",
         "title": "ステップ T-1: 開発環境構築とスキル同期",
         "objective": "AntiGravityでモデルを選定（3.8 Flash優先、エラー時3.6 Flash）、専用フォルダを作成し、講師リポジトリをクローンして研修スキルを習得する。",
-        "command": "mkdir ipp-agent-workspace && cd ipp-agent-workspace && git clone https://github.com/almlog/altx-ai-training-lab.git",
-        "expected_check": "ipp-agent-workspace 内に altx-ai-training-lab が正常クローンされ、.agents/skills/ が認識されること",
+        "command": "mkdir ipp-agent-workspace && cd ipp-agent-workspace && git clone https://github.com/almlog/ipp-ai-training-lab.git",
+        "expected_check": "ipp-agent-workspace 内に ipp-ai-training-lab が正常クローンされ、.agents/skills/ が認識されること",
         "cautions": "AntiGravity のモデル設定で「gemini-3.8-flash」を選択してください（エラーや未提供時は「gemini-3.6-flash」へフォールバック）。以後の全作業は必ず専用フォルダ（ipp-agent-workspace）内で行ってください。",
         "agy_prompt": (
             "【AntiGravity投入用プロンプト: Step T-1 (HITMANクローン)】\n"
@@ -398,16 +398,16 @@ TRAINING_SOP_HITMAN_CLONE = {
             "1. モデル選定確認: チャット設定で「gemini-3.8-flash」（エラー時は3.6-flash）が選択されていることを確認する。\n"
             "2. 作業ディレクトリ作成: 「ipp-agent-workspace」を作成し、以後の作業フォルダとする。\n"
             "3. リポジトリクローン:\n"
-            "   git clone https://github.com/almlog/altx-ai-training-lab.git\n"
+            "   git clone https://github.com/almlog/ipp-ai-training-lab.git\n"
             "   を実行し、リポジトリ内の .agents/skills/ を読み込んで自己学習する。\n"
             "4. 検証と生ログ出力:\n"
             "   ターミナルで以下を実行してください：\n"
-            "   python --version && ls -la altx-ai-training-lab/.agents/skills/\n\n"
+            "   python --version && ls -la ipp-ai-training-lab/.agents/skills/\n\n"
             "【重要: HITMAN提出用生ログ出力規程】\n"
             "「完了しました」等の自然言語による要約だけで回答を終わらせることは厳禁です。\n"
             "受講生がHITMANの客観Wチェックに提出できるよう、必ず回答の最末尾に実行コマンドとターミナル標準出力（生ログ）を、以下の通り```bashのコードブロック形式で逐語出力してください：\n\n"
             "```bash\n"
-            "$ python --version && ls -la altx-ai-training-lab/.agents/skills/\n"
+            "$ python --version && ls -la ipp-ai-training-lab/.agents/skills/\n"
             "(ターミナルの標準出力をそのまま全文出力)\n"
             "```\n\n"
             "出力後、受講生へ「上記コードブロック内のターミナルログをコピーして、HITMANのチャット欄に貼り付けてください。HITMANが客観Wチェックを行い、合格承認後にステップ T-2へ進みます！」と案内して待機してください。"
@@ -550,7 +550,7 @@ TRAINING_PARAMETERS = {
     "PYTHON_ENV": "uv (自動管理)",
     "PRIMARY_MODEL": "gemini-3.8-flash",
     "FALLBACK_MODEL": "gemini-3.6-flash",
-    "REPO_URL": "https://github.com/almlog/altx-ai-training-lab.git",
+    "REPO_URL": "https://github.com/almlog/ipp-ai-training-lab.git",
 }
 DEFAULT_TRAINING_PARAMETERS = dict(TRAINING_PARAMETERS)
 
@@ -1530,7 +1530,7 @@ def verify_step_output(step_number: int | str, command_output: str) -> dict:
             ws_cur = TRAINING_PARAMETERS.get("WORKSPACE_DIR", "ipp-agent-workspace")
             ws_cur_clean = ws_cur.replace("\\", "/").rstrip("/").split("/")[-1].lower()
             has_t1_sig = any(k in output_lower for k in (
-                ws_cur_clean, "ipp-agent-workspace", "altx-agent-workspace", "ipp-ai-training-lab", "altx-ai-training-lab", "git clone", "cloning into",
+                ws_cur_clean, "ipp-agent-workspace", "altx-agent-workspace", "ipp-ai-training-lab", "ipp-ai-training-lab", "git clone", "cloning into",
                 "gemini-3.8-flash", "gemini-3.6-flash", "python", "3.11", "3.12", "api key",
                 "requirements", "virtualenv", ".venv", "active", "mkdir", "new-item", "cd "
             ))
