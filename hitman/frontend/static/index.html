@@ -2911,9 +2911,8 @@ function loadState() {
             appState.courseCardCollapsed = true;
           }
         }
-        // 【自己治癒】T-2 が誤って自動補完（「ステップ T-3 進行に伴い...」など）で SUCCESS になっていたり、
-        // 実際の客観Wチェック合格証跡（cat project_brief.md や VERIFIED_APPROVED）がないのに
-        // T-2完了・T-3進行中になってしまっている場合は、T-2 進行中（未完了）へ修復
+        // 【自己治癒: T-2】T-2 が誤って自動補完で SUCCESS になっていたり、
+        // 実際の客観Wチェック合格証跡がないのに完了になっている場合は T-2 進行中へ修復
         if (appState.sopResults && appState.sopResults["T-2"]) {
           const t2Res = appState.sopResults["T-2"];
           const snippet = t2Res.logSnippet || "";
@@ -2924,8 +2923,16 @@ function loadState() {
             appState.errorStep = null;
           }
         }
-        if (appState.currentStep === "T-3" && (!appState.sopResults || !appState.sopResults["T-2"])) {
-          appState.currentStep = "T-2";
+        // 【自己治癒: T-3】T-3 の客観ログ（pytest や agent.py 等）の承認がないのに SUCCESS になっている場合は未完了に修復
+        if (appState.sopResults && appState.sopResults["T-3"]) {
+          const t3Res = appState.sopResults["T-3"];
+          const snippet = t3Res.logSnippet || "";
+          const isRealT3Approval = snippet.includes("pytest") || snippet.includes("agent.py") || snippet.includes("単体テスト") || snippet.includes("テストPASS");
+          if (!isRealT3Approval) {
+            delete appState.sopResults["T-3"];
+            appState.currentStep = "T-3";
+            appState.errorStep = null;
+          }
         }
       }
       return true;
@@ -5343,16 +5350,6 @@ function buildNode(id, comps, seen) {
       }
       t.textContent = rawText;
 
-      if (hint === "h1") {
-        // カードのタイトルからステップ番号を検出して即時UI同期
-        const stepMatch = rawText.match(/ステップ\s*(T-[1-6]|[1-4]-[1-4]|R-[1-2]|E-1)/i) || rawText.match(/\b(T-[1-6])\b/i);
-        if (stepMatch && typeof syncStepProgression === "function") {
-          const detected = stepMatch[1].toUpperCase();
-          if (appState.currentStep !== detected) {
-            syncStepProgression(detected, rawText);
-          }
-        }
-      }
       return t;
     }
     case "Divider":
@@ -5420,6 +5417,9 @@ function syncStepProgression(targetStep, contextText = "") {
       if (access.allowed || targetIdx <= curIdx) {
         appState.currentStep = normStep;
         appState.errorStep = null;
+        if (targetIdx > curIdx && appState.sopResults[normStep]) {
+          delete appState.sopResults[normStep];
+        }
       }
     }
   } else {
@@ -5441,8 +5441,9 @@ function extractStepFromMessage(text, parts) {
   // 作業手順カードのタイトル見出しはそのカードが提示している作業ステップそのもの
   if (parts && Array.isArray(parts)) {
     for (const p of parts) {
-      if (p && p.kind === "a2ui" && p.data && Array.isArray(p.data)) {
-        for (const msg of p.data) {
+      if (p && p.kind === "a2ui" && p.data) {
+        const msgs = Array.isArray(p.data) ? p.data : [p.data];
+        for (const msg of msgs) {
           const comps = msg?.surfaceUpdate?.components;
           if (Array.isArray(comps)) {
             for (const c of comps) {
@@ -5582,7 +5583,14 @@ function detectStepTransitions(text, parts) {
     appState.escalationActive = true;
     appState.escalationReason = text.substring(0, 140);
   } else if (isApproved) {
-    appState.sopResults[appState.currentStep] = {
+    // 承認対象ステップの特定（メッセージに対象ステップの明記があればそれを優先、なければ現在ステップ）
+    let verifiedStep = appState.currentStep;
+    const approvalTargetMatch = text.match(/ステップ\s*(T-[1-6]|[1-4]-[1-4]|R-[1-2]|E-1)[^。\n]*?(?:ログ|確認|合格|承認)/i);
+    if (approvalTargetMatch) {
+      verifiedStep = approvalTargetMatch[1].toUpperCase();
+    }
+
+    appState.sopResults[verifiedStep] = {
       verdict: "SUCCESS",
       timestamp: now,
       logSnippet: text.substring(0, 100)
@@ -5590,22 +5598,27 @@ function detectStepTransitions(text, parts) {
     appState.errorStep = null;
     appState.escalationActive = false;
     appState.escalationReason = "";
-    // Auto advance to next step in sequence
-    const curIdx = STEP_SEQUENCE.indexOf(appState.currentStep);
-    if (curIdx >= 0 && curIdx + 1 < STEP_SEQUENCE.length) {
-      appState.currentStep = STEP_SEQUENCE[curIdx + 1];
-    }
-    // Check if card or text explicitly mentions next target step
+
+    // 次に進むべきステップを決定
+    const vIdx = STEP_SEQUENCE.indexOf(verifiedStep);
+    let nextStep = (vIdx >= 0 && vIdx + 1 < STEP_SEQUENCE.length) ? STEP_SEQUENCE[vIdx + 1] : verifiedStep;
+
+    // カードに提示された新ステップがあればそれを取得
     const detected = extractStepFromMessage(text, parts);
     if (detected) {
-      syncStepProgression(detected, text);
-      return;
+      const dIdx = STEP_SEQUENCE.indexOf(detected);
+      if (dIdx > vIdx) {
+        nextStep = detected;
+      }
     }
+
+    syncStepProgression(nextStep, text);
+    return;
   } else if (text.includes("差し戻し") || text.includes("自己申告") || text.includes("CLAIM_BLOCKED") || text.includes("BLOCKED_RETRY") || text.includes("【自律判定: 再投入ブロック】") || text.includes("【判定: 不合格】")) {
     // 差し戻し・再投入要求時は、受講生が現在取り組んでいるステップ（appState.currentStep）を絶対に維持する（巻き戻し厳禁）
     appState.errorStep = appState.currentStep;
   } else {
-    // カードやメッセージから提示されたステップへの自動追従
+    // カードやメッセージから提示されたステップへの自動追従（承認なしのガイダンス等）
     const detected = extractStepFromMessage(text, parts);
     if (detected) {
       syncStepProgression(detected, text);
