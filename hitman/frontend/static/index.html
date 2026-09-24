@@ -5087,6 +5087,78 @@ function copyOnlyCommand(cmdStr, btnElem) {
 }
 
 // --- Chat & A2UI Renderer ---
+let currentSurfaceHasAction = false;
+
+function createActionPromptBlock(promptText) {
+  const actionBlock = el("div", "action-prompt-block");
+  actionBlock.style.cssText = "background:linear-gradient(135deg, #f0fdf4 0%, #e0f2fe 100%); border:1.5px solid #38bdf8; border-radius:10px; padding:12px 16px; margin:10px 0; box-shadow:0 2px 6px rgba(0,0,0,0.04);";
+
+  const actionHeader = el("div", "action-prompt-header");
+  actionHeader.style.cssText = "display:flex; align-items:center; gap:6px; font-weight:700; color:#0284c7; font-size:13px; margin-bottom:6px;";
+  actionHeader.innerHTML = `<span class="material-symbols-outlined" style="font-size:18px; color:#0284c7;">chat</span><span>💬 アクション: チャットで相談・入力</span>`;
+  actionBlock.appendChild(actionHeader);
+
+  const gentleBanner = el("div", "action-gentle-banner");
+  gentleBanner.style.cssText = "font-size:11.5px; color:#0369a1; background:#f0f9ff; border:1px dashed #7dd3fc; border-radius:6px; padding:6px 10px; margin-bottom:8px; display:flex; align-items:center; gap:6px;";
+  gentleBanner.innerHTML = `<span class="material-symbols-outlined" style="font-size:16px; color:#0284c7;">support_agent</span><span><strong>ゼロから全部考えられなくても大丈夫！</strong> AIが選択肢をご用意しています。下のボタンを押すか、お気軽に相談してください。</span>`;
+  actionBlock.appendChild(gentleBanner);
+
+  if (promptText && !promptText.startsWith("【アクション】") && !promptText.includes("ゼロから全部")) {
+    const actionText = el("div", "action-prompt-text");
+    actionText.style.cssText = "font-size:13px; color:#1e293b; line-height:1.5; margin-bottom:8px;";
+    actionText.textContent = promptText;
+    actionBlock.appendChild(actionText);
+  }
+
+  const chipsContainer = el("div", "ideation-chips-container");
+  chipsContainer.style.cssText = "display:flex; flex-wrap:wrap; gap:6px; margin-top:8px;";
+
+  const curStep = String(appState.currentStep || "").toUpperCase();
+  let chips = [];
+  if (curStep.includes("E-1") || (promptText && (promptText.includes("エスカレ") || promptText.includes("想定外")))) {
+    chips = [
+      { label: "🛡️ 【推奨】方針A: 切り戻し（ロールバック）", prompt: "協議の結果、安全を最優先して方針A（ロールバック・切り戻し）を実施したいです。" },
+      { label: "🔧 方針B: 修正してペアで再試行", prompt: "協議の結果、修正クエリ・パッチを作成し、リーダー同席の特別モードで再試行したいです。" },
+      { label: "👥 方針C: 運用責任者に確認", prompt: "現在の方針について運用責任者（上長）へ確認し、指示を仰ぎたいです。" },
+      { label: "❓ どう判断すべきか相談", prompt: "このエラー状況で、どのような方針を取るべきかアドバイスをいただけますか？" }
+    ];
+  } else if (curStep.includes("R-1") || curStep.includes("R-2") || (promptText && (promptText.includes("切り戻し") || promptText.includes("ロールバック")))) {
+    chips = [
+      { label: "🛡️ 切り戻し手順を開始", prompt: "切り戻し手順を開始します。手順を案内してください。" },
+      { label: "🔍 現状のバックアップ確認", prompt: "切り戻し対象のバックアップファイルの状態を確認したいです。" },
+      { label: "❓ 切り戻しの注意点を教えて", prompt: "切り戻しを実施するにあたって、注意すべき点や確認事項を教えてください。" }
+    ];
+  } else {
+    chips = [
+      { label: "💡 ログ自動解析Bot", prompt: "障害ログを自動解析して原因と対処法を提示するAIツールを作りたい" },
+      { label: "💡 規程・FAQ検索Bot", prompt: "社内就業規則やITマニュアルを検索して回答するRAGエージェントを作りたい" },
+      { label: "💡 日報自動要約AI", prompt: "日報や業務報告を要約して重要インシデントを抽出するAIを作りたい" },
+      { label: "⭐ おすすめ！HITMANクローン", prompt: "迷っているので、完成設計図があって確実に成功できるコースB（HITMANクローン構築）にしたいです" },
+      { label: "❓ おすすめのアイデアを教えて", prompt: "自分一人ではアイデアが思いつかないのですが、現場でよく作られるおすすめのアイデアを教えてもらえますか？" },
+      { label: "✅ これで決定！", prompt: "これで決定！このアイデアで進めます。" }
+    ];
+  }
+
+  chips.forEach(chip => {
+    const chipBtn = el("button", "ideation-chip-btn");
+    chipBtn.style.cssText = "font-size:12px; font-weight:600; padding:4px 10px; border-radius:14px; border:1px solid #93c5fd; background:#ffffff; color:#1d4ed8; cursor:pointer; transition:all 0.15s ease; box-shadow:0 1px 2px rgba(0,0,0,0.05);";
+    chipBtn.textContent = chip.label;
+    chipBtn.onmouseenter = () => { chipBtn.style.background = "#eff6ff"; chipBtn.style.borderColor = "#3b82f6"; };
+    chipBtn.onmouseleave = () => { chipBtn.style.background = "#ffffff"; chipBtn.style.borderColor = "#93c5fd"; };
+    chipBtn.onclick = (e) => {
+      e.stopPropagation();
+      const inputEl = document.getElementById("input") || input;
+      if (inputEl) {
+        inputEl.value = chip.prompt;
+        inputEl.focus();
+      }
+    };
+    chipsContainer.appendChild(chipBtn);
+  });
+  actionBlock.appendChild(chipsContainer);
+  return actionBlock;
+}
+
 const log = document.getElementById("log");
 const form = document.getElementById("form");
 const input = document.getElementById("input");
@@ -5175,6 +5247,13 @@ function buildNode(id, comps, seen) {
           copyOnlyCommand(foundCmd.dataset.rawCommand || foundCmd.textContent, topCopyBtn);
         };
         header.appendChild(topCopyBtn);
+      } else {
+        const foundAction = body.querySelector('.action-prompt-block');
+        if (!foundAction && appState.mode === "TRAINING" && appState.currentStep === "T-2") {
+          currentSurfaceHasAction = true;
+          const actionBlock = createActionPromptBlock("【アクション】チャットで企画を相談するか、「これで決定！」とお知らせください。");
+          body.appendChild(actionBlock);
+        }
       }
       return cardWrapper;
     }
@@ -5200,78 +5279,14 @@ function buildNode(id, comps, seen) {
                          (/^[a-z0-9_./\\-]+(?:\.py|\.sh|\.md|\.json|\.txt)?(?:\s+-[a-z0-9_-]+|\s+[a-z0-9_./\\-]+)*$/i.test(pureCmd) && !/[ぁ-んァ-ヶｱ-ﾝﾞﾟ一-龥]/.test(pureCmd)));
 
       const isCommandHint = (hint === "h2");
-      const isActionPrompt = isCommandHint && pureCmd && !isShellCmd && (
-        /^(?:作成したい|チャット|メッセージ|入力|アイデア|相談|決定|お考え|教えて|下のチャット|希望)/i.test(pureCmd) ||
-        /[ぁ-んァ-ヶｱ-ﾝﾞﾟ一-龥]/.test(pureCmd)
-      );
+      const isActionKeyword = /^(?:作成したい|チャット|メッセージ|入力|アイデア|相談|決定|お考え|教えて|下のチャット|希望|アクション)/i.test(pureCmd) ||
+                              /(?:チャットで|メッセージで|入力して|相談して|決定して)/.test(pureCmd);
+      const isGenericHeading = /(?:アーキテクチャ|スキル|確認|チェック|目的|概要|注意事項|前提条件|成果物|フレームワーク|要件)/.test(pureCmd);
+      const isActionPrompt = isCommandHint && pureCmd && !isShellCmd && isActionKeyword && !isGenericHeading && !currentSurfaceHasAction;
 
       if (isActionPrompt) {
-        const actionBlock = el("div", "action-prompt-block");
-        actionBlock.style.cssText = "background:linear-gradient(135deg, #f0fdf4 0%, #e0f2fe 100%); border:1.5px solid #38bdf8; border-radius:10px; padding:12px 16px; margin:10px 0; box-shadow:0 2px 6px rgba(0,0,0,0.04);";
-
-        const actionHeader = el("div", "action-prompt-header");
-        actionHeader.style.cssText = "display:flex; align-items:center; gap:6px; font-weight:700; color:#0284c7; font-size:13px; margin-bottom:6px;";
-        actionHeader.innerHTML = `<span class="material-symbols-outlined" style="font-size:18px; color:#0284c7;">chat</span><span>💬 アクション: チャットで相談・入力</span>`;
-        actionBlock.appendChild(actionHeader);
-
-        const gentleBanner = el("div", "action-gentle-banner");
-        gentleBanner.style.cssText = "font-size:11.5px; color:#0369a1; background:#f0f9ff; border:1px dashed #7dd3fc; border-radius:6px; padding:6px 10px; margin-bottom:8px; display:flex; align-items:center; gap:6px;";
-        gentleBanner.innerHTML = `<span class="material-symbols-outlined" style="font-size:16px; color:#0284c7;">support_agent</span><span><strong>ゼロから全部考えられなくても大丈夫！</strong> AIが選択肢をご用意しています。下のボタンを押すか、お気軽に相談してください。</span>`;
-        actionBlock.appendChild(gentleBanner);
-
-        const actionText = el("div", "action-prompt-text");
-        actionText.style.cssText = "font-size:13px; color:#1e293b; line-height:1.5; margin-bottom:8px;";
-        actionText.textContent = pureCmd;
-        actionBlock.appendChild(actionText);
-
-        const chipsContainer = el("div", "ideation-chips-container");
-        chipsContainer.style.cssText = "display:flex; flex-wrap:wrap; gap:6px; margin-top:8px;";
-
-        const curStep = String(appState.currentStep || "").toUpperCase();
-        let chips = [];
-        if (curStep.includes("E-1") || pureCmd.includes("エスカレ") || pureCmd.includes("想定外")) {
-          chips = [
-            { label: "🛡️ 【推奨】方針A: 切り戻し（ロールバック）", prompt: "協議の結果、安全を最優先して方針A（ロールバック・切り戻し）を実施したいです。" },
-            { label: "🔧 方針B: 修正してペアで再試行", prompt: "協議の結果、修正クエリ・パッチを作成し、リーダー同席の特別モードで再試行したいです。" },
-            { label: "👥 方針C: 運用責任者に確認", prompt: "現在の方針について運用責任者（上長）へ確認し、指示を仰ぎたいです。" },
-            { label: "❓ どう判断すべきか相談", prompt: "このエラー状況で、どのような方針を取るべきかアドバイスをいただけますか？" }
-          ];
-        } else if (curStep.includes("R-1") || curStep.includes("R-2") || pureCmd.includes("切り戻し") || pureCmd.includes("ロールバック")) {
-          chips = [
-            { label: "🛡️ 切り戻し手順を開始", prompt: "切り戻し手順を開始します。手順を案内してください。" },
-            { label: "🔍 現状のバックアップ確認", prompt: "切り戻し対象のバックアップファイルの状態を確認したいです。" },
-            { label: "❓ 切り戻しの注意点を教えて", prompt: "切り戻しを実施するにあたって、注意すべき点や確認事項を教えてください。" }
-          ];
-        } else {
-          // デフォルト: T-2（企画・アイデア・壁打ち）
-          chips = [
-            { label: "💡 ログ自動解析Bot", prompt: "障害ログを自動解析して原因と対処法を提示するAIツールを作りたい" },
-            { label: "💡 規程・FAQ検索Bot", prompt: "社内就業規則やITマニュアルを検索して回答するRAGエージェントを作りたい" },
-            { label: "💡 日報自動要約AI", prompt: "日報や業務報告を要約して重要インシデントを抽出するAIを作りたい" },
-            { label: "⭐ おすすめ！HITMANクローン", prompt: "迷っているので、完成設計図があって確実に成功できるコースB（HITMANクローン構築）にしたいです" },
-            { label: "❓ おすすめのアイデアを教えて", prompt: "自分一人ではアイデアが思いつかないのですが、現場でよく作られるおすすめのアイデアを教えてもらえますか？" },
-            { label: "✅ これで決定！", prompt: "これで決定！このアイデアで進めます。" }
-          ];
-        }
-
-        chips.forEach(chip => {
-          const chipBtn = el("button", "ideation-chip-btn");
-          chipBtn.style.cssText = "font-size:12px; font-weight:600; padding:4px 10px; border-radius:14px; border:1px solid #93c5fd; background:#ffffff; color:#1d4ed8; cursor:pointer; transition:all 0.15s ease; box-shadow:0 1px 2px rgba(0,0,0,0.05);";
-          chipBtn.textContent = chip.label;
-          chipBtn.onmouseenter = () => { chipBtn.style.background = "#eff6ff"; chipBtn.style.borderColor = "#3b82f6"; };
-          chipBtn.onmouseleave = () => { chipBtn.style.background = "#ffffff"; chipBtn.style.borderColor = "#93c5fd"; };
-          chipBtn.onclick = (e) => {
-            e.stopPropagation();
-            const inputEl = document.getElementById("input") || input;
-            if (inputEl) {
-              inputEl.value = chip.prompt;
-              inputEl.focus();
-            }
-          };
-          chipsContainer.appendChild(chipBtn);
-        });
-        actionBlock.appendChild(chipsContainer);
-        return actionBlock;
+        currentSurfaceHasAction = true;
+        return createActionPromptBlock(pureCmd);
       }
 
       const isCommand = isShellCmd || ((hint === "h2") && pureCmd && !isActionPrompt && !/[ぁ-んァ-ヶｱ-ﾝﾞﾟ一-龥]/.test(pureCmd));
@@ -5360,6 +5375,7 @@ function buildNode(id, comps, seen) {
 }
 
 function renderSurface(messages, container) {
+  currentSurfaceHasAction = false;
   const comps = {};
   const roots = [];
   for (const m of messages) {
