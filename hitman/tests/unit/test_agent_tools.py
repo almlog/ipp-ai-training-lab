@@ -510,6 +510,21 @@ def test_guide_training_app_creation_consultation_and_confirmation_gate():
     assert "コース確定" in res_confirm["message"]
     assert "日報自動要約AI" in res_confirm["user_idea"] or "日報自動要約AI" in res_confirm["title"]
 
+    # 4-2. ユーザー実例: 「カレンダー＆WBSスケジュール管理」相談後に「これで決定！このアイデアで進めます。」で確定
+    res_sched_consult = guide_training_app_creation("カレンダー＆WBS形式のスケジュール管理とプライバシー保護機能を備えたAIツールを作りたい")
+    assert res_sched_consult["confirmation_status"] == "consulting"
+    assert "コースA" in res_sched_consult["course"]
+    assert "スケジュール管理" in res_sched_consult["user_idea"]
+
+    res_sched_confirm = guide_training_app_creation("これで決定！このアイデアで進めます。")
+    assert res_sched_confirm["confirmation_status"] == "confirmed"
+    assert res_sched_confirm["is_confirmed"] is True
+    assert "コースA" in res_sched_confirm["course"]
+    assert "コースB" not in res_sched_confirm["course"]
+    assert "hitman_spec.md" not in res_sched_confirm["command"]
+    assert res_sched_confirm["command"] == "cat ipp-agent-workspace/project_brief.md"
+    assert "スケジュール管理" in res_sched_confirm["user_idea"] or "スケジュール管理" in res_sched_confirm["title"]
+
     # 5. 明示的な is_confirmed フラグによる制御
     res_explicit_consult = guide_training_app_creation("障害ログ解析Bot", is_confirmed=False)
     assert res_explicit_consult["confirmation_status"] == "consulting"
