@@ -608,6 +608,20 @@ def test_training_step_verification_t1_to_t6():
     assert t1_pass["verdict"] == "SUCCESS"
     assert t1_pass["w_check_status"] == "VERIFIED_APPROVED"
 
+    # Windows PowerShell の Get-ChildItem ログでも確実に合格すること
+    t1_win = verify_step_output(
+        "T-1",
+        "PS C:\\Users\\suzuki\\ipp-agent-workspace> Get-ChildItem ipp-ai-training-lab\\.agents\\skills\\\n"
+        "    Directory: C:\\Users\\suzuki\\ipp-agent-workspace\\ipp-ai-training-lab\\.agents\\skills\n\n"
+        "Mode                 LastWriteTime         Length Name\n"
+        "----                 -------------         ------ ----\n"
+        "d----          2026/09/24     19:00                pick-your-agent-project\n"
+        "d----          2026/09/24     19:00                enable-a2ui\n"
+        "d----          2026/09/24     19:00                build-agent-frontend\n"
+    )
+    assert t1_win["verdict"] == "SUCCESS"
+    assert t1_win["w_check_status"] == "VERIFIED_APPROVED"
+
     t1_fail = verify_step_output("T-1", "環境構築完了しました！次はどうすればいいですか？")
     assert t1_fail["verdict"] == "FAILED"
 

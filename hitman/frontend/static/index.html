@@ -5165,12 +5165,13 @@ function buildNode(id, comps, seen) {
 
       // Command Box vs Action Prompt rendering
       const pureCmd = extractPureCommand(rawText);
-      const isShellCmd = pureCmd && (/^(?:cat |mkdir |cd |git |pytest |python |uv |curl |tar |df |systemctl |cp |mv |ls |mysql |touch |pip |docker |gcloud |Get-Content |Test-Path )/i.test(pureCmd) ||
+      const isShellCmd = pureCmd && (/^(?:cat |mkdir |cd |git |pytest |python |uv |curl |tar |df |systemctl |cp |mv |ls |mysql |touch |pip |docker |gcloud |Get-Content |Test-Path |Get-ChildItem |dir )/i.test(pureCmd) ||
                          (/^[a-z0-9_./\\-]+(?:\.py|\.sh|\.md|\.json|\.txt)?(?:\s+-[a-z0-9_-]+|\s+[a-z0-9_./\\-]+)*$/i.test(pureCmd) && !/[ぁ-んァ-ヶｱ-ﾝﾞﾟ一-龥]/.test(pureCmd)));
 
-      const isActionPrompt = pureCmd && !isShellCmd && (
-        /^(?:作成したい|チャット|メッセージ|入力|アイデア|相談|決定|お考え|教えて|下のチャット)/i.test(pureCmd) ||
-        (/[ぁ-んァ-ヶｱ-ﾝﾞﾟ一-龥]/.test(pureCmd) && (hint === "h2" || hint === "body"))
+      const isCommandHint = (hint === "h2");
+      const isActionPrompt = isCommandHint && pureCmd && !isShellCmd && (
+        /^(?:作成したい|チャット|メッセージ|入力|アイデア|相談|決定|お考え|教えて|下のチャット|希望)/i.test(pureCmd) ||
+        /[ぁ-んァ-ヶｱ-ﾝﾞﾟ一-龥]/.test(pureCmd)
       );
 
       if (isActionPrompt) {

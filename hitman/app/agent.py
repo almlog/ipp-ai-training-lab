@@ -219,9 +219,9 @@ TRAINING_SOP_ORIGINAL = {
         "step_id": "T-1",
         "title": "ステップ T-1: 開発環境構築とスキル同期",
         "objective": "AntiGravityでモデルを選定（3.8 Flash優先、エラー時3.6 Flash）、専用フォルダを作成し、講師リポジトリをクローンして研修スキルを習得する。",
-        "command": "mkdir ipp-agent-workspace && cd ipp-agent-workspace && git clone https://github.com/almlog/ipp-ai-training-lab.git",
-        "expected_check": "ipp-agent-workspace 内に ipp-ai-training-lab が正常クローンされ、.agents/skills/ が認識されること",
-        "cautions": "AntiGravity のモデル設定で「gemini-3.8-flash」を選択してください（エラーや未提供時は「gemini-3.6-flash」へフォールバック）。以後の全作業は必ず専用フォルダ（ipp-agent-workspace）内で行ってください。",
+        "command": "mkdir ipp-agent-workspace ; cd ipp-agent-workspace ; git clone https://github.com/almlog/ipp-ai-training-lab.git",
+        "expected_check": "ipp-agent-workspace 内に ipp-ai-training-lab が正常クローンされ、.agents/skills/ が認識されること（Windows/Mac/Linux対応）",
+        "cautions": "AntiGravity のモデル設定で「gemini-3.8-flash」を選択してください（エラーや未提供時は「gemini-3.6-flash」へフォールバック）。以後の全作業は必ず専用フォルダ（ipp-agent-workspace）内で行ってください。Windows環境（PowerShell）でもMac/Linuxでもそのまま実行可能です。",
         "agy_prompt": (
             "【AntiGravity投入用プロンプト: Step T-1（環境構築・スキル同期）】\n"
             "あなたはIPPのAI実践研修専属メンターです。\n"
@@ -234,15 +234,13 @@ TRAINING_SOP_ORIGINAL = {
             "   git clone https://github.com/almlog/ipp-ai-training-lab.git\n"
             "   を実行し、リポジトリ内の .agents/skills/ を読み込んで自己学習する。\n"
             "4. 検証と生ログ出力:\n"
-            "   ターミナルで以下を実行してください：\n"
-            "   python --version && ls -la ipp-ai-training-lab/.agents/skills/\n\n"
+            "   受講生が操作しているOS（Windows PowerShell / CMD / Mac・Linux bash）に合わせてターミナルで実行してください：\n"
+            "   - Windows (PowerShell): python --version; Get-ChildItem ipp-ai-training-lab\\.agents\\skills\\\n"
+            "   - Mac / Linux: python3 --version && ls ipp-ai-training-lab/.agents/skills/\n"
+            "   （※または python -c \"import sys, os; print(sys.version); print(os.listdir('ipp-ai-training-lab/.agents/skills'))\"）\n\n"
             "【重要: HITMAN提出用生ログ出力規程】\n"
             "「完了しました」等の自然言語による要約だけで回答を終わらせることは厳禁です。\n"
-            "受講生がHITMANの客観Wチェックに提出できるよう、必ず回答の最末尾に実行コマンドとターミナル標準出力（生ログ）を、以下の通り```bashのコードブロック形式で逐語出力してください：\n\n"
-            "```bash\n"
-            "$ python --version && ls -la ipp-ai-training-lab/.agents/skills/\n"
-            "(ターミナルの標準出力をそのまま全文出力)\n"
-            "```\n\n"
+            "受講生がHITMANの客観Wチェックに提出できるよう、必ず回答の最末尾に実行コマンドとターミナル標準出力（生ログ：git clone、Pythonバージョン、skillsフォルダ一覧等）をコードブロック形式で逐語出力してください。\n"
             "出力後、受講生へ「上記コードブロック内のターミナルログをコピーして、HITMANのチャット欄に貼り付けてください。HITMANが客観Wチェックを行い、合格承認後にステップ T-2へ進みます！」と案内して待機してください。"
         ),
     },
@@ -386,9 +384,9 @@ TRAINING_SOP_HITMAN_CLONE = {
         "step_id": "T-1",
         "title": "ステップ T-1: 開発環境構築とスキル同期",
         "objective": "AntiGravityでモデルを選定（3.8 Flash優先、エラー時3.6 Flash）、専用フォルダを作成し、講師リポジトリをクローンして研修スキルを習得する。",
-        "command": "mkdir ipp-agent-workspace && cd ipp-agent-workspace && git clone https://github.com/almlog/ipp-ai-training-lab.git",
-        "expected_check": "ipp-agent-workspace 内に ipp-ai-training-lab が正常クローンされ、.agents/skills/ が認識されること",
-        "cautions": "AntiGravity のモデル設定で「gemini-3.8-flash」を選択してください（エラーや未提供時は「gemini-3.6-flash」へフォールバック）。以後の全作業は必ず専用フォルダ（ipp-agent-workspace）内で行ってください。",
+        "command": "mkdir ipp-agent-workspace ; cd ipp-agent-workspace ; git clone https://github.com/almlog/ipp-ai-training-lab.git",
+        "expected_check": "ipp-agent-workspace 内に ipp-ai-training-lab が正常クローンされ、.agents/skills/ が認識されること（Windows/Mac/Linux対応）",
+        "cautions": "AntiGravity のモデル設定で「gemini-3.8-flash」を選択してください（エラーや未提供時は「gemini-3.6-flash」へフォールバック）。以後の全作業は必ず専用フォルダ（ipp-agent-workspace）内で行ってください。Windows環境（PowerShell）でもMac/Linuxでもそのまま実行可能です。",
         "agy_prompt": (
             "【AntiGravity投入用プロンプト: Step T-1 (HITMANクローン)】\n"
             "あなたはIPPのAI実践研修専属メンターです。\n"
@@ -401,15 +399,13 @@ TRAINING_SOP_HITMAN_CLONE = {
             "   git clone https://github.com/almlog/ipp-ai-training-lab.git\n"
             "   を実行し、リポジトリ内の .agents/skills/ を読み込んで自己学習する。\n"
             "4. 検証と生ログ出力:\n"
-            "   ターミナルで以下を実行してください：\n"
-            "   python --version && ls -la ipp-ai-training-lab/.agents/skills/\n\n"
+            "   受講生が操作しているOS（Windows PowerShell / CMD / Mac・Linux bash）に合わせてターミナルで実行してください：\n"
+            "   - Windows (PowerShell): python --version; Get-ChildItem ipp-ai-training-lab\\.agents\\skills\\\n"
+            "   - Mac / Linux: python3 --version && ls ipp-ai-training-lab/.agents/skills/\n"
+            "   （※または python -c \"import sys, os; print(sys.version); print(os.listdir('ipp-ai-training-lab/.agents/skills'))\"）\n\n"
             "【重要: HITMAN提出用生ログ出力規程】\n"
             "「完了しました」等の自然言語による要約だけで回答を終わらせることは厳禁です。\n"
-            "受講生がHITMANの客観Wチェックに提出できるよう、必ず回答の最末尾に実行コマンドとターミナル標準出力（生ログ）を、以下の通り```bashのコードブロック形式で逐語出力してください：\n\n"
-            "```bash\n"
-            "$ python --version && ls -la ipp-ai-training-lab/.agents/skills/\n"
-            "(ターミナルの標準出力をそのまま全文出力)\n"
-            "```\n\n"
+            "受講生がHITMANの客観Wチェックに提出できるよう、必ず回答の最末尾に実行コマンドとターミナル標準出力（生ログ：git clone、Pythonバージョン、skillsフォルダ一覧等）をコードブロック形式で逐語出力してください。\n"
             "出力後、受講生へ「上記コードブロック内のターミナルログをコピーして、HITMANのチャット欄に貼り付けてください。HITMANが客観Wチェックを行い、合格承認後にステップ T-2へ進みます！」と案内して待機してください。"
         ),
     },
@@ -1532,12 +1528,14 @@ def verify_step_output(step_number: int | str, command_output: str) -> dict:
             ws_cur = TRAINING_PARAMETERS.get("WORKSPACE_DIR", "ipp-agent-workspace")
             ws_cur_clean = ws_cur.replace("\\", "/").rstrip("/").split("/")[-1].lower()
             has_t1_sig = any(k in output_lower for k in (
-                ws_cur_clean, "ipp-agent-workspace", "altx-agent-workspace", "ipp-ai-training-lab", "ipp-ai-training-lab", "git clone", "cloning into",
+                ws_cur_clean, "ipp-agent-workspace", "altx-agent-workspace", "ipp-ai-training-lab", "git clone", "cloning into",
                 "gemini-3.8-flash", "gemini-3.6-flash", "python", "3.11", "3.12", "api key",
-                "requirements", "virtualenv", ".venv", "active", "mkdir", "new-item", "cd "
+                "requirements", "virtualenv", ".venv", "active", "mkdir", "new-item", "cd ",
+                "directory:", "mode", "lastwritetime", "length", "get-childitem", "dir", "powershell",
+                "skills", "pick-your-agent-project", "enable-a2ui"
             ))
             if not has_t1_sig:
-                return _make_no_log_response("T-1", f"作業フォルダ作成（{ws_cur}）、git clone、または環境確認の実行ログが確認できません。")
+                return _make_no_log_response("T-1", f"作業フォルダ作成（{ws_cur}）、git clone、または環境確認（Windows/Mac/Linux）の実行ログが確認できません。")
             CURRENT_STEP = "T-2"
             return {
                 "verdict": "SUCCESS",
@@ -1549,7 +1547,8 @@ def verify_step_output(step_number: int | str, command_output: str) -> dict:
                     "開発環境の準備、リポジトリクローン、スキル同期を客観確認しました！\n"
                     f"作業フォルダ（{ws_cur}）とスキル群が正しくセットアップされています（合格承認）。\n\n"
                     "次のステップ ➔ ステップ T-2: アイデア策定・要件定義\n"
-                    "作成したいオリジナルAIツール（例: ログ解析Bot、障害要約ツール、ルービックキューブ解析AIなど）のアイデアを教えてください。アイデアが未定の場合は、HITMAN（ペアオペレーター）自身を自作するコースへの変更も可能です。"
+                    "ゼロから全部一人で考えられなくても大丈夫です！\n"
+                    "現場で役立つ人気アイデアや、迷ったときの王道【コースB（HITMANクローン）】をAIからご提案します。下のチャット欄でお気軽にご相談ください！"
                 ),
             }
 
@@ -2601,9 +2600,10 @@ a2ui_instruction = schema_manager.generate_system_prompt(
         "2. ステップ E-1（エスカレーション協議）: 障害や不整合で移行した際、受講生に判断を丸投げせず、方針A（切り戻し・推奨）、方針B（修正パッチ適用）、方針C（上長指示仰ぎ）の具体的選択肢を提示し、『迷ったら安全第一で方針A（切り戻し）がおすすめです』と寄り添って合意形成を行ってください。"
         "3. 質問・エラー・操作の迷い時: 受講生が『エラーが出た』『コマンドが見つからない』『どうすればいい？』と入力した際は、決してログ未検知・自己申告違反として突っぱねず、エラー内容に寄り添い、原因と解決コマンドを優しく案内してください。"
         "【重要: 自己申告差し戻し時のステップ維持規程】受講生が自己申告（「大丈夫でした」「できました」「次のステップに進もう」「確認した」等）を入力して差し戻す際は、教育的指導を行った上で、受講生が現在取り組んでいるステップ（例: T-2合格後なら必ず『ステップ T-3』）の手順カード（A2UI）を再提示すること。絶対にステップ T-1 や過去の完了済みステップに巻き戻してはならない！"
+        "【重要: 完了済みステップのカード再提示・復習表示の絶対禁止】受講生が既に合格・完了した過去ステップ（ステップ T-1等）について、『復習用』『確認用』などと称してカード（A2UI）を再提示・再生成することは絶対に禁止します。手順が巻き戻りループする重大バグの原因となります。質問やアイデア相談を受けた場合でも、カードを出す場合は必ず『現在進行中のステップ（現在がT-2なら必ずT-2カード）』のみを提示してください。完了済みステップのカードを自発的に生成・再提示してはなりません。"
         "【重要: 研修ステップ T-2（企画・アイデア相談＆確定ゲート）の進行規程】"
         "受講生がステップ T-2 において、作りたいツールの相談、質問、壁打ち（例: 「え？自分で考えるの？そうだな、こういうアプリは作れるかな？」「〜〜は作れる？」「おすすめのアイデアある？」「迷っている」等）を入力した際は、決して `verify_step_output` で自己申告違反として差し戻してはなりません。"
-        "1. 【相談・壁打ち時】: 受講生の疑問や不安に寄り添い、AIエンジニア・メンターとして実現可能性やおすすめスキルを親身にアドバイスしてください。`guide_training_app_creation(idea=..., is_confirmed=False)` を呼び出し、ターミナル実行コマンドは出さず（command=''）、回答の最後で『この企画で決定して進めますか？もしこれでよろしければ【これで決定！】とお知らせください。要件定義プロンプトを発行します！（※別のアイデア相談も大歓迎です）』と必ず意思確認を行ってください。受講生が合意するまで勝手に企画を確定したり、要件定義の提出を求めてはなりません。"
+        "1. 【相談・壁打ち時】: 受講生の疑問や不安に寄り添い、AIエンジニア・メンターとして実現可能性やおすすめスキルを親身にアドバイスしてください。必ず `guide_training_app_creation(idea=..., is_confirmed=False)` を呼び出し、A2UIカードにはその戻り値にある情報（ステップ T-2）のみを提示し、ターミナル実行コマンドは出さず（command=''）、回答の最後で『この企画で決定して進めますか？もしこれでよろしければ【これで決定！】とお知らせください。要件定義プロンプトを発行します！（※別のアイデア相談も大歓迎です）』と必ず意思確認を行ってください。受講生が合意するまで勝手に企画を確定したり、要件定義の提出を求めてはなりません。またステップ T-1 のカードを決して出してはなりません。"
         "2. 【確定時】: 受講生が『これで決定！』『このアイデアで進める』『決定』『コースB（HITMANクローン）にする』等と明示的に確定の意思を示した時のみ、`guide_training_app_creation(idea=..., is_confirmed=True)` を呼び出して企画を確定し、AntiGravity投入用プロンプトと提出コマンド（command='cat ipp-agent-workspace/project_brief.md' または 'cat ipp-agent-workspace/hitman_spec.md'）を提示してください。"
         "【絶対厳守】受講生がやりたいことを確定するまでは、決して次のステップに進めたり、要件定義ログの提出を強制してはなりません。また受講生は既にステップ T-1 を完了・合格しているため、決してステップ T-1 へ巻き戻してはなりません。"
         "【重要: 研修ステップ提出時の客観Wチェック規程】受講生からステップ T-1〜T-6 の各コードや実行ログ（ファイル内容・コマンド実行結果等）が提出された際は、必ず `verify_step_output` ツールを呼び出して客観検証を行い、その判定結果（【判定: 合格】（Wチェック承認: VERIFIED_APPROVED））をメッセージ冒頭に明記して、次のステップの手順カード（A2UI）を提示してください。"
