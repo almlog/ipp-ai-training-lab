@@ -256,7 +256,29 @@ async def _chat_direct(user_id: str, message: str) -> list[dict]:
             )
         )
 
-    events = await asyncio.to_thread(_sync_run)
+    async def _run_with_retry():
+        max_retries = 3
+        last_error = None
+        for attempt in range(max_retries):
+            try:
+                return await asyncio.to_thread(_sync_run)
+            except Exception as e:
+                last_error = e
+                err_str = str(e).lower()
+                is_transient = any(kw in err_str for kw in [
+                    "503", "unavailable", "429", "resource_exhausted",
+                    "dns", "getaddrinfo", "timeout", "connection reset", "backend unavailable"
+                ])
+                if is_transient and attempt < max_retries - 1:
+                    wait_sec = 2.0 * (attempt + 1)
+                    logger.warning(
+                        f"Transient error in LLM runner (attempt {attempt+1}/{max_retries}): {e}. Retrying in {wait_sec}s..."
+                    )
+                    await asyncio.sleep(wait_sec)
+                    continue
+                raise last_error
+
+    events = await _run_with_retry()
     parts: list[dict] = []
     for event in events:
         if getattr(event, "author", None) in ("hitman", "model", "bot", "assistant"):
@@ -314,15 +336,22 @@ async def chat(req: Request):
     else:
         llm_message = message
 
-    if RESOURCE:
-        parts = await _chat_cloud(user_id, llm_message)
-    elif os.environ.get("USE_LOCAL_AGENT_SERVER", "false").lower() == "true":
-        try:
-            parts = await _chat_local(user_id, llm_message)
-        except Exception:
+    try:
+        if RESOURCE:
+            parts = await _chat_cloud(user_id, llm_message)
+        elif os.environ.get("USE_LOCAL_AGENT_SERVER", "false").lower() == "true":
+            try:
+                parts = await _chat_local(user_id, llm_message)
+            except Exception:
+                parts = await _chat_direct(user_id, llm_message)
+        else:
             parts = await _chat_direct(user_id, llm_message)
-    else:
-        parts = await _chat_direct(user_id, llm_message)
+    except Exception as exc:
+        logger.error(f"Chat execution failed after retries: {exc}")
+        parts = [{
+            "kind": "text",
+            "text": f"⚠️ AIクラウドサービスとの通信で一時的な遅延またはエラーが発生しました（{type(exc).__name__}: {str(exc)[:120]}）。お手数ですが、もう一度送信をお試しください。"
+        }]
 
     if not parts:
         parts = [{"kind": "text", "text": "(応答がありませんでした。もう一度お試しください。)"}]
