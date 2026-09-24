@@ -5318,6 +5318,17 @@ function buildNode(id, comps, seen) {
         t.classList.add("a2-caption");
       }
       t.textContent = rawText;
+
+      if (hint === "h1") {
+        // カードのタイトルからステップ番号を検出して即時UI同期
+        const stepMatch = rawText.match(/ステップ\s*(T-[1-6]|[1-4]-[1-4]|R-[1-2]|E-1)/i) || rawText.match(/\b(T-[1-6])\b/i);
+        if (stepMatch && typeof syncStepProgression === "function") {
+          const detected = stepMatch[1].toUpperCase();
+          if (appState.currentStep !== detected) {
+            syncStepProgression(detected, rawText);
+          }
+        }
+      }
       return t;
     }
     case "Divider":
@@ -5357,6 +5368,77 @@ function renderSurface(messages, container) {
   return drew;
 }
 
+function syncStepProgression(targetStep, contextText = "") {
+  if (!targetStep) return;
+  const now = new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+  const normStep = targetStep.toUpperCase();
+
+  if (appState.mode === "TRAINING" && normStep.startsWith("T-")) {
+    const targetIdx = STEP_SEQUENCE.indexOf(normStep);
+    if (targetIdx > 0) {
+      // ターゲットステップより前のすべての前提ステップを SUCCESS に自動補完
+      for (let i = 0; i < targetIdx; i++) {
+        const prevStep = STEP_SEQUENCE[i];
+        if (!appState.sopResults[prevStep] || appState.sopResults[prevStep].verdict !== "SUCCESS") {
+          appState.sopResults[prevStep] = {
+            verdict: "SUCCESS",
+            timestamp: now,
+            logSnippet: `ステップ ${normStep} 進行に伴い前提ステップ完了を確認`
+          };
+        }
+      }
+    }
+    const curIdx = STEP_SEQUENCE.indexOf(appState.currentStep);
+    // 巻き戻しは防止しつつ、前進または同一ステップの場合は更新
+    if (targetIdx >= curIdx || curIdx < 0) {
+      appState.currentStep = normStep;
+      appState.errorStep = null;
+    }
+  } else {
+    const access = canAccessStep(normStep);
+    if (access.allowed || normStep.startsWith("R-") || normStep.startsWith("E-")) {
+      appState.currentStep = normStep;
+      appState.errorStep = null;
+    }
+  }
+
+  updateModeUI();
+  renderFlowChart();
+  renderSopTable();
+  saveState();
+}
+
+function extractStepFromMessage(text, parts) {
+  let combined = text || "";
+  if (parts && Array.isArray(parts)) {
+    for (const p of parts) {
+      if (p && p.kind === "a2ui" && p.data) {
+        combined += " " + JSON.stringify(p.data);
+      }
+    }
+  }
+
+  // 1. "ステップ T-2", "Step T-2", "ステップ 2-1" などの明示的パターン
+  const stepMatches = Array.from(combined.matchAll(/ステップ\s*(T-[1-6]|[1-4]-[1-4]|R-[1-2]|E-1)/gi));
+  if (stepMatches.length > 0) {
+    return stepMatches[stepMatches.length - 1][1].toUpperCase();
+  }
+
+  // 2. step_id / current_step
+  const jsonMatches = Array.from(combined.matchAll(/(?:step_id|current_step)["':\s]+(T-[1-6]|[1-4]-[1-4]|R-[1-2]|E-1)/gi));
+  if (jsonMatches.length > 0) {
+    return jsonMatches[jsonMatches.length - 1][1].toUpperCase();
+  }
+
+  // 3. 単独の T-1〜T-6 パターン
+  const singleMatches = Array.from(combined.matchAll(/\b(T-[1-6])\b/g));
+  if (singleMatches.length > 0) {
+    return singleMatches[singleMatches.length - 1][1].toUpperCase();
+  }
+
+  return null;
+}
+
 function detectStepTransitions(text, parts) {
   const now = new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
   
@@ -5378,15 +5460,7 @@ function detectStepTransitions(text, parts) {
     }
     appState.trainingCourseSelected = true;
     appState.courseCardCollapsed = true;
-    // If T-1 is already done, keep currentStep at T-2 (do not rewind)
-    if (appState.sopResults["T-1"] && appState.sopResults["T-1"].verdict === "SUCCESS") {
-      appState.currentStep = "T-2";
-    }
-    updateModeUI();
-    renderFlowChart();
-    renderSopTable();
-    saveState();
-    return;
+    // Note: Do not return early, allow step transition to process below!
   }
 
   // 0. Security Blocked check (Highest Priority)
@@ -5417,8 +5491,6 @@ function detectStepTransitions(text, parts) {
                      text.includes("確認できました") ||
                      text.includes("スキル読み込み完了") ||
                      text.includes("環境構築・スキル読み込み完了") ||
-                     (text.includes("どちらのコース") && text.includes("コースA") && text.includes("コースB")) ||
-                     text.includes("【受講コースの選択をお願いします】") ||
                      text.includes("正しく実装されています") ||
                      text.includes("コードを確認しました") ||
                      text.includes("設定完了") ||
@@ -5468,42 +5540,21 @@ function detectStepTransitions(text, parts) {
     if (curIdx >= 0 && curIdx + 1 < STEP_SEQUENCE.length) {
       appState.currentStep = STEP_SEQUENCE[curIdx + 1];
     }
-    // Check if text explicitly mentions the next target step
-    const nextMatch = text.match(/次[へはの]?(?:ステップ)?(?:手順(?:として)?)?(?:の)?\s*ステップ\s*(T-[0-9]+|[0-9]-[0-9]+)/i) ||
-                      text.match(/次のステップ\s*[:：➔➔→]?\s*(T-[0-9]+|[0-9]-[0-9]+)/i);
-    if (nextMatch) {
-      let candidate = nextMatch[1];
-      if (candidate.length === 1 && !candidate.includes("-")) candidate += "-1";
-      const access = canAccessStep(candidate);
-      if (access.allowed) {
-        appState.currentStep = candidate;
-      }
+    // Check if card or text explicitly mentions next target step
+    const detected = extractStepFromMessage(text, parts);
+    if (detected) {
+      syncStepProgression(detected, text);
+      return;
     }
   } else if (text.includes("差し戻し") || text.includes("自己申告") || text.includes("CLAIM_BLOCKED") || text.includes("BLOCKED_RETRY") || text.includes("【自律判定: 再投入ブロック】") || text.includes("【判定: 不合格】")) {
     // 差し戻し・再投入要求時は、受講生が現在取り組んでいるステップ（appState.currentStep）を絶対に維持する（巻き戻し厳禁）
     appState.errorStep = appState.currentStep;
   } else {
-    // Detect which step was presented next for general inquiries or instructions
-    const matches = Array.from(text.matchAll(/ステップ\s*(T-[0-9]+|[0-9]-[0-9]+|R-[0-9]+|E-[0-9]+|[0-9]+)/gi));
-    for (let i = matches.length - 1; i >= 0; i--) {
-      let candidate = matches[i][1];
-      if (candidate.length === 1 && !candidate.includes("-")) candidate += "-1";
-      if (appState.sopResults[candidate] && appState.sopResults[candidate].verdict === "SUCCESS") {
-        continue;
-      }
-      if (appState.mode === "TRAINING") {
-        const curIdx = STEP_SEQUENCE.indexOf(appState.currentStep);
-        const candIdx = STEP_SEQUENCE.indexOf(candidate);
-        // 研修モードでは、現在ステップより前のステップへの巻き戻りを絶対に防止
-        if (candIdx >= 0 && curIdx >= 0 && candIdx < curIdx) {
-          continue;
-        }
-      }
-      const access = canAccessStep(candidate);
-      if (access.allowed || candidate.startsWith("R-") || candidate.startsWith("E-")) {
-        appState.currentStep = candidate;
-        break;
-      }
+    // カードやメッセージから提示されたステップへの自動追従
+    const detected = extractStepFromMessage(text, parts);
+    if (detected) {
+      syncStepProgression(detected, text);
+      return;
     }
   }
 
