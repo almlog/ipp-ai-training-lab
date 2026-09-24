@@ -2828,6 +2828,12 @@ function updateSopItemsFromDb(sopDb, seq) {
   }
 
   SOP_ITEMS = items;
+  if (appState.mode === "TRAINING" && appState.courseAIdea && appState.trainingCourse !== "hitman_clone") {
+    const t2 = items.find(i => i.id === "T-2");
+    if (t2) {
+      t2.title = `ステップ T-2: 仕様・要件定義策定（${appState.courseAIdea}）`;
+    }
+  }
   if (seq && Array.isArray(seq) && seq.length > 0) {
     STEP_SEQUENCE = seq;
   }
@@ -2899,9 +2905,27 @@ function loadState() {
     try {
       const parsed = JSON.parse(saved);
       appState = Object.assign(appState, parsed);
-      if (appState.mode === "TRAINING" && (appState.trainingCourseSelected || (appState.sopResults && appState.sopResults["T-1"]))) {
-        if (appState.courseCardCollapsed === undefined) {
-          appState.courseCardCollapsed = true;
+      if (appState.mode === "TRAINING") {
+        if (appState.trainingCourseSelected || (appState.sopResults && appState.sopResults["T-1"])) {
+          if (appState.courseCardCollapsed === undefined) {
+            appState.courseCardCollapsed = true;
+          }
+        }
+        // 【自己治癒】T-2 が誤って自動補完（「ステップ T-3 進行に伴い...」など）で SUCCESS になっていたり、
+        // 実際の客観Wチェック合格証跡（cat project_brief.md や VERIFIED_APPROVED）がないのに
+        // T-2完了・T-3進行中になってしまっている場合は、T-2 進行中（未完了）へ修復
+        if (appState.sopResults && appState.sopResults["T-2"]) {
+          const t2Res = appState.sopResults["T-2"];
+          const snippet = t2Res.logSnippet || "";
+          const isRealApproval = snippet.includes("VERIFIED_APPROVED") || snippet.includes("Wチェック承認") || (snippet.includes("合格") && !snippet.includes("ステップ T-3 進行に伴い"));
+          if (!isRealApproval) {
+            delete appState.sopResults["T-2"];
+            appState.currentStep = "T-2";
+            appState.errorStep = null;
+          }
+        }
+        if (appState.currentStep === "T-3" && (!appState.sopResults || !appState.sopResults["T-2"])) {
+          appState.currentStep = "T-2";
         }
       }
       return true;
@@ -5375,24 +5399,28 @@ function syncStepProgression(targetStep, contextText = "") {
 
   if (appState.mode === "TRAINING" && normStep.startsWith("T-")) {
     const targetIdx = STEP_SEQUENCE.indexOf(normStep);
-    if (targetIdx > 0) {
-      // ターゲットステップより前のすべての前提ステップを SUCCESS に自動補完
-      for (let i = 0; i < targetIdx; i++) {
-        const prevStep = STEP_SEQUENCE[i];
-        if (!appState.sopResults[prevStep] || appState.sopResults[prevStep].verdict !== "SUCCESS") {
-          appState.sopResults[prevStep] = {
-            verdict: "SUCCESS",
-            timestamp: now,
-            logSnippet: `ステップ ${normStep} 進行に伴い前提ステップ完了を確認`
-          };
-        }
+    const curIdx = STEP_SEQUENCE.indexOf(appState.currentStep);
+
+    // 【重要】未検証の前提ステップを勝手に SUCCESS に自動昇格させない！
+    // ただし T-1 のみは環境構築完了ステップとして、T-2 提示時に合格前提の記録を補完する
+    if (targetIdx > 0 && normStep === "T-2") {
+      if (!appState.sopResults["T-1"] || appState.sopResults["T-1"].verdict !== "SUCCESS") {
+        appState.sopResults["T-1"] = {
+          verdict: "SUCCESS",
+          timestamp: now,
+          logSnippet: "ステップ T-1 環境構築・スキル同期完了"
+        };
       }
     }
-    const curIdx = STEP_SEQUENCE.indexOf(appState.currentStep);
-    // 巻き戻しは防止しつつ、前進または同一ステップの場合は更新
-    if (targetIdx >= curIdx || curIdx < 0) {
-      appState.currentStep = normStep;
-      appState.errorStep = null;
+
+    // 適切なステップへの遷移
+    if (targetIdx >= 0) {
+      // ターゲットステップが現在ステップと同じか、前提ステップが完了している場合にのみ遷移を許可
+      const access = canAccessStep(normStep);
+      if (access.allowed || targetIdx <= curIdx) {
+        appState.currentStep = normStep;
+        appState.errorStep = null;
+      }
     }
   } else {
     const access = canAccessStep(normStep);
@@ -5409,31 +5437,54 @@ function syncStepProgression(targetStep, contextText = "") {
 }
 
 function extractStepFromMessage(text, parts) {
-  let combined = text || "";
+  // 1. 最優先: A2UI カード内の見出し（h1 または h2）から対象ステップを抽出
+  // 作業手順カードのタイトル見出しはそのカードが提示している作業ステップそのもの
   if (parts && Array.isArray(parts)) {
     for (const p of parts) {
-      if (p && p.kind === "a2ui" && p.data) {
-        combined += " " + JSON.stringify(p.data);
+      if (p && p.kind === "a2ui" && p.data && Array.isArray(p.data)) {
+        for (const msg of p.data) {
+          const comps = msg?.surfaceUpdate?.components;
+          if (Array.isArray(comps)) {
+            for (const c of comps) {
+              if (c?.component?.Text) {
+                const hint = c.component.Text.usageHint;
+                const txt = c.component.Text.text?.literalString || "";
+                if ((hint === "h1" || hint === "h2") && txt) {
+                  const m = txt.match(/ステップ\s*(T-[1-6]|[1-4]-[1-4]|R-[1-2]|E-1)/i) || txt.match(/\b(T-[1-6])\b/i);
+                  if (m) {
+                    return m[1].toUpperCase();
+                  }
+                }
+              }
+            }
+          }
+        }
       }
     }
   }
 
-  // 1. "ステップ T-2", "Step T-2", "ステップ 2-1" などの明示的パターン
-  const stepMatches = Array.from(combined.matchAll(/ステップ\s*(T-[1-6]|[1-4]-[1-4]|R-[1-2]|E-1)/gi));
+  // 2. テキスト本文からの抽出
+  // 次ステップ予告文（例: 「合格後、ステップ T-3 へ進みます」等）を事前に除外
+  let cleanText = (text || "");
+  cleanText = cleanText.replace(/(?:合格後|完了後|次(?:は|の)|進(?:み|ま)|案内|移行)[^。\n]*?ステップ\s*(?:T-[1-6]|[1-4]-[1-4]|R-[1-2]|E-1)[^。\n]*/gi, "");
+  cleanText = cleanText.replace(/ステップ\s*(?:T-[1-6]|[1-4]-[1-4]|R-[1-2]|E-1)[^。\n]*?(?:へ進み|へ案内|へ移行|に進み|へ前進)/gi, "");
+
+  // 明示的な作業ステップ指定（先頭のマッチ、または作業手順見出しを優先）
+  const stepMatches = Array.from(cleanText.matchAll(/ステップ\s*(T-[1-6]|[1-4]-[1-4]|R-[1-2]|E-1)/gi));
   if (stepMatches.length > 0) {
-    return stepMatches[stepMatches.length - 1][1].toUpperCase();
+    return stepMatches[0][1].toUpperCase();
   }
 
-  // 2. step_id / current_step
-  const jsonMatches = Array.from(combined.matchAll(/(?:step_id|current_step)["':\s]+(T-[1-6]|[1-4]-[1-4]|R-[1-2]|E-1)/gi));
+  // 3. step_id / current_step
+  const jsonMatches = Array.from(cleanText.matchAll(/(?:step_id|current_step)["':\s]+(T-[1-6]|[1-4]-[1-4]|R-[1-2]|E-1)/gi));
   if (jsonMatches.length > 0) {
-    return jsonMatches[jsonMatches.length - 1][1].toUpperCase();
+    return jsonMatches[0][1].toUpperCase();
   }
 
-  // 3. 単独の T-1〜T-6 パターン
-  const singleMatches = Array.from(combined.matchAll(/\b(T-[1-6])\b/g));
+  // 4. 単独の T-1〜T-6 パターン（先頭を優先）
+  const singleMatches = Array.from(cleanText.matchAll(/\b(T-[1-6])\b/g));
   if (singleMatches.length > 0) {
-    return singleMatches[singleMatches.length - 1][1].toUpperCase();
+    return singleMatches[0][1].toUpperCase();
   }
 
   return null;
@@ -5463,39 +5514,43 @@ function detectStepTransitions(text, parts) {
     // Note: Do not return early, allow step transition to process below!
   }
 
+  // コースA企画アイデア（タイトル）の動的同期
+  const ideaMatch = text.match(/『([^』]+)』/) || text.match(/企画[：:\s]+([^\n]+)/);
+  if (ideaMatch && appState.mode === "TRAINING" && appState.trainingCourse !== "hitman_clone") {
+    const rawIdea = ideaMatch[1].trim();
+    if (rawIdea && rawIdea.length < 50 && !rawIdea.includes("コース")) {
+      appState.courseAIdea = rawIdea;
+      const t2Step = SOP_ITEMS.find(s => s.id === "T-2");
+      if (t2Step) {
+        t2Step.title = `ステップ T-2: 仕様・要件定義策定（${rawIdea}）`;
+      }
+    }
+  }
+
   // 0. Security Blocked check (Highest Priority)
   const isSecurityBlocked = text.includes("SECURITY_BLOCKED") ||
                             text.includes("セキュリティ遮断") ||
                             text.includes("重大セキュリティ警告");
 
   // 1. Success / Approved verification check (Never approve if security blocked)
+  // 【厳格化】日常会話の「確認できました」「正常に完了」等を除外し、客観ログ検証の合格トークンに限定
   const isApproved = !isSecurityBlocked && (
                      text.includes("VERIFIED_APPROVED") ||
                      text.includes("Wチェック承認") ||
                      text.includes("【AI確認者 有識者Wチェック承認") ||
                      text.includes("【判定: 合格】") ||
-                     text.includes("判定: 合格") ||
                      text.includes("【判定：合格】") ||
                      text.includes("【合格承認】") ||
-                     text.includes("合格承認") ||
                      text.includes("【Wチェック合格承認】") ||
                      text.includes("Wチェック合格承認") ||
                      text.includes("修了認定") ||
-                     text.includes("正常に完了") ||
-                     text.includes("正常完了") ||
-                     text.includes("実行ログを確認いたしました") ||
                      text.includes("実行結果ログの確認が完了") ||
                      text.includes("環境構築の実行ログを確認") ||
-                     text.includes("準備が正常に完了") ||
-                     text.includes("正常に確認できました") ||
-                     text.includes("確認できました") ||
                      text.includes("スキル読み込み完了") ||
                      text.includes("環境構築・スキル読み込み完了") ||
-                     text.includes("正しく実装されています") ||
-                     text.includes("コードを確認しました") ||
-                     text.includes("設定完了") ||
-                     text.includes("基礎が完成しています") ||
-                     text.includes("エージェントの起動・動作確認テスト"));
+                     text.includes("pytest全テストPASS") ||
+                     text.includes("Cloud Runデプロイ完了確認") ||
+                     text.includes("エージェントの起動・動作確認テスト完了"));
 
   // 2. Rollback verdict check (strict)
   const isRollback = text.includes("BRANCH_ROLLBACK") ||
