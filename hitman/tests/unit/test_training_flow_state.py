@@ -232,6 +232,11 @@ def test_idea_consultation_does_not_move_step_and_is_per_user(client):
     sop_b = client.get("/api/sop", params={"user_id": b, "mode": "TRAINING"}).json()["sop"]
     assert "障害ログ" in sop_a["T-2"]["title"]
     assert "障害ログ" not in sop_b["T-2"]["title"]
+    # 企画からエージェント名（フォルダ・サービス名）を決めて T-3〜T-5 に反映。他の受講生には影響しない
+    assert "--agent-dir ipp-agent-workspace/log_analyzer_bot" in sop_a["T-3"]["command"]
+    assert "gcloud run deploy log-analyzer-bot" in sop_a["T-5"]["command"]
+    assert "社内障害ログ自動解析Bot" in sop_a["T-4"]["title"]
+    assert "ipp-agent-workspace/my_agent" in sop_b["T-3"]["command"]
 
 
 def test_conversation_history_is_kept_in_session(client, scripted):

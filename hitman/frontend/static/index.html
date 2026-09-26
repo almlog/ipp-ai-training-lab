@@ -2098,10 +2098,10 @@ html, body {
       <div class="status-dot"></div>
       <span>稼働中</span>
     </div>
-    <button class="btn-reset" onclick="resetSessionConfirm()" title="現在の作業状態と履歴をリセットして新規開始">
+    <button class="btn-reset" onclick="resetSessionConfirm()" title="作業履歴・進行ステップ・キャッシュを消去して初期化（サーバ側のセッションも破棄）">
       <span class="material-symbols-outlined" style="font-size:16px;">restart_alt</span>
-      <span class="hdr-btn-txt-long">新規作業開始</span>
-      <span class="hdr-btn-txt-short">リセット</span>
+      <span class="hdr-btn-txt-long">キャッシュ初期化</span>
+      <span class="hdr-btn-txt-short">初期化</span>
     </button>
   </div>
 </header>
@@ -2172,6 +2172,10 @@ html, body {
           <button type="button" class="btn-config-env" onclick="openTrainingEnvModal()" title="作業フォルダ・パス・エージェント名・仮想環境設定を変更">
             <span class="material-symbols-outlined" style="font-size:13px;">settings</span>
             <span>⚙️ 研修環境設定</span>
+          </button>
+          <button type="button" class="btn-config-env" onclick="resetSessionConfirm()" title="作業履歴・進行ステップ・キャッシュを消去して初期化（サーバ側のセッションも破棄）" style="background:#fee2e2;border-color:#fca5a5;color:#b91c1c;">
+            <span class="material-symbols-outlined" style="font-size:13px;">restart_alt</span>
+            <span>↺ 初期化</span>
           </button>
         </div>
       </div>
@@ -2617,9 +2621,12 @@ html, body {
         <span style="font-size:0.72rem;color:#64748b;display:block;margin-top:3px;">※受講生の本番環境ではチェックを外して非表示にできます。現在は検証・デモ用にONになっています。</span>
       </div>
 
-      <div style="margin-top:0.8rem;border-top:1px dashed #cbd5e1;padding-top:0.8rem;">
-        <button type="button" class="btn-report-hdr" style="background:#7c3aed;color:#fff;border-color:#6d28d9;width:100%;justify-content:center;padding:0.5rem;" onclick="pasteTestDummyLog(); closeTrainingEnvModal();">
-          🛠️ 講師検証用: 現在ステップの合格テストログを入力欄に注入
+      <div style="margin-top:0.8rem;border-top:1px dashed #cbd5e1;padding-top:0.8rem;display:flex;gap:0.5rem;flex-wrap:wrap;">
+        <button type="button" class="btn-report-hdr" style="background:#fee2e2;color:#b91c1c;border-color:#fca5a5;flex:1;justify-content:center;padding:0.5rem;" onclick="resetSessionConfirm()">
+          🗑️ キャッシュを完全消去して初期化
+        </button>
+        <button type="button" class="btn-report-hdr" style="background:#7c3aed;color:#fff;border-color:#6d28d9;flex:1;justify-content:center;padding:0.5rem;" onclick="pasteTestDummyLog(); closeTrainingEnvModal();">
+          🛠️ 講師検証用: 合格テストログ注入
         </button>
       </div>
     </div>
@@ -2636,6 +2643,30 @@ html, body {
 </div>
 
 <script>
+
+// --- URL Reset Handler (?reset=true or ?clear=1) ---
+// ブラウザのキャッシュに加えて、サーバ側のセッション（会話履歴・研修の進捗）も破棄する
+(function checkUrlReset() {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("reset") === "true" || params.get("clear") === "1") {
+      let uid = null;
+      try { uid = localStorage.getItem("hitman_session_uid"); } catch (e) {}
+      const finish = () => {
+        try { localStorage.clear(); sessionStorage.clear(); } catch (e) {}
+        window.location.replace(window.location.origin + window.location.pathname);
+      };
+      if (uid) {
+        fetch("/api/session/reset", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ user_id: uid }) })
+          .catch(() => {}).finally(finish);
+      } else {
+        finish();
+      }
+    }
+  } catch(e) {
+    console.error("URL reset error:", e);
+  }
+})();
 
 // --- Mobile View Switcher Logic ---
 function switchMobileView(view) {
@@ -2954,7 +2985,7 @@ function loadState() {
 }
 
 async function resetSessionConfirm() {
-  if (confirm("作業履歴と手順書記録をリセットして、新規セッションを開始しますか？")) {
+  if (confirm("作業履歴・進行ステップ・保存キャッシュをすべて消去して、新規セッションに初期化しますか？\n（サーバ側の会話履歴と研修の進捗も破棄されます）")) {
     // サーバ側の会話履歴・研修ステートも破棄する（旧実装はフロントのみ初期化し、LLMが旧文脈を引きずっていた）
     try {
       await fetch("/api/session/reset", {
@@ -2963,8 +2994,8 @@ async function resetSessionConfirm() {
         body: JSON.stringify({ user_id: getSessionUserId() })
       });
     } catch (e) { console.warn("session reset failed", e); }
-    try { localStorage.removeItem(STORAGE_KEY); } catch (e) {}
-    location.reload();
+    try { localStorage.clear(); sessionStorage.clear(); } catch (e) {}
+    window.location.href = window.location.pathname + "?reset_done=" + Date.now();
   }
 }
 
@@ -5660,9 +5691,13 @@ function detectStepTransitions(text, parts) {
                             text.includes("セキュリティ遮断") ||
                             text.includes("重大セキュリティ警告");
 
-  // 1. Success / Approved verification check (Never approve if security blocked)
+  // 1. Success / Approved verification check (Never approve if security blocked or rejected)
+  const isRejected = text.includes("差し戻し") || text.includes("自己申告") ||
+                     text.includes("CLAIM_BLOCKED") || text.includes("BLOCKED_RETRY") ||
+                     text.includes("【自律判定: 再投入ブロック】") || text.includes("【判定: 不合格】") ||
+                     text.includes("【判定：不合格】");
   // 【厳格化】日常会話の「確認できました」「正常に完了」等を除外し、客観ログ検証の合格トークンに限定
-  const isApproved = !isSecurityBlocked && (
+  const isApproved = !isSecurityBlocked && !isRejected && (
                      text.includes("VERIFIED_APPROVED") ||
                      text.includes("Wチェック承認") ||
                      text.includes("【AI確認者 有識者Wチェック承認") ||
@@ -5741,9 +5776,14 @@ function detectStepTransitions(text, parts) {
 
     syncStepProgression(nextStep, text);
     return;
-  } else if (text.includes("差し戻し") || text.includes("自己申告") || text.includes("CLAIM_BLOCKED") || text.includes("BLOCKED_RETRY") || text.includes("【自律判定: 再投入ブロック】") || text.includes("【判定: 不合格】")) {
-    // 差し戻し・再投入要求時は、受講生が現在取り組んでいるステップ（appState.currentStep）を絶対に維持する（巻き戻し厳禁）
+  } else if (isRejected) {
+    // 差し戻し・再投入要求時は、受講生が現在取り組んでいるステップ（appState.currentStep）を絶対に維持する（巻き戻し・勝手な進行厳禁）
     appState.errorStep = appState.currentStep;
+    updateModeUI();
+    renderFlowChart();
+    renderSopTable();
+    saveState();
+    return;
   } else {
     // カードやメッセージから提示されたステップへの自動追従（承認なしのガイダンス等）
     const detected = extractStepFromMessage(text, parts);
