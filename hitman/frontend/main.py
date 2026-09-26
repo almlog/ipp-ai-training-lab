@@ -619,6 +619,38 @@ async def api_session_reset(req: Request):
         return JSONResponse(content={"status": "success", "state": await _snapshot_state(uid)})
 
 
+def _demo_evidence_enabled() -> bool:
+    """講師デモ用ログ生成の可否。Cloud Run（K_SERVICE あり）では受講生の不正合格を防ぐため既定で無効。
+    本番でもデモしたい場合は HITMAN_DEMO_EVIDENCE=1、ローカルで無効にしたい場合は 0 を設定する。"""
+    flag = os.environ.get("HITMAN_DEMO_EVIDENCE", "").strip()
+    if flag:
+        return flag == "1"
+    return not os.environ.get("K_SERVICE")
+
+
+@app.get("/api/training/demo-evidence/enabled")
+async def api_demo_evidence_enabled():
+    return JSONResponse(content={"enabled": _demo_evidence_enabled()})
+
+
+@app.post("/api/training/demo-evidence")
+async def api_demo_evidence(req: Request):
+    """🧪ログ注入（講師デモ用）: 受講生のセッションに紐づく T-2/T-3 のサンプルログを生成する。
+    pattern: "ok"（正常＝合格する）/ "ng"（異常＝不合格になる）。それ以外のステップは text=None（フロントの固定サンプルを使う）。"""
+    if not _demo_evidence_enabled():
+        return JSONResponse(status_code=403, content={"text": None, "note": "この環境では講師デモ用ログ生成は無効です。"})
+    body = await req.json()
+    uid = _normalize_user_id(body.get("user_id"))
+    step = str(body.get("step") or "")
+    pattern = "ng" if str(body.get("pattern")) == "ng" else "ok"
+    _ensure_import_path()
+    from app.agent import build_demo_evidence
+    async with _user_lock(uid):
+        async with _SessionState(uid) as (st, _ctx, _created):
+            result = build_demo_evidence(step, pattern, st)
+    return JSONResponse(content=result)
+
+
 @app.post("/api/training/parameters")
 async def set_training_params(req: Request):
     body = await req.json()

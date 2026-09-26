@@ -654,6 +654,11 @@
     margin-top: 0.3rem;
     transition: all 0.15s ease;
   }
+  .btn-step-test-log-ng {
+    background: #fef2f2;
+    border-color: #fca5a5;
+    color: #b91c1c;
+  }
   .btn-step-test-log:hover {
     background: #f3e8ff;
     border-color: #c084fc;
@@ -2323,8 +2328,9 @@ html, body {
     </div>
     <div class="modal-body" style="padding:1rem;">
       <div style="font-size:0.8rem;color:#475569;margin-bottom:0.6rem;line-height:1.45;">
-        各ステップの客観Wチェック判定を即座に合格通過（🟢 VERIFIED_APPROVED）させるためのターミナル実行ログ（生ログ）です。<br>
-        <strong>「📥 入力欄にセット」</strong> を押すとチャット入力欄に自動転送され、そのまま <strong>[送信]</strong> できます。
+        各ステップの客観Wチェック判定をデモ・確認するためのターミナル実行ログ（生ログ）です。<br>
+        <strong>「✅ 正常をセット」</strong>は合格する想定、<strong>「❌ 異常をセット」</strong>は不合格（差し戻し）になる想定のログです。押すとチャット入力欄に転送され、そのまま <strong>[送信]</strong> できます。<br>
+        ※ T-2（コースA）と T-3 の正常ログは、受講生が確定した企画と確認コードに合わせてその場で生成します（企画確定前は生成できません）。
       </div>
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.6rem;background:#f1f5f9;padding:0.4rem 0.6rem;border-radius:6px;">
         <span style="font-size:0.78rem;font-weight:700;color:#334155;">対象コース:</span>
@@ -3944,6 +3950,79 @@ Content-Type: application/json
   }
 };
 
+// 🧪ログ注入の「異常パターン」: 各ステップで不合格（差し戻し）になるべきログ。判定ルールのデモ・回帰確認用。
+// T-2（コースA）/ T-3 の正常パターンは受講生の企画・確認コードに紐づくため、サーバ（/api/training/demo-evidence）で生成する。
+const TEST_EVIDENCES_NG = {
+  original: {
+    "T-1": `PS C:\\work> git clone https://github.com/almlog/ipp-ai-training-lab.git
+Cloning into 'ipp-ai-training-lab'...
+fatal: could not read Username for 'https://github.com': terminal prompts disabled`,
+    "T-2": `[skill:pick-your-agent-project@v1]
+# project_brief.md (自作AIエージェント要件定義)
+## 1. アプリ概要
+- エージェント名: expense_faq_bot (経費精算FAQアシスタント)
+- 目的: 相談して確定した企画とは別のアプリの要件定義書（別企画のサンプルを貼り付けた想定）
+## 2. ツール
+- ツール: search_expense_rule`,
+    "T-4": `============================= test session starts ==============================
+collected 5 items
+
+tests/test_agent.py ..FF.                                                  [100%]
+
+FAILED tests/test_agent.py::test_different_inputs_give_different_results - AssertionError
+FAILED tests/test_agent.py::test_root_agent_wires_tools - AssertionError
+========================= 2 failed, 3 passed in 1.42s ==========================`,
+    "T-5": `Deploying from source. To deploy a container use [--image]...
+ERROR: (gcloud.run.deploy) PERMISSION_DENIED: Permission 'run.services.create' denied on resource 'namespaces/my-project/services/my-agent' (or resource may not exist).`,
+    "T-6": `To https://github.com/student/my-agent.git
+ ! [rejected]        main -> main (fetch first)
+error: failed to push some refs to 'https://github.com/student/my-agent.git'`
+  },
+  hitman_clone: {}
+};
+TEST_EVIDENCES_NG.hitman_clone = Object.assign({}, TEST_EVIDENCES_NG.original, {
+  "T-2": `PS C:\\work\\ipp-agent-workspace> cat hitman_spec.md
+cat : パス 'C:\\work\\ipp-agent-workspace\\hitman_spec.md' が存在しないため検出できません。`
+});
+
+// 注入するログを取得する。pattern: "ok"（正常＝合格する想定）/ "ng"（異常＝不合格になる想定）
+async function getEvidenceLog(stepId, course, pattern) {
+  const table = pattern === "ng" ? TEST_EVIDENCES_NG : TEST_EVIDENCES;
+  const staticLog = ((table[course] || table.original) || {})[stepId] || "";
+  const needsSession = appState.mode === "TRAINING" && (stepId === "T-3" || (stepId === "T-2" && pattern === "ok" && course !== "hitman_clone"));
+  if (!needsSession) return { text: staticLog, note: "" };
+  try {
+    const res = await fetch("/api/training/demo-evidence", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ user_id: getSessionUserId(), step: stepId, pattern: pattern })
+    });
+    const data = await res.json();
+    if (res.ok && data.text) return { text: data.text, note: "" };
+    if (res.ok && data.note) return { text: "", note: data.note };
+    return { text: staticLog, note: "固定サンプルを使います（この受講生の企画・確認コードと紐づかないため、正常パターンでも不合格になります）。" };
+  } catch (e) {
+    return { text: staticLog, note: "サンプル生成に失敗したため固定サンプルを使います。" };
+  }
+}
+
+async function setEvidenceToInput(stepId, course, pattern) {
+  const { text, note } = await getEvidenceLog(stepId, course, pattern);
+  if (!text) {
+    showToast(`⚠️ ${note || "このステップのサンプルログがありません。"}`);
+    return false;
+  }
+  const inputEl = document.getElementById("input");
+  if (!inputEl) return false;
+  inputEl.value = text;
+  autoResizeTextarea();
+  appState.rawLog = text;
+  inputEl.focus();
+  const label = pattern === "ng" ? "❌ 異常パターン（不合格になる想定）" : "✅ 正常パターン（合格する想定）";
+  showToast(`🛠️ ステップ ${stepId} の${label}をセットしました。[送信] を押してください。${note ? " " + note : ""}`);
+  return true;
+}
+
 function escapeHtml(str) {
   if (!str) return "";
   return str
@@ -4147,8 +4226,11 @@ function renderTestEvidencesList() {
             ${isCur ? '<span style="font-size:0.68rem;background:#2563eb;color:#fff;padding:0.1rem 0.4rem;border-radius:4px;font-weight:700;">進行中</span>' : ''}
           </div>
           <div style="display:flex;gap:0.35rem;">
-            <button type="button" class="course-btn" style="padding:0.3rem 0.65rem;font-size:0.75rem;background:#7c3aed;color:#fff;border:none;border-radius:5px;" onclick="injectEvidencesLog('${stepId}', '${currentEvidencesCourse}')">
-              📥 入力欄にセット
+            <button type="button" class="course-btn" style="padding:0.3rem 0.65rem;font-size:0.75rem;background:#15803d;color:#fff;border:none;border-radius:5px;" onclick="injectEvidencesLog('${stepId}', '${currentEvidencesCourse}', 'ok')" title="合格する想定のログ">
+              ✅ 正常をセット
+            </button>
+            <button type="button" class="course-btn" style="padding:0.3rem 0.65rem;font-size:0.75rem;background:#b91c1c;color:#fff;border:none;border-radius:5px;" onclick="injectEvidencesLog('${stepId}', '${currentEvidencesCourse}', 'ng')" title="不合格（差し戻し）になる想定のログ">
+              ❌ 異常をセット
             </button>
             <button type="button" class="course-btn" style="padding:0.3rem 0.65rem;font-size:0.75rem;border-radius:5px;" onclick="copyEvidencesLog('${stepId}', '${currentEvidencesCourse}')">
               📄 コピー
@@ -4162,18 +4244,8 @@ function renderTestEvidencesList() {
   container.innerHTML = html;
 }
 
-function injectEvidencesLog(stepId, course) {
-  const evs = TEST_EVIDENCES[course] || TEST_EVIDENCES.original;
-  const log = evs[stepId] || "";
-  const inputEl = document.getElementById("input");
-  if (inputEl) {
-    inputEl.value = log;
-    autoResizeTextarea();
-    appState.rawLog = log;
-    inputEl.focus();
-    closeTestEvidencesModal();
-    showToast(`✓ ステップ ${stepId} の合格ログを入力欄にセットしました！ [送信] を押してください。`);
-  }
+async function injectEvidencesLog(stepId, course, pattern = "ok") {
+  if (await setEvidenceToInput(stepId, course, pattern)) closeTestEvidencesModal();
 }
 
 function copyEvidencesLog(stepId, course) {
@@ -4186,18 +4258,9 @@ function copyEvidencesLog(stepId, course) {
   }
 }
 
-function injectStepDummyLog(stepId) {
+function injectStepDummyLog(stepId, pattern = "ok") {
   const course = appState.trainingCourse || "original";
-  const evs = TEST_EVIDENCES[course] || TEST_EVIDENCES.original;
-  const log = evs[stepId] || "";
-  const inputEl = document.getElementById("input");
-  if (inputEl) {
-    inputEl.value = log;
-    autoResizeTextarea();
-    appState.rawLog = log;
-    inputEl.focus();
-    showToast(`🛠️ ステップ ${stepId} の合格ログを入力欄にセットしました！ [送信] を押してください。`);
-  }
+  return setEvidenceToInput(stepId, course, pattern);
 }
 
 function pasteTestDummyLog() {
@@ -4946,7 +5009,7 @@ function renderFlowChart() {
         <div class="step-cmd-preview">${resolveStepVariables(step.cmd).substring(0, 45)}...</div>
         <div style="margin-top:0.35rem;display:flex;gap:0.35rem;flex-wrap:wrap;">
           ${step.agy_prompt ? `<button type="button" class="btn-copy-agy" onclick="event.stopPropagation(); copyAgyPrompt('${step.id}')" title="AntiGravity投入用プロンプトをクリップボードにコピー"><span class="material-symbols-outlined" style="font-size:14px;vertical-align:middle;">content_copy</span><span>AGYプロンプト</span></button>` : ""}
-          ${appState.mode === "TRAINING" ? `<button type="button" class="btn-step-test-log" onclick="event.stopPropagation(); injectStepDummyLog('${step.id}')" title="このステップの合格テストログを入力欄に注入"><span class="material-symbols-outlined" style="font-size:14px;vertical-align:middle;">science</span><span>🧪 ログ注入</span></button>` : ""}
+          ${appState.mode === "TRAINING" && appState.trainerDebugMode !== false ? `<button type="button" class="btn-step-test-log" onclick="event.stopPropagation(); injectStepDummyLog('${step.id}', 'ok')" title="正常パターン（合格する想定のログ）を入力欄に注入"><span>🧪 正常</span></button><button type="button" class="btn-step-test-log btn-step-test-log-ng" onclick="event.stopPropagation(); injectStepDummyLog('${step.id}', 'ng')" title="異常パターン（不合格になる想定のログ）を入力欄に注入"><span>🧪 異常</span></button>` : ""}
         </div>
       </div>
       <div class="step-status-icon">${icon}</div>

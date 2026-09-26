@@ -1848,6 +1848,82 @@ def judge_smoke_output(text: str, expected_nonce: str | None = None, expected_ag
     return {"status": "FAIL", "reason": reason, "hints": [_SMOKE_HINTS[k] for k in ng], "data": data, "checks": checks}
 
 
+def _expected_agent_dir(state: "HitmanState") -> str | None:
+    """T-3 カードのコマンドの --agent-dir から、確定した企画のエージェントフォルダ名を取り出す。"""
+    sop_now = get_training_sop(state.course, state=state)
+    m_dir = re.search(r"--agent-dir\s+\S*?([A-Za-z0-9_]+)\s", sop_now["T-3"]["command"] + " ")
+    return m_dir.group(1) if m_dir else None
+
+
+def _demo_smoke_output(state: "HitmanState", stub: bool) -> str:
+    """講師デモ用: その受講生の確認コード・企画フォルダで実行した体裁のスモークテスト出力を作る。
+    stub=True なら『引数を無視して固定値を返すダミー実装』の不合格例になる。"""
+    import hashlib
+
+    def h(obj: Any, n: int) -> str:
+        return hashlib.sha256(json.dumps(obj, sort_keys=True, ensure_ascii=False, default=str).encode("utf-8")).hexdigest()[:n]
+
+    agent_dir = _expected_agent_dir(state) or "my_agent"
+    qs = ["No space left on device のエラーが出ました", "DB connection timeout が発生しました"]
+    real = [{"cause": "ディスク容量不足", "action": "不要ファイルを削除"}, {"cause": "DB接続タイムアウト", "action": "接続設定を確認"}]
+    fixed = {"cause": "正常に解析しました", "action": "問題ありません"}
+    runs = []
+    for q, res in zip(qs, real):
+        out = fixed if stub else res
+        reply = f"判定結果: {json.dumps(out, ensure_ascii=False)}" + ("" if stub else f"（{q[:12]}）")
+        runs.append({
+            "question": q,
+            "reply_excerpt": reply,
+            "reply_hash": h(reply, 12),
+            "tool_calls": [{"name": "analyze_log", "args_hash": h({"log_text": q}, 12)}],
+            "tool_results": [{"name": "analyze_log", "result_hash": h(out, 12)}],
+        })
+    checks, suspects = _smoke_checks(runs)
+    data = {
+        "version": 2, "nonce": state.t3_nonce, "agent_dir": agent_dir, "agent": agent_dir,
+        "tools": ["analyze_log"], "runs": runs, "checks": checks,
+        "tool_call_count": sum(len(r["tool_calls"]) for r in runs),
+        "stub_suspects": sorted(suspects), "passed": all(checks.values()),
+    }
+    lines = [
+        SMOKE_MARKER,
+        f"$ python .agents/skills/ipp-agent-smoke-test/scripts/smoke_test.py --agent-dir ipp-agent-workspace/{agent_dir} --q1 \"{qs[0]}\" --q2 \"{qs[1]}\" --nonce {state.t3_nonce}",
+        f"agent: {agent_dir}  dir: {agent_dir}  nonce: {state.t3_nonce}  tools: analyze_log",
+    ]
+    for i, r in enumerate(runs, start=1):
+        lines += [f"--- Q{i}: {r['question']}", "tools called: analyze_log", "reply: " + r["reply_excerpt"]]
+    lines += [f"check {k}: {'OK' if v else 'NG'}" for k, v in checks.items()]
+    if suspects:
+        lines.append("stub suspects (異なる入力で同じ結果を返したツール): " + ", ".join(sorted(suspects)))
+    lines.append("SMOKE_RESULT: " + ("PASS" if data["passed"] else "FAIL"))
+    lines.append("SMOKE_JSON: " + json.dumps(data, sort_keys=True, ensure_ascii=False, separators=(",", ":")))
+    lines.append("SMOKE_DIGEST: " + _smoke_digest(data))
+    return "\n".join(lines)
+
+
+def build_demo_evidence(step: str, pattern: str, state: "HitmanState") -> dict:
+    """講師デモ用の『ログ注入』のうち、受講生のセッションに紐づく必要があるもの（T-2/T-3）を作る。
+    それ以外のステップは固定サンプル（フロントの TEST_EVIDENCES）で足りるため text=None を返す。"""
+    ok = pattern != "ng"
+    if step == "T-2" and ok and state.course != "hitman_clone":
+        if not state.plan_confirmed:
+            return {"text": None, "note": "企画がまだ確定していません。先にチャットで企画を確定してください（未確定のままでは正常ログも不合格になります）。"}
+        slug = state.agent_slug or _expected_agent_dir(state) or "my_agent"
+        idea = state.user_idea or slug
+        text = (
+            f"[skill:pick-your-agent-project@v1]\n# project_brief.md (自作AIエージェント要件定義)\n"
+            f"## 1. アプリ概要\n- エージェント名: {slug}\n- 企画: {idea}\n"
+            "## 2. アーキテクチャ\n- フレームワーク: Google ADK + Python\n- UIコンポーネント: A2UI v0.8 リッチカード表示\n"
+            "## 3. ツール\n- 企画に合わせた関数ツール（入力に応じて処理し、固定値は返さない）"
+        )
+        return {"text": text, "note": ""}
+    if step == "T-3":
+        if not state.t3_nonce:
+            return {"text": None, "note": "T-3 の確認コードがまだ発行されていません（T-2 合格後に発行されます）。"}
+        return {"text": _demo_smoke_output(state, stub=not ok), "note": ""}
+    return {"text": None, "note": ""}
+
+
 # 各研修ステップで使われるはずの研修スキル（使用証跡が無ければ参考メッセージを付ける。合否には影響しない）
 EXPECTED_SKILLS_BY_STEP = {
     "T-1": ["ipp-skill-check"],
@@ -2025,6 +2101,26 @@ def _verify_step_output_impl(step_number: int | str, command_output: str, state:
         "filesystem read-only",
     ]
     is_training_step = step_str.startswith("T-") or (ACTIVE_OPERATION_MODE == MODE_TRAINING and step_str in TRAINING_STEP_SEQUENCE)
+    # 研修ステップで「コマンド自体が失敗した」ことを示す出力。URL やファイル名が含まれていても合格させない
+    # （旧実装は git push が rejected でも github.com を含むだけで T-6 合格、cat の失敗でも T-2 合格になっていた）
+    training_error_keywords = [
+        "failed to push some refs", "! [rejected]", "no such file or directory",
+        "が存在しないため検出できません", "cannot find path",
+    ]
+    if is_training_step and not smoke_verified:
+        for ek in training_error_keywords:
+            if ek in output_lower:
+                return {
+                    "verdict": "FAILED",
+                    "w_check_status": "BLOCKED_RETRY",
+                    "step_id": CURRENT_STEP if CURRENT_STEP in TRAINING_STEP_SEQUENCE else step_str,
+                    "reason": f"実行ログ内にコマンドの失敗（'{ek}'）が検出されました。",
+                    "autonomous_verdict": f"【AI確認者 判定】コマンドの失敗（{ek}）を検知。成功した実行ログを提出してください。",
+                    "message": (
+                        f"【判定: 不合格】コマンドが失敗しています（'{ek}'）。\n"
+                        "エラー全文を AntiGravity に貼り付けて原因と対処を確認し、成功した実行ログをもう一度貼り付けてください。"
+                    ),
+                }
     for fk in fatal_keywords:
         if smoke_verified:
             # スモークテストの質問・応答に含まれるエラー文言（例: HITMANクローンに与えた異常ログ）は判定対象外
@@ -2200,11 +2296,7 @@ def _verify_step_output_impl(step_number: int | str, command_output: str, state:
         # 合格条件は「実際にエージェントを動かした記録（スモークテスト）」。ファイル一覧やコードの冒頭だけでは、
         # 固定値を返すだけのダミー実装でも合格してしまうため。判定は表示上の PASS ではなく生データから行う。
         if "T-3" in step_str:
-            expected_dir = None
-            if state.mode == MODE_TRAINING:
-                sop_now = get_training_sop(state.course, state=state)
-                m_dir = re.search(r"--agent-dir\s+\S*?([A-Za-z0-9_]+)\s", sop_now["T-3"]["command"] + " ")
-                expected_dir = m_dir.group(1) if m_dir else None
+            expected_dir = _expected_agent_dir(state) if state.mode == MODE_TRAINING else None
             smoke = judge_smoke_output(
                 command_output,
                 expected_nonce=state.t3_nonce if state.mode == MODE_TRAINING else None,
