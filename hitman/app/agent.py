@@ -595,24 +595,312 @@ ACTIVE_AUDIT_LOG: list[dict] = []
 CURRENT_STEP: str = "1-1"
 
 
-def set_training_course(course_type: str) -> dict:
-    """研修モードの受講コース（'original': オリジナルAIツール, 'hitman_clone': HITMANクローン）を設定する。"""
-    global ACTIVE_TRAINING_COURSE
+# ==============================================================================
+# セッション単位ステート（Single Source of Truth）
+# ------------------------------------------------------------------------------
+# 研修フローの状態（モード・コース・現在ステップ・合否結果・企画アイデア等）は
+# ADK セッションの state に保持する。ツールは ToolContext.state 経由で読み書きし、
+# frontend/main.py は /chat 応答に state スナップショットを返す。
+# これにより受講生ごとに状態が分離され、フロントがLLMの文章から状態を推測する必要がなくなる。
+#
+# ToolContext が無い呼び出し（単体テストや旧来の直接呼び出し）では、後方互換のため
+# モジュールグローバルを格納先とする _GlobalStateStore にフォールバックする。
+# ==============================================================================
+K_MODE = "hitman:mode"
+K_CURRENT_STEP = "hitman:current_step"
+K_LAST_VERDICT = "hitman:last_verdict"
+K_VERDICT_SEQ = "hitman:verdict_seq"
+K_COURSE = "training:course"
+K_PARAMS = "training:params"
+K_USER_IDEA = "training:user_idea"
+K_RESULTS = "training:results"
+K_T2_OVERRIDE = "training:t2_override"
+K_COURSE_SELECTED = "training:course_selected"
+
+STATE_KEYS = (
+    K_MODE, K_CURRENT_STEP, K_LAST_VERDICT, K_VERDICT_SEQ, K_COURSE, K_PARAMS,
+    K_USER_IDEA, K_RESULTS, K_T2_OVERRIDE, K_COURSE_SELECTED,
+)
+
+# ToolContext なし呼び出し用のフォールバック格納先（グローバル変数に載らない項目）
+_LEGACY_EXTRA_STATE: dict[str, Any] = {}
+
+
+class _GlobalStateStore:
+    """後方互換用: ステートキーをモジュールグローバル変数へマッピングする格納先。"""
+
+    _GLOBAL_MAP = {
+        K_MODE: "ACTIVE_OPERATION_MODE",
+        K_CURRENT_STEP: "CURRENT_STEP",
+        K_COURSE: "ACTIVE_TRAINING_COURSE",
+        K_PARAMS: "TRAINING_PARAMETERS",
+    }
+
+    def __contains__(self, key: str) -> bool:
+        return key in self._GLOBAL_MAP or key in _LEGACY_EXTRA_STATE
+
+    def get(self, key: str, default: Any = None) -> Any:
+        if key in self._GLOBAL_MAP:
+            return globals()[self._GLOBAL_MAP[key]]
+        return _LEGACY_EXTRA_STATE.get(key, default)
+
+    def __getitem__(self, key: str) -> Any:
+        return self.get(key)
+
+    def __setitem__(self, key: str, value: Any) -> None:
+        if key in self._GLOBAL_MAP:
+            globals()[self._GLOBAL_MAP[key]] = value
+        else:
+            _LEGACY_EXTRA_STATE[key] = value
+
+
+class HitmanState:
+    """セッションステートの型付きビュー。
+
+    格納先は ADK の State（ToolContext.state）、プレーン dict、または _GlobalStateStore。
+    ミュータブルな値（dict）は必ずコピーを代入して更新する（ADK の state_delta に確実に載せるため）。
+    """
+
+    def __init__(self, store: Any):
+        self._s = store
+
+    @classmethod
+    def of(cls, tool_context: Any = None) -> "HitmanState":
+        store = getattr(tool_context, "state", None) if tool_context is not None else None
+        return cls(store if store is not None else _GlobalStateStore())
+
+    def _get(self, key: str, default: Any) -> Any:
+        val = self._s.get(key, None) if key in self._s else None
+        return default if val is None else val
+
+    # --- モード / ステップ ---
+    @property
+    def mode(self) -> str:
+        return self._get(K_MODE, MODE_NORMAL)
+
+    @mode.setter
+    def mode(self, v: str) -> None:
+        self._s[K_MODE] = v
+
+    @property
+    def current_step(self) -> str:
+        default = "T-1" if self.mode == MODE_TRAINING else "1-1"
+        return self._get(K_CURRENT_STEP, default)
+
+    @current_step.setter
+    def current_step(self, v: str) -> None:
+        self._s[K_CURRENT_STEP] = v
+
+    # --- 研修コース / 環境 / 企画 ---
+    @property
+    def course(self) -> str:
+        return self._get(K_COURSE, "original")
+
+    @course.setter
+    def course(self, v: str) -> None:
+        self._s[K_COURSE] = v
+
+    @property
+    def course_selected(self) -> bool:
+        return bool(self._get(K_COURSE_SELECTED, False))
+
+    @course_selected.setter
+    def course_selected(self, v: bool) -> None:
+        self._s[K_COURSE_SELECTED] = bool(v)
+
+    @property
+    def params(self) -> dict:
+        return dict(self._get(K_PARAMS, DEFAULT_TRAINING_PARAMETERS))
+
+    @params.setter
+    def params(self, v: dict) -> None:
+        self._s[K_PARAMS] = dict(v)
+
+    @property
+    def user_idea(self) -> str:
+        return self._get(K_USER_IDEA, "")
+
+    @user_idea.setter
+    def user_idea(self, v: str) -> None:
+        self._s[K_USER_IDEA] = v or ""
+
+    @property
+    def t2_override(self) -> dict:
+        return dict(self._get(K_T2_OVERRIDE, {}))
+
+    @t2_override.setter
+    def t2_override(self, v: dict) -> None:
+        self._s[K_T2_OVERRIDE] = dict(v or {})
+
+    # --- 合否結果 ---
+    @property
+    def results(self) -> dict:
+        return dict(self._get(K_RESULTS, {}))
+
+    @results.setter
+    def results(self, v: dict) -> None:
+        self._s[K_RESULTS] = dict(v)
+
+    @property
+    def last_verdict(self) -> dict:
+        return dict(self._get(K_LAST_VERDICT, {}))
+
+    @property
+    def verdict_seq(self) -> int:
+        return int(self._get(K_VERDICT_SEQ, 0))
+
+    def record_verdict(self, result: dict) -> None:
+        """直近のWチェック判定を記録する（フロントが『このターンで判定があったか』を識別できるよう連番を進める）。"""
+        seq = self.verdict_seq + 1
+        self._s[K_VERDICT_SEQ] = seq
+        self._s[K_LAST_VERDICT] = {
+            "seq": seq,
+            "step_id": result.get("step_id"),
+            "verdict": result.get("verdict"),
+            "w_check_status": result.get("w_check_status"),
+            "branch_to": result.get("branch_to"),
+        }
+
+    def snapshot(self) -> dict:
+        """フロントエンドへ返す公開ステート。"""
+        return {
+            "mode": self.mode,
+            "current_step": self.current_step,
+            "course": self.course,
+            "course_selected": self.course_selected,
+            "results": self.results,
+            "user_idea": self.user_idea,
+            "last_verdict": self.last_verdict or None,
+            "verdict_seq": self.verdict_seq,
+            "sequence": list(TRAINING_STEP_SEQUENCE) if self.mode == MODE_TRAINING else list(ACTIVE_STEP_SEQUENCE),
+            "completed": self.mode == MODE_TRAINING and self.results.get(TRAINING_STEP_SEQUENCE[-1]) == "SUCCESS",
+        }
+
+
+def _normalize_course(course_type: str | None) -> str:
+    """コース指定文字列を 'hitman_clone' / 'original' に正規化する。
+
+    旧実装は候補に単独の "b" を含む部分一致だったため、"web" 等を含む任意の文字列で
+    コースBと誤判定していた。"b" は完全一致のみ許可する。
+    """
     c = (course_type or "").strip().lower()
-    if any(k in c for k in ("hitman", "clone", "クローン", "コースb", "コース b", "course_b", "course b", "b")):
-        ACTIVE_TRAINING_COURSE = "hitman_clone"
-    else:
-        ACTIVE_TRAINING_COURSE = "original"
+    if c in ("b", "course_b", "hitman_clone"):
+        return "hitman_clone"
+    if any(k in c for k in ("hitman", "clone", "クローン", "コースb", "コース b", "course b", "course_b")):
+        return "hitman_clone"
+    return "original"
+
+
+def select_training_course(state: HitmanState, course_type: str) -> dict:
+    """受講コースを確定する（UIボタン・LLMツール共通の唯一のコース変更経路）。
+
+    - 同じコースの再選択は進捗に一切影響しない（旧実装の『折りたたみボタンで進捗リセット』ループ対策）
+    - コース変更時は T-1 の合格のみ引き継ぎ、T-2 以降の結果とT-2の企画上書きはクリアする
+    - 現在ステップは T-1 合格済なら T-2、未合格なら T-1（T-1 は必ず客観ログで検証する）
+    """
+    new_course = _normalize_course(course_type)
+    changed = new_course != state.course
+    state.course = new_course
+    state.course_selected = True
+    if state.mode != MODE_TRAINING:
+        state.mode = MODE_TRAINING
+    if changed:
+        t1_done = state.results.get("T-1") == "SUCCESS"
+        state.results = {"T-1": "SUCCESS"} if t1_done else {}
+        state.t2_override = {}
+        state.current_step = "T-2" if t1_done else "T-1"
+    elif state.current_step not in TRAINING_STEP_SEQUENCE:
+        state.current_step = "T-1"
     return {
-        "status": "success",
-        "course": ACTIVE_TRAINING_COURSE,
-        "course_name": "コースB: HITMANクローン構築" if ACTIVE_TRAINING_COURSE == "hitman_clone" else "コースA: オリジナルAIツール開発",
-        "step_sequence": list(TRAINING_STEP_SEQUENCE),
-        "sop": get_training_sop(ACTIVE_TRAINING_COURSE),
+        "course": new_course,
+        "changed": changed,
+        "course_name": "コースB: HITMANクローン構築" if new_course == "hitman_clone" else "コースA: オリジナルAIツール開発",
+        "current_step": state.current_step,
     }
 
 
-def set_training_environment(workspace_dir: str = "", agent_name: str = "", python_env: str = "") -> dict:
+def apply_training_verdict(state: HitmanState, result: dict) -> None:
+    """研修ステップの判定結果をステートへ反映する（研修ステップ遷移の唯一の経路）。
+
+    合格（VERIFIED_APPROVED）のときだけ、判定対象が現在ステップと一致する場合に限り前進する。
+    案内文や LLM の言い回しではステップは一切動かない。
+    """
+    step_id = result.get("step_id")
+    if step_id not in TRAINING_STEP_SEQUENCE:
+        return
+    if result.get("w_check_status") != "VERIFIED_APPROVED" or result.get("verdict") != "SUCCESS":
+        return
+    cur = state.current_step
+    if cur in TRAINING_STEP_SEQUENCE and step_id != cur:
+        # 現在ステップ以外への合格は反映しない（スキップ・巻き戻し防止）
+        return
+    results = state.results
+    results[step_id] = "SUCCESS"
+    state.results = results
+    idx = TRAINING_STEP_SEQUENCE.index(step_id)
+    if idx + 1 < len(TRAINING_STEP_SEQUENCE):
+        state.current_step = TRAINING_STEP_SEQUENCE[idx + 1]
+    else:
+        state.current_step = step_id
+
+
+def reset_session_state(store: Any) -> None:
+    """格納先（dict 等）の HITMAN ステートを初期化する。"""
+    for k in STATE_KEYS:
+        if k in store:
+            store[k] = None
+
+
+def seed_state_from_client(store: Any, client_state: dict | None) -> bool:
+    """サーバ側セッションが失われた場合（Cloud Run のコールドスタート・別インスタンス）に限り、
+    フロントが保持していた直近のサーバステートで新規セッションを初期化する。"""
+    if not client_state or not isinstance(client_state, dict):
+        return False
+    st = HitmanState(store)
+    mode = client_state.get("mode")
+    if mode in (MODE_NORMAL, MODE_TRAINING, MODE_SPECIAL_PAIR):
+        st.mode = mode
+    if st.mode == MODE_TRAINING:
+        course = client_state.get("course")
+        if course:
+            st.course = _normalize_course(course)
+        st.course_selected = bool(client_state.get("course_selected"))
+        results = client_state.get("results") or {}
+        clean = {}
+        for step in TRAINING_STEP_SEQUENCE:  # 連続した合格のみ採用（途中の穴は許さない）
+            if results.get(step) == "SUCCESS":
+                clean[step] = "SUCCESS"
+            else:
+                break
+        st.results = clean
+        done = len(clean)
+        st.current_step = TRAINING_STEP_SEQUENCE[min(done, len(TRAINING_STEP_SEQUENCE) - 1)]
+        if client_state.get("user_idea"):
+            st.user_idea = str(client_state["user_idea"])[:200]
+    return True
+
+
+def set_training_course(course_type: str, tool_context: Any = None) -> dict:
+    """研修モードの受講コース（'original': オリジナルAIツール, 'hitman_clone': HITMANクローン）を設定する。
+    受講生が明示的にコースを選んだ場合のみ呼び出すこと。同じコースの再選択では進捗は変わらない。
+
+    Args:
+        course_type: 'original'（コースA）または 'hitman_clone'（コースB）。
+    """
+    state = HitmanState.of(tool_context)
+    sel = select_training_course(state, course_type)
+    return {
+        "status": "success",
+        "course": sel["course"],
+        "course_name": sel["course_name"],
+        "changed": sel["changed"],
+        "current_step": sel["current_step"],
+        "step_sequence": list(TRAINING_STEP_SEQUENCE),
+        "sop": get_training_sop(sel["course"], state=state),
+    }
+
+
+def set_training_environment(workspace_dir: str = "", agent_name: str = "", python_env: str = "", tool_context: Any = None) -> dict:
     """【研修モード専用】受講生のPC環境に合わせて、作業ディレクトリのパス・フォルダ名、開発エージェント名、仮想環境設定をカスタマイズする。
     
     Args:
@@ -620,32 +908,39 @@ def set_training_environment(workspace_dir: str = "", agent_name: str = "", pyth
         agent_name: 自作するAIエージェントのモジュール名（例: 'my_agent', 'my_hitman', 'db_bot'）。
         python_env: Python仮想環境の実行方法（例: 'uv', '.venv', 'python -m venv .venv', 'conda'）。
     """
-    global TRAINING_PARAMETERS
+    state = HitmanState.of(tool_context)
+    params = state.params
     if workspace_dir:
-        TRAINING_PARAMETERS["WORKSPACE_DIR"] = workspace_dir.strip()
+        params["WORKSPACE_DIR"] = workspace_dir.strip()
     if agent_name:
-        TRAINING_PARAMETERS["AGENT_NAME"] = agent_name.strip()
+        params["AGENT_NAME"] = agent_name.strip()
     if python_env:
-        TRAINING_PARAMETERS["PYTHON_ENV"] = python_env.strip()
+        params["PYTHON_ENV"] = python_env.strip()
+    state.params = params
 
-    ws = TRAINING_PARAMETERS["WORKSPACE_DIR"]
-    ag = TRAINING_PARAMETERS["AGENT_NAME"]
-    pe = TRAINING_PARAMETERS["PYTHON_ENV"]
+    ws = params["WORKSPACE_DIR"]
+    ag = params["AGENT_NAME"]
+    pe = params["PYTHON_ENV"]
 
     return {
         "status": "success",
-        "parameters": dict(TRAINING_PARAMETERS),
+        "parameters": dict(params),
         "message": f"研修環境設定を更新しました：作業フォルダ『{ws}』、エージェント名『{ag}』、仮想環境『{pe}』。後続の全手順・プロンプトに反映されます。",
     }
 
 
-def get_training_sop(course_type: str = None, params: dict = None) -> dict:
-    """研修モードの指定コース用SOPを取得し、動的パラメータ（WORKSPACE_DIR, AGENT_NAME, PYTHON_ENV等）を展開して返却する。"""
-    c = (course_type or ACTIVE_TRAINING_COURSE).lower()
-    is_hitman = any(k in c for k in ("hitman", "clone", "クローン", "コースb", "コース b", "course_b", "course b", "b"))
+def get_training_sop(course_type: str = None, params: dict = None, state: "HitmanState" = None) -> dict:
+    """研修モードの指定コース用SOPを取得し、動的パラメータ（WORKSPACE_DIR, AGENT_NAME, PYTHON_ENV等）を展開して返却する。
+    コースAのT-2は、セッションで確定した企画（t2_override）があればその内容で上書きする。"""
+    state = state or HitmanState.of(None)
+    is_hitman = _normalize_course(course_type or state.course) == "hitman_clone"
     base_sop = copy.deepcopy(TRAINING_SOP_HITMAN_CLONE if is_hitman else TRAINING_SOP_ORIGINAL)
+    if not is_hitman:
+        override = state.t2_override
+        if override:
+            base_sop["T-2"].update({k: v for k, v in override.items() if k in ("title", "objective", "command", "agy_prompt")})
 
-    p = dict(TRAINING_PARAMETERS)
+    p = dict(state.params)
     if params:
         p.update({k: v for k, v in params.items() if v})
 
@@ -678,33 +973,37 @@ def get_training_sop(course_type: str = None, params: dict = None) -> dict:
     return base_sop
 
 
-def get_active_sop(mode: str = None, course: str = None, params: dict = None) -> dict:
-    effective_mode = mode or ACTIVE_OPERATION_MODE
+def get_active_sop(mode: str = None, course: str = None, params: dict = None, state: "HitmanState" = None) -> dict:
+    state = state or HitmanState.of(None)
+    effective_mode = mode or state.mode
     if effective_mode == MODE_TRAINING:
-        return get_training_sop(course or ACTIVE_TRAINING_COURSE, params=params)
+        return get_training_sop(course or state.course, params=params, state=state)
     return ACTIVE_SOP_DATABASE
 
 
-def get_active_step_sequence(mode: str = None, course: str = None) -> list[str]:
-    effective_mode = mode or ACTIVE_OPERATION_MODE
+def get_active_step_sequence(mode: str = None, course: str = None, state: "HitmanState" = None) -> list[str]:
+    state = state or HitmanState.of(None)
+    effective_mode = mode or state.mode
     if effective_mode == MODE_TRAINING:
         return list(TRAINING_STEP_SEQUENCE)
     return list(ACTIVE_STEP_SEQUENCE)
 
 
-def get_active_parameters(mode: str = None) -> dict[str, str]:
-    effective_mode = mode or ACTIVE_OPERATION_MODE
+def get_active_parameters(mode: str = None, state: "HitmanState" = None) -> dict[str, str]:
+    state = state or HitmanState.of(None)
+    effective_mode = mode or state.mode
     if effective_mode == MODE_TRAINING:
-        return dict(TRAINING_PARAMETERS)
+        return state.params
     return ACTIVE_PARAMETERS
 
 
-def get_active_approval(mode: str = None, course: str = None) -> dict[str, Any]:
-    effective_mode = mode or ACTIVE_OPERATION_MODE
+def get_active_approval(mode: str = None, course: str = None, state: "HitmanState" = None) -> dict[str, Any]:
+    state = state or HitmanState.of(None)
+    effective_mode = mode or state.mode
     if effective_mode == MODE_TRAINING:
         meta = dict(TRAINING_APPROVAL_METADATA)
-        c = (course or ACTIVE_TRAINING_COURSE).lower()
-        if "hitman" in c:
+        c = _normalize_course(course or state.course)
+        if c == "hitman_clone":
             meta["work_title"] = "【コースB】HITMANクローン自律構築・デプロイ実践手順書"
         else:
             meta["work_title"] = "【コースA】オリジナルAIエージェント自律開発・デプロイ実践手順書"
@@ -716,8 +1015,9 @@ def get_active_branch_rules() -> dict[str, dict]:
     return ACTIVE_BRANCH_RULES
 
 
-def get_operation_mode() -> dict:
+def get_operation_mode(tool_context: Any = None) -> dict:
     """現在のHITMAN運用モード（NORMAL/TRAINING/SPECIAL_PAIR）および適用ルールを取得する。"""
+    state = HitmanState.of(tool_context)
     mode_descriptions = {
         MODE_NORMAL: "【通常モード】現場本番作業用。客観的コマンド実行ログが必須。自己申告は冷徹に即時差し戻し（Wチェック厳格判定）。",
         MODE_TRAINING: "【研修モード】教育用特別モード。受講生の手順書活用によるオリジナルアプリ開発・デプロイ体験を伴走支援。自作アプリが思いつかない受講生にはHITMAN作成を支援。客観証跡の重要性を教育的に指導。",
@@ -725,15 +1025,16 @@ def get_operation_mode() -> dict:
     }
     return {
         "status": "success",
-        "mode": ACTIVE_OPERATION_MODE,
-        "description": mode_descriptions.get(ACTIVE_OPERATION_MODE, "不明なモード"),
+        "mode": state.mode,
+        "current_step": state.current_step,
+        "description": mode_descriptions.get(state.mode, "不明なモード"),
         "supervisor_name": ACTIVE_SUPERVISOR_NAME,
         "supervisor_role": ACTIVE_SUPERVISOR_ROLE,
         "audit_logs_count": len(ACTIVE_AUDIT_LOG),
     }
 
 
-def set_operation_mode(mode: str, supervisor_name: str = "", supervisor_role: str = "") -> dict:
+def set_operation_mode(mode: str, supervisor_name: str = "", supervisor_role: str = "", tool_context: Any = None) -> dict:
     """HITMANの運用モードを切り替える（'NORMAL', 'TRAINING', 'SPECIAL_PAIR'）。
 
     Args:
@@ -744,22 +1045,25 @@ def set_operation_mode(mode: str, supervisor_name: str = "", supervisor_role: st
     Returns:
         切り替え後の運用モード情報。
     """
-    global ACTIVE_OPERATION_MODE, ACTIVE_SUPERVISOR_NAME, ACTIVE_SUPERVISOR_ROLE, CURRENT_STEP
+    global ACTIVE_SUPERVISOR_NAME, ACTIVE_SUPERVISOR_ROLE
+    state = HitmanState.of(tool_context)
     m = (mode or "").strip().upper()
     if "TRAIN" in m or "研修" in m:
-        ACTIVE_OPERATION_MODE = MODE_TRAINING
-        if not CURRENT_STEP.startswith("T-"):
-            CURRENT_STEP = "T-1"
+        state.mode = MODE_TRAINING
+        if not str(state.current_step).startswith("T-"):
+            # 研修モードへ戻った場合は最初の未完了ステップから再開する（誤操作で進捗を失わない）
+            done = state.results
+            state.current_step = next((s for s in TRAINING_STEP_SEQUENCE if done.get(s) != "SUCCESS"), TRAINING_STEP_SEQUENCE[-1])
     elif "SPEC" in m or "PAIR" in m or "エスカレ" in m or "特別" in m or "2人" in m:
-        ACTIVE_OPERATION_MODE = MODE_SPECIAL_PAIR
+        state.mode = MODE_SPECIAL_PAIR
         if supervisor_name:
             ACTIVE_SUPERVISOR_NAME = supervisor_name
         if supervisor_role:
             ACTIVE_SUPERVISOR_ROLE = supervisor_role
     elif "NORM" in m or "通常" in m:
-        ACTIVE_OPERATION_MODE = MODE_NORMAL
-        if CURRENT_STEP.startswith("T-"):
-            CURRENT_STEP = "1-1"
+        state.mode = MODE_NORMAL
+        if str(state.current_step).startswith("T-"):
+            state.current_step = "1-1"
     else:
         return {
             "status": "error",
@@ -767,10 +1071,10 @@ def set_operation_mode(mode: str, supervisor_name: str = "", supervisor_role: st
         }
     return {
         "status": "success",
-        "mode": ACTIVE_OPERATION_MODE,
-        "current_step": CURRENT_STEP,
-        "message": f"【運用モード変更】HITMANの運用モードを【{ACTIVE_OPERATION_MODE}】へ切り替えました。",
-        "details": get_operation_mode(),
+        "mode": state.mode,
+        "current_step": state.current_step,
+        "message": f"【運用モード変更】HITMANの運用モードを【{state.mode}】へ切り替えました。",
+        "details": get_operation_mode(tool_context),
     }
 
 
@@ -813,6 +1117,9 @@ def reset_active_sop() -> dict:
     TRAINING_PARAMETERS = dict(DEFAULT_TRAINING_PARAMETERS)
     ACTIVE_SUPERVISOR_NAME = ""
     ACTIVE_SUPERVISOR_ROLE = ""
+    global CURRENT_STEP
+    CURRENT_STEP = "1-1"
+    _LEGACY_EXTRA_STATE.clear()
     return ACTIVE_SOP_DATABASE
 
 
@@ -993,7 +1300,7 @@ def import_sop_procedure(content: str, format_type: str = "auto") -> dict:
     }
 
 
-def get_procedure_step(step_number: int | str) -> dict:
+def get_procedure_step(step_number: int | str, tool_context: Any = None) -> dict:
     """指定されたステップ番号またはサブステップ番号（例: 1, '1-1', '1-2', 'R-1'）の手順書内容を取得する。
 
     Args:
@@ -1002,17 +1309,16 @@ def get_procedure_step(step_number: int | str) -> dict:
     Returns:
         ステップのタイトル、作業目的、実行コマンド、確認項目、注意事項を含む辞書。
     """
+    state = HitmanState.of(tool_context)
     step_str = str(step_number).strip().upper()
-    db = get_active_sop()
+    db = get_active_sop(state=state)
 
-    # 自動モード同期 & ロバスト検索: T-1 〜 T-6 等の研修ステップが要求された場合は、訓練用SOPを自動参照
+    # 研修ステップ（T-x）が要求された場合は訓練用SOPを参照する（モード自体は変更しない）
     if (step_str.startswith("T-") or "T-" in step_str) and step_str not in db:
-        global ACTIVE_OPERATION_MODE
-        ACTIVE_OPERATION_MODE = MODE_TRAINING
-        db = get_training_sop(ACTIVE_TRAINING_COURSE)
+        db = get_training_sop(state.course, state=state)
 
     # 研修モード時のステップ番号エイリアス変換 (例: '1' -> 'T-1', '1-1' -> 'T-1')
-    if ACTIVE_OPERATION_MODE == MODE_TRAINING or ("T-1" in db and step_str not in db):
+    if state.mode == MODE_TRAINING or ("T-1" in db and step_str not in db):
         step_alias = {
             "1": "T-1", "1-1": "T-1", "STEP1": "T-1", "STEP 1": "T-1",
             "2": "T-2", "2-1": "T-2", "STEP2": "T-2", "STEP 2": "T-2",
@@ -1026,11 +1332,12 @@ def get_procedure_step(step_number: int | str) -> dict:
 
     # 研修モード時、オペレーターが途中（T-3等）で進行中に引数省略やデフォルトの1/T-1で呼び出された場合、
     # 既に完了した過去ステップに巻き戻さず、現在進行中（CURRENT_STEP）を優先
-    if ACTIVE_OPERATION_MODE == MODE_TRAINING and CURRENT_STEP in TRAINING_STEP_SEQUENCE:
-        cur_idx = TRAINING_STEP_SEQUENCE.index(CURRENT_STEP)
+    cur_step = state.current_step
+    if state.mode == MODE_TRAINING and cur_step in TRAINING_STEP_SEQUENCE:
+        cur_idx = TRAINING_STEP_SEQUENCE.index(cur_step)
         cand_idx = TRAINING_STEP_SEQUENCE.index(step_str) if step_str in TRAINING_STEP_SEQUENCE else -1
         if (cand_idx < cur_idx and cur_idx > 0) or step_str in ("", "NONE", "NULL"):
-            step_str = CURRENT_STEP
+            step_str = cur_step
 
     if step_str in db:
         step = db[step_str]
@@ -1179,11 +1486,12 @@ def is_pure_assertion_without_log(raw: str) -> bool:
     return False
 
 
-def _make_no_log_response(step_str: str, detail: str = "") -> dict:
+def _make_no_log_response(step_str: str, detail: str = "", state: "HitmanState" = None) -> dict:
     """客観ログ未検知時のレスポンスを運用モードに応じて生成する。"""
-    global ACTIVE_OPERATION_MODE, ACTIVE_SUPERVISOR_NAME, CURRENT_STEP, ACTIVE_TRAINING_COURSE
+    state = state or HitmanState.of(None)
+    CURRENT_STEP = state.current_step
 
-    if ACTIVE_OPERATION_MODE == MODE_TRAINING:
+    if state.mode == MODE_TRAINING:
         target_step = CURRENT_STEP if CURRENT_STEP in TRAINING_STEP_SEQUENCE else step_str
         if step_str in TRAINING_STEP_SEQUENCE and CURRENT_STEP in TRAINING_STEP_SEQUENCE:
             # step_strがCURRENT_STEPより過去の場合は巻き戻さずCURRENT_STEPを維持
@@ -1196,7 +1504,7 @@ def _make_no_log_response(step_str: str, detail: str = "") -> dict:
         else:
             target_step = step_str if step_str.startswith("T-") else "T-1"
 
-        sop_db = get_training_sop(ACTIVE_TRAINING_COURSE)
+        sop_db = get_training_sop(state.course, state=state)
         step_data = sop_db.get(target_step, {})
         step_title = step_data.get("title", f"ステップ {target_step}")
         cmd = step_data.get("command", "")
@@ -1219,7 +1527,7 @@ def _make_no_log_response(step_str: str, detail: str = "") -> dict:
                 f"（補足: {detail}）"
             ),
         }
-    elif ACTIVE_OPERATION_MODE == MODE_SPECIAL_PAIR:
+    elif state.mode == MODE_SPECIAL_PAIR:
         sup_text = f"（同席責任者: {ACTIVE_SUPERVISOR_NAME}）" if ACTIVE_SUPERVISOR_NAME else ""
         return {
             "verdict": "FAILED",
@@ -1342,7 +1650,35 @@ def check_destructive_or_malicious_input(command_output: str) -> dict | None:
     return None
 
 
-def verify_step_output(step_number: int | str, command_output: str) -> dict:
+def verify_step_output(step_number: int | str, command_output: str, tool_context: Any = None) -> dict:
+    """オペレーターがコマンドを実行した出力ログを有識者AI（確認者）として客観検証し、
+    Wチェック判定（合格承認・リトライ遮断・自律分岐指示）を行う。
+    自己申告のみの入力は厳格に差し戻し、客観証跡ログを必須とします。
+    研修モードでは、判定対象は常に現在進行中のステップになり、合格時のみ次ステップへ進む。
+
+    Args:
+        step_number: 検証対象のステップ番号（例: 1, '1-1', '1-2', 'T-3'）。
+        command_output: オペレーターがターミナルからコピーした実行結果ログ、またはTeraTermログ。
+
+    Returns:
+        合否結果（SUCCESS/FAILED）、Wチェック承認状態（w_check_status）、自律判定理由、分岐先を含む辞書。
+    """
+    state = HitmanState.of(tool_context)
+    step_str = str(step_number).strip().upper()
+    # 研修モードのアンチスキップ: 現在ステップより先のステップ番号が指定されても現在ステップとして検証する
+    cur = state.current_step
+    if state.mode == MODE_TRAINING and cur in TRAINING_STEP_SEQUENCE and step_str in TRAINING_STEP_SEQUENCE:
+        if TRAINING_STEP_SEQUENCE.index(step_str) > TRAINING_STEP_SEQUENCE.index(cur):
+            step_number = cur
+    result = _verify_step_output_impl(step_number, command_output, state)
+    apply_training_verdict(state, result)
+    if state.mode == MODE_TRAINING or str(result.get("step_id", "")).startswith("T-"):
+        result["current_step"] = state.current_step
+    state.record_verdict(result)
+    return result
+
+
+def _verify_step_output_impl(step_number: int | str, command_output: str, state: "HitmanState") -> dict:
     """オペレーターがコマンドを実行した出力ログを有識者AI（確認者）として客観検証し、
     Wチェック判定（合格承認・リトライ遮断・自律分岐指示）を行う。
     自己申告のみの入力は厳格に差し戻し、客観証跡ログを必須とします。
@@ -1354,7 +1690,8 @@ def verify_step_output(step_number: int | str, command_output: str) -> dict:
     Returns:
         合否結果（SUCCESS/FAILED）、Wチェック承認状態（w_check_status）、自律判定理由、分岐先を含む辞書。
     """
-    global CURRENT_STEP, ACTIVE_OPERATION_MODE, ACTIVE_TRAINING_COURSE
+    CURRENT_STEP = state.current_step
+    ACTIVE_OPERATION_MODE = state.mode
 
     # 0. 最優先セキュリティチェック（破壊的コマンド・プロンプトインジェクションの即時遮断）
     security_violation = check_destructive_or_malicious_input(command_output)
@@ -1429,34 +1766,27 @@ def verify_step_output(step_number: int | str, command_output: str) -> dict:
         or (is_course_switch_intent and any(k in output_lower for k in ("コースa", "オリジナル", "自作")))
     )
 
-    if is_course_b_choice:
-        set_training_course("hitman_clone")
-        CURRENT_STEP = "T-2"
+    if is_course_b_choice or is_course_a_choice:
+        sel = select_training_course(state, "hitman_clone" if is_course_b_choice else "original")
+        next_hint = (
+            "続いて『ステップ T-2: 仕様・要件定義』へ進んでください。"
+            if sel["current_step"] == "T-2"
+            else f"まずは現在のステップ『{sel['current_step']}』の実行ログを貼り付けてください（T-1 の環境構築ログを客観確認してから T-2 へ進みます）。"
+        )
+        detail = (
+            "HITMAN自身のExcel手順書パーサー、A2UIカード生成、および客観Wチェック判定ロジックを自律構築・デプロイします。"
+            if is_course_b_choice else
+            "受講生ご自身の現場課題を解決する自作エージェントを企画・開発します。"
+        )
         return {
             "verdict": "SUCCESS",
             "w_check_status": "COURSE_SELECTED",
-            "step_id": "T-2",
-            "autonomous_verdict": "【AI講師 Wチェック承認 ✓】研修コースを「コースB: HITMANクローン構築」に確定しました。",
+            "step_id": sel["current_step"],
+            "autonomous_verdict": f"【AI講師 コース確定 ✓】研修コースを「{sel['course_name']}」に確定しました。",
             "message": (
-                "【受講コース確定: コースB（HITMANクローン構築）】\n"
-                "コースB（HITMANクローン構築体験）を選択いただきました！\n"
-                "HITMAN自身のExcel手順書パーサー、A2UIカード生成、および客観Wチェック判定ロジックを自律構築・デプロイします。\n"
-                "続いて『ステップ T-2: 仕様設計（hitman_spec.md策定）』へ進んでください。"
-            ),
-        }
-    elif is_course_a_choice:
-        set_training_course("original")
-        CURRENT_STEP = "T-2"
-        return {
-            "verdict": "SUCCESS",
-            "w_check_status": "COURSE_SELECTED",
-            "step_id": "T-2",
-            "autonomous_verdict": "【AI講師 Wチェック承認 ✓】研修コースを「コースA: オリジナルAIツール開発」に確定しました。",
-            "message": (
-                "【受講コース確定: コースA（オリジナルAIツール開発）】\n"
-                "コースA（オリジナルAIツール開発）を選択いただきました！\n"
-                "受講生ご自身の現場課題を解決する自作エージェントを企画・開発します。\n"
-                "続いて『ステップ T-2: 要件定義（project_brief.md策定）』へ進んでください。"
+                f"【受講コース確定: {sel['course_name']}】\n"
+                f"{detail}\n"
+                f"{next_hint}"
             ),
         }
 
@@ -1466,7 +1796,21 @@ def verify_step_output(step_number: int | str, command_output: str) -> dict:
         "cannot allocate memory", "database corrupted", "fatal: could not read",
         "filesystem read-only",
     ]
+    is_training_step = step_str.startswith("T-") or (ACTIVE_OPERATION_MODE == MODE_TRAINING and step_str in TRAINING_STEP_SEQUENCE)
     for fk in fatal_keywords:
+        if fk in output_lower and is_training_step:
+            # 研修にはロールバック手順(R-1)が存在しないため、エラー修正を促して現在ステップに留める
+            return {
+                "verdict": "FAILED",
+                "w_check_status": "BLOCKED_RETRY",
+                "step_id": CURRENT_STEP if CURRENT_STEP in TRAINING_STEP_SEQUENCE else step_str,
+                "reason": f"実行ログ内にエラー '{fk}' が検出されました。",
+                "autonomous_verdict": f"【AI確認者 判定】ログ内にエラー（{fk}）を検知。エラーを解消してから再度ログを提出してください。",
+                "message": (
+                    f"【判定: 不合格】ログ内にエラー '{fk}' が見つかりました。\n"
+                    "エラー全文を AntiGravity に貼り付けて原因と対処を確認し、修正後にもう一度実行ログを貼り付けてください。"
+                ),
+            }
         if fk in output_lower:
             return {
                 "verdict": "FAILED",
@@ -1484,7 +1828,7 @@ def verify_step_output(step_number: int | str, command_output: str) -> dict:
         "duplicate entry", "table doesn't exist", "relation does not exist",
     ]
     for ek in escalation_keywords:
-        if ek in output_lower:
+        if ek in output_lower and not is_training_step:
             return {
                 "verdict": "FAILED",
                 "w_check_status": "BRANCH_ESCALATION",
@@ -1517,7 +1861,7 @@ def verify_step_output(step_number: int | str, command_output: str) -> dict:
             cand_idx = TRAINING_STEP_SEQUENCE.index(step_str) if step_str in TRAINING_STEP_SEQUENCE else -1
             if cand_idx < cur_idx:
                 step_str = CURRENT_STEP
-        return _make_no_log_response(step_str, "ターミナルログの出力構造（ヘッダー、終了ステータス等）が見当たりません。")
+        return _make_no_log_response(step_str, "ターミナルログの出力構造（ヘッダー、終了ステータス等）が見当たりません。", state=state)
 
     # ==============================================================================
     # 研修モード（TRAINING）用ステップ（T-1 〜 T-6）の客観ログ検証
@@ -1525,18 +1869,17 @@ def verify_step_output(step_number: int | str, command_output: str) -> dict:
     if step_str.startswith("T-") or "T-" in step_str or (ACTIVE_OPERATION_MODE == MODE_TRAINING and step_str in TRAINING_STEP_SEQUENCE):
         # T-1: 開発環境構築とスキル同期
         if "T-1" in step_str:
-            ws_cur = TRAINING_PARAMETERS.get("WORKSPACE_DIR", "ipp-agent-workspace")
+            ws_cur = state.params.get("WORKSPACE_DIR", "ipp-agent-workspace")
             ws_cur_clean = ws_cur.replace("\\", "/").rstrip("/").split("/")[-1].lower()
             has_t1_sig = any(k in output_lower for k in (
                 ws_cur_clean, "ipp-agent-workspace", "altx-agent-workspace", "ipp-ai-training-lab", "git clone", "cloning into",
-                "gemini-3.8-flash", "gemini-3.6-flash", "python", "3.11", "3.12", "api key",
-                "requirements", "virtualenv", ".venv", "active", "mkdir", "new-item", "cd ",
-                "directory:", "mode", "lastwritetime", "length", "get-childitem", "dir", "powershell",
-                "skills", "pick-your-agent-project", "enable-a2ui"
+                "gemini-3.8-flash", "gemini-3.6-flash", "python 3.", "3.11", "3.12", "3.13",
+                "virtualenv", ".venv", "mkdir", "new-item",
+                "directory:", "lastwritetime", "get-childitem",
+                ".agents", "pick-your-agent-project", "enable-a2ui", "build-agent-frontend"
             ))
             if not has_t1_sig:
-                return _make_no_log_response("T-1", f"作業フォルダ作成（{ws_cur}）、git clone、または環境確認（Windows/Mac/Linux）の実行ログが確認できません。")
-            CURRENT_STEP = "T-2"
+                return _make_no_log_response("T-1", f"作業フォルダ作成（{ws_cur}）、git clone、または環境確認（Windows/Mac/Linux）の実行ログが確認できません。", state=state)
             return {
                 "verdict": "SUCCESS",
                 "w_check_status": "VERIFIED_APPROVED",
@@ -1559,8 +1902,7 @@ def verify_step_output(step_number: int | str, command_output: str) -> dict:
                 "要件", "目的", "a2ui", "memory", "エージェント名", "agent", "spec"
             ))
             if not has_t2_sig:
-                return _make_no_log_response("T-2", "project_brief.md または hitman_spec.md の内容・要件定義の出力が確認できません。")
-            CURRENT_STEP = "T-3"
+                return _make_no_log_response("T-2", "project_brief.md または hitman_spec.md の内容・要件定義の出力が確認できません。", state=state)
             return {
                 "verdict": "SUCCESS",
                 "w_check_status": "VERIFIED_APPROVED",
@@ -1580,8 +1922,7 @@ def verify_step_output(step_number: int | str, command_output: str) -> dict:
                 "my_agent", "my_hitman", "basiccatalog", "tool", "fastapi"
             ))
             if not has_t3_sig:
-                return _make_no_log_response("T-3", "agent.py や A2UIカード連携コード、生成ファイル群の出力が確認できません。")
-            CURRENT_STEP = "T-4"
+                return _make_no_log_response("T-3", "agent.py や A2UIカード連携コード、生成ファイル群の出力が確認できません。", state=state)
             return {
                 "verdict": "SUCCESS",
                 "w_check_status": "VERIFIED_APPROVED",
@@ -1605,10 +1946,9 @@ def verify_step_output(step_number: int | str, command_output: str) -> dict:
                     "autonomous_verdict": "【AI確認者 判定】単体テストの失敗を検知。不合格箇所を修正し、全件PASSEDとなるまでデプロイへの進行を遮断します。",
                     "message": "【判定: 不合格】単体テストでエラーが検知されました。AntiGravityにログを渡し修正を行って、再度全件合格のログを貼り付けてください。",
                 }
-            has_t4_sig = any(k in output_lower for k in ("passed", "test session starts", "collected ", "100%", "0 error", "ok"))
+            has_t4_sig = any(k in output_lower for k in ("passed", "test session starts"))
             if not has_t4_sig:
-                return _make_no_log_response("T-4", "pytest実行ログ（passed, test session starts等）が確認できません。")
-            CURRENT_STEP = "T-5"
+                return _make_no_log_response("T-4", "pytest実行ログ（passed, test session starts等）が確認できません。", state=state)
             return {
                 "verdict": "SUCCESS",
                 "w_check_status": "VERIFIED_APPROVED",
@@ -1623,10 +1963,9 @@ def verify_step_output(step_number: int | str, command_output: str) -> dict:
 
         # T-5: Cloud Run 本番デプロイ
         if "T-5" in step_str:
-            has_t5_sig = any(k in output_lower for k in ("run.app", "service url:", "deploying container", "ok", "service [", "https://"))
+            has_t5_sig = any(k in output_lower for k in ("run.app", "service url:"))
             if not has_t5_sig:
-                return _make_no_log_response("T-5", "Cloud Run デプロイログまたはサービスURL（https://...run.app）が確認できません。")
-            CURRENT_STEP = "T-6"
+                return _make_no_log_response("T-5", "Cloud Run デプロイログまたはサービスURL（https://...run.app）が確認できません。", state=state)
             return {
                 "verdict": "SUCCESS",
                 "w_check_status": "VERIFIED_APPROVED",
@@ -1641,10 +1980,9 @@ def verify_step_output(step_number: int | str, command_output: str) -> dict:
 
         # T-6: 個人GitHub公開＆修了証発行
         if "T-6" in step_str:
-            has_t6_sig = any(k in output_lower for k in ("github.com", "remote: create a pull request", "to https://github.com", "origin", "pushed", "repo view"))
+            has_t6_sig = any(k in output_lower for k in ("github.com", "remote: create a pull request"))
             if not has_t6_sig:
-                return _make_no_log_response("T-6", "個人GitHubリポジトリURL（https://github.com/...）またはプッシュログが確認できません。")
-            CURRENT_STEP = "T-6"
+                return _make_no_log_response("T-6", "個人GitHubリポジトリURL（https://github.com/...）またはプッシュログが確認できません。", state=state)
             return {
                 "verdict": "SUCCESS",
                 "w_check_status": "VERIFIED_APPROVED",
@@ -1663,7 +2001,7 @@ def verify_step_output(step_number: int | str, command_output: str) -> dict:
     if "1-1" in step_str or ("df" in output_lower and "1" in step_str):
         has_df_evidence = any(k in output_lower for k in ("filesystem", "mounted", "avail", "/backup", "/dev/", "use%", "size"))
         if not has_df_evidence:
-            return _make_no_log_response("1-1", "df -h コマンドの出力（Filesystem, Size, Used, Avail, Mounted on等）が確認できません。")
+            return _make_no_log_response("1-1", "df -h コマンドの出力（Filesystem, Size, Used, Avail, Mounted on等）が確認できません。", state=state)
 
         if "100%" in output_lower or "99%" in output_lower or "no space left" in output_lower:
             return {
@@ -1882,7 +2220,7 @@ def request_supervisor_step_skip(
     }
 
 
-def guide_training_app_creation(idea: str = "", course_type: str = "custom", is_confirmed: bool = False) -> dict:
+def guide_training_app_creation(idea: str = "", course_type: str = "custom", is_confirmed: bool = False, tool_context: Any = None) -> dict:
     """【研修モード専用】受講生がHITMANの手順書やスキルを活用してオリジナルアプリ（AIエージェント）を
     企画・作成・デプロイする体験をナビゲートする。
     自作アプリのアイデアが思いつかない受講生には、HITMANクローン自身の作成を支援する。
@@ -1896,9 +2234,9 @@ def guide_training_app_creation(idea: str = "", course_type: str = "custom", is_
     Returns:
         開発ガイダンス、推奨構成、AntiGravity投入プロンプト案を含む辞書。
     """
-    global ACTIVE_TRAINING_COURSE, CURRENT_STEP
+    state = HitmanState.of(tool_context)
     idea_raw = (idea or "").strip()
-    prev_idea = TRAINING_PARAMETERS.get("USER_IDEA", "")
+    prev_idea = state.user_idea
 
     # 相談・壁打ちを示すキーワード（質問、疑問、迷い、探りなど）
     consultation_keywords = (
@@ -1964,8 +2302,9 @@ def guide_training_app_creation(idea: str = "", course_type: str = "custom", is_
         is_hitman = False
 
     if is_hitman:
-        ACTIVE_TRAINING_COURSE = "hitman_clone"
-        CURRENT_STEP = "T-2"
+        # 相談段階（未確定）ではコースを切り替えない。確定時のみ唯一のコース変更経路を通す。
+        if actual_confirmed:
+            select_training_course(state, "hitman_clone")
         hitman_prompt = (
             "【AntiGravity投入用プロンプト: Step T-2 (HITMANクローン構築)】\n"
             "あなたはIPPのAI研修専属メンターです。\n"
@@ -1982,7 +2321,7 @@ def guide_training_app_creation(idea: str = "", course_type: str = "custom", is_
                 "is_confirmed": True,
                 "course": "コースB: HITMAN作成コース（HITMANクローン構築体験）",
                 "concept": "HITMAN自身のアーキテクチャ（Excel手順書パーサー、A2UIカード、客観Wチェック判定、エスカレーションゲート）を自ら構築・デプロイする王道コースです。",
-                "current_step": "T-2",
+                "current_step": state.current_step,
                 "step_id": "T-2",
                 "title": "ステップ T-2: HITMAN仕様設計＆SOP定義",
                 "command": "cat ipp-agent-workspace/hitman_spec.md",
@@ -2012,7 +2351,7 @@ def guide_training_app_creation(idea: str = "", course_type: str = "custom", is_
                 "is_confirmed": False,
                 "course": "コースB: HITMAN作成コース（HITMANクローン構築体験）",
                 "concept": "HITMAN自身のアーキテクチャ（Excel手順書パーサー、A2UIカード、客観Wチェック判定、エスカレーションゲート）を自ら構築・デプロイする王道コースです。",
-                "current_step": "T-2",
+                "current_step": state.current_step,
                 "step_id": "T-2",
                 "title": "ステップ T-2: コースB（HITMANクローン構築）相談・確認",
                 "command": "",
@@ -2039,10 +2378,10 @@ def guide_training_app_creation(idea: str = "", course_type: str = "custom", is_
                 ),
             }
 
-    ACTIVE_TRAINING_COURSE = "original"
-    CURRENT_STEP = "T-2"
+    if state.course != "original" and actual_confirmed:
+        select_training_course(state, "original")
     if idea_clean and not any(k in idea_clean for k in confirmation_keywords):
-        TRAINING_PARAMETERS["USER_IDEA"] = idea_clean
+        state.user_idea = idea_clean
 
     # --- 受講生の作りたいものに寄り添い、武器庫（.agents/skills/）から最適なスキルを動的に召喚 ---
     idea_lower = idea_clean.lower()
@@ -2122,11 +2461,14 @@ def guide_training_app_creation(idea: str = "", course_type: str = "custom", is_
     )
 
     if actual_confirmed:
-        # TRAINING_SOP_ORIGINAL T-2 の prompt を動的更新
-        TRAINING_SOP_ORIGINAL["T-2"]["agy_prompt"] = prompt_for_agy
-        TRAINING_SOP_ORIGINAL["T-2"]["title"] = f"ステップ T-2: 『{idea_clean or '自作エージェント'}』要件定義＆設計"
-        TRAINING_SOP_ORIGINAL["T-2"]["objective"] = f"企画『{idea_clean or '現場課題を解決する自作エージェント'}』の要件定義書 project_brief.md を作成し、catログを提出する。"
-        TRAINING_SOP_ORIGINAL["T-2"]["command"] = "cat ipp-agent-workspace/project_brief.md"
+        # セッション内のT-2定義を企画内容で上書き（モジュール共有のSOP定義は書き換えない）
+        state.course_selected = True
+        state.t2_override = {
+            "agy_prompt": prompt_for_agy,
+            "title": f"ステップ T-2: 『{idea_clean or '自作エージェント'}』要件定義＆設計",
+            "objective": f"企画『{idea_clean or '現場課題を解決する自作エージェント'}』の要件定義書 project_brief.md を作成し、catログを提出する。",
+            "command": "cat ipp-agent-workspace/project_brief.md",
+        }
 
         user_message = (
             f"【コース確定: コースA（オリジナルAI開発『{idea_clean or '自作エージェント'}』）】\n"
@@ -2142,7 +2484,7 @@ def guide_training_app_creation(idea: str = "", course_type: str = "custom", is_
             "is_confirmed": True,
             "course": "コースA: オリジナルアプリ開発コース（自作AIツール開発）",
             "user_idea": idea_clean or "現場課題を解決するオリジナルAIエージェント",
-            "current_step": "T-2",
+            "current_step": state.current_step,
             "step_id": "T-2",
             "title": f"ステップ T-2: 『{idea_clean or '自作エージェント'}』要件定義＆設計",
             "command": "cat ipp-agent-workspace/project_brief.md",
@@ -2206,16 +2548,14 @@ def guide_training_app_creation(idea: str = "", course_type: str = "custom", is_
                 f"・もし別のアイデア（ログ解析、マニュアル検索、コースBなど）も検討したい場合や、質問・アレンジしたい点があれば、何でもこのままご相談ください。"
             )
 
-        TRAINING_SOP_ORIGINAL["T-2"]["title"] = display_title
-        TRAINING_SOP_ORIGINAL["T-2"]["objective"] = display_obj
-        TRAINING_SOP_ORIGINAL["T-2"]["command"] = ""
+        state.t2_override = {"title": display_title, "objective": display_obj, "command": ""}
         return {
             "status": "success",
             "confirmation_status": "consulting",
             "is_confirmed": False,
             "course": "コースA: オリジナルアプリ開発コース（自作AIツール開発）",
             "user_idea": idea_clean or "現場課題を解決するオリジナルAIエージェント",
-            "current_step": "T-2",
+            "current_step": state.current_step,
             "step_id": "T-2",
             "title": f"ステップ T-2: アイデア相談・壁打ち中（『{idea_clean or '自作エージェント'}』）",
             "command": "",
@@ -2432,6 +2772,7 @@ def generate_final_report(
     supervisor_name: str = "",
     sop_results: dict = None,
     escalation_record: dict = None,
+    tool_context: Any = None,
 ) -> dict:
     """リリース作業完了後の最終評価レポートを生成する。
     作業前後の結果報告（Before/After）、作業所要時間、格納成果物の保全状況、エスカレ履歴に基づく総合評価を含む。
@@ -2443,9 +2784,10 @@ def generate_final_report(
     is_special = mode == "SPECIAL_PAIR"
 
     if mode == "TRAINING":
-        is_hitman = ACTIVE_TRAINING_COURSE == "hitman_clone"
+        state = HitmanState.of(tool_context)
+        is_hitman = state.course == "hitman_clone"
         course_name = "コースB: HITMANクローン構築" if is_hitman else "コースA: オリジナルAIツール開発"
-        app_name = "HITMAN Clone" if is_hitman else "オリジナルAIエージェント (Rubik's Cube Solver Agent)"
+        app_name = "HITMAN Clone" if is_hitman else f"オリジナルAIエージェント（{state.user_idea or '自作エージェント'}）"
         
         training_before_after = [
             {"item": "T-1: 環境構築＆スキル同期", "before": "手動セットアップ・未定義", "after": "専用ワークスペース作成＆講師スキル同期完了", "verdict": "承認済 ✓"},
@@ -2602,6 +2944,11 @@ a2ui_instruction = schema_manager.generate_system_prompt(
         "受講生やオペレーターが『最初からすべて自分で考えられるなら、HITMANは使っていない』という教育的・人間的本質を心に刻んでください。"
         "ユーザーにゼロから考えさせる丸投げ（『アイデアを入力してください』『どうしますか？』等）は厳禁です。"
         "コマンド投入1択ではないすべての場面（企画相談、エスカレーション協議、切り戻し判断、疑問・エラー相談）では、必ずAI側から温かく共感した上で、具体的で魅力的な選択肢（スキャフォールディング）を2〜3個提示し、『迷ったらおすすめのこれ！』と先回りしてリードしてください。"
+        "【ステップ進行の大原則（システム管理）】"
+        "現在進行中のステップ・コース・確定済み企画はシステムが管理しており、各メッセージ冒頭の[HITMAN 運用コンテキスト]に示されます。"
+        "ステップを進められるのは verify_step_output の判定（VERIFIED_APPROVED）だけです。ツールを呼ばずに『合格』『承認』と書いたり、ステップが進んだかのように案内してはなりません。"
+        "手順カード（A2UI）は、ツール結果の current_step（無ければ運用コンテキストの現在進行中ステップ）のものだけを提示してください。"
+        "受講生の相談・質問には、固定の定型文に頼らず、受講生の業務や意図を踏まえて具体的に答えてください。"
         "【3つの運用モードと基本規程】"
         "1. 【通常モード (NORMAL)】: 現場本番作業用。客観的コマンド実行ログ（rawログ）が確認できなければ1ミリも前進させてはなりません。"
         "オペレーターが『容量は空いてたよ』『大丈夫でした』『完了した』等の口頭・自然言語の自己申告をした場合、自己申告のみでの承認は重大インシデント防止規程違反であるため絶対に承認せず、必ず `verify_step_output` を呼び出して客観的実行ログの提示を要求して差し戻してください。"
