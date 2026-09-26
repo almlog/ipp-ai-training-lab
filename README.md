@@ -120,8 +120,9 @@ ipp-ai-training-lab/
         ├── pick-your-agent-project/  # 受講生の思い思いのツール企画支援
         ├── build-agent-frontend/     # A2UI 対応フロントエンド構築
         ├── enable-a2ui/              # A2UI リッチカード統合
-        ├── build-rag/                # RAG エンジン構築
-        └── setup-memory-bank/        # 長期記憶 Memory Bank セットアップ
+        ├── rag-engine-setup/         # RAG エンジン構築
+        ├── memory-bank-setup/        # 長期記憶 Memory Bank セットアップ
+        └── ipp-skill-check/          # T-1 スキル読み込み確認（HITMAN 提出用）
 ```
 
 ---

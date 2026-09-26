@@ -5,6 +5,9 @@ description: Make an ADK agent emit A2UI so its replies render as rich display U
 
 # Enable A2UI (renders in adk web)
 
+> [!NOTE]
+> **HITMAN 使用証跡**: このスキルを使って作業した回答では、HITMAN 提出用コードブロックの1行目に `[skill:enable-a2ui@v1]` と出力すること（実際にこのスキルを使った場合のみ）。
+
 Make an ADK agent return **A2UI** so `adk web` renders cards instead of plain text.
 You need **both** of these or you'll just see raw JSON:
 

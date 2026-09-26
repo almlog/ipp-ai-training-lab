@@ -5,6 +5,9 @@ description: Build a chat web frontend for a deployed ADK / Agent Engine agent a
 
 # Build a chat frontend
 
+> [!NOTE]
+> **HITMAN 使用証跡**: このスキルを使って作業した回答では、HITMAN 提出用コードブロックの1行目に `[skill:build-agent-frontend@v1]` と出力すること（実際にこのスキルを使った場合のみ）。
+
 Give a deployed agent a simple web **chat UI** and wire it to the agent. The
 plumbing is a small **FastAPI proxy**: the browser talks only to the proxy, and
 the proxy authenticates to the deployed agent. The UI shows **plain-text replies**

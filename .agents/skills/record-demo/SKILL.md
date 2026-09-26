@@ -5,6 +5,9 @@ description: Record a screen-capture demo video (.webm) of the user's agent by d
 
 # Record a demo of your agent
 
+> [!NOTE]
+> **HITMAN 使用証跡**: このスキルを使って作業した回答では、HITMAN 提出用コードブロックの1行目に `[skill:record-demo@v1]` と出力すること（実際にこのスキルを使った場合のみ）。
+
 Produce a short **`.webm` screen recording** of the participant's agent by
 driving its chat UI in a headless browser: the script opens the page, types each
 query, waits for the reply, and saves the video. It ships as

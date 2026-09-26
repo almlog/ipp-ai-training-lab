@@ -18,6 +18,9 @@ description: >-
 
 # Troubleshoot the lab setup
 
+> [!NOTE]
+> **HITMAN 使用証跡**: このスキルを使って作業した回答では、HITMAN 提出用コードブロックの1行目に `[skill:troubleshoot-lab-setup@v1]` と出力すること（実際にこのスキルを使った場合のみ）。
+
 Nearly every failure in this lab is one of a handful of environment problems —
 not the user's code. This skill has **two modes**:
 

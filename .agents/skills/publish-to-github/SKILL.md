@@ -16,6 +16,9 @@ description: >-
 
 # Publish the project to the participant's own GitHub
 
+> [!NOTE]
+> **HITMAN 使用証跡**: このスキルを使って作業した回答では、HITMAN 提出用コードブロックの1行目に `[skill:publish-to-github@v1]` と出力すること（実際にこのスキルを使った場合のみ）。
+
 The lab runs inside an **ephemeral workstation** — when the lab ends, the machine
 and the code on it are gone. This skill gets the participant's project safely onto
 **their own personal GitHub** (so they keep it and can share it), then hands them a
