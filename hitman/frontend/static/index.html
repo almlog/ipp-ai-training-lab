@@ -2662,6 +2662,29 @@ function switchMobileView(view) {
 
 // --- Core State & Persistence ---
 const STORAGE_KEY = "hitman_console_state_v2";
+const SESSION_UID_KEY = "hitman_session_uid";
+const MAX_SAVED_CHAT_ENTRIES = 80;
+
+// ブラウザごとのセッション識別子（旧実装は全員 "operator-01" 固定で、受講生同士の状態が混ざっていた）
+function getSessionUserId() {
+  try {
+    let v = localStorage.getItem(SESSION_UID_KEY);
+    if (!v) {
+      const rnd = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : (Date.now().toString(36) + Math.random().toString(36).slice(2));
+      v = "u-" + rnd;
+      localStorage.setItem(SESSION_UID_KEY, v);
+    }
+    return v;
+  } catch (e) {
+    if (!window.__hitmanUid) window.__hitmanUid = "u-" + Date.now().toString(36) + Math.random().toString(36).slice(2);
+    return window.__hitmanUid;
+  }
+}
+
+// 描画中の応答が属するステップ（履歴の再描画時に「今の」ステップで過去カードを描かないため）
+let renderStepContext = null;
+// 送信中フラグ（Enterキー・クイック送信での二重送信防止）
+let chatInFlight = false;
 
 let appState = {
   chatHistory: [],
@@ -2671,7 +2694,8 @@ let appState = {
   rawLog: "",
   sqlContent: "",
   sqlFileName: "",
-  userId: "operator-01",
+  userId: "operator-01", // 表示用の担当者名（セッション識別には getSessionUserId() を使用）
+  serverState: null, // サーバ（ADKセッション）が返した直近の正のステート
   startTime: null,
   endTime: null,
   mode: "NORMAL", // "NORMAL", "TRAINING", "SPECIAL_PAIR"
@@ -2827,13 +2851,8 @@ function updateSopItemsFromDb(sopDb, seq) {
     }
   }
 
+  // T-2 のタイトルはサーバがセッションの確定企画から生成する（/api/sop?user_id=...）ため、ここでは上書きしない
   SOP_ITEMS = items;
-  if (appState.mode === "TRAINING" && appState.courseAIdea && appState.trainingCourse !== "hitman_clone") {
-    const t2 = items.find(i => i.id === "T-2");
-    if (t2) {
-      t2.title = `ステップ T-2: 仕様・要件定義策定（${appState.courseAIdea}）`;
-    }
-  }
   if (seq && Array.isArray(seq) && seq.length > 0) {
     STEP_SEQUENCE = seq;
   }
@@ -2896,11 +2915,25 @@ function renderCostUI() {
 }
 
 function saveState() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(appState));
+  // 容量超過で例外になると送信処理まで止まるため、必ず握りつぶし、履歴を切り詰めて再試行する
+  try {
+    if (appState.chatHistory && appState.chatHistory.length > MAX_SAVED_CHAT_ENTRIES) {
+      appState.chatHistory = appState.chatHistory.slice(-MAX_SAVED_CHAT_ENTRIES);
+    }
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(appState));
+  } catch (e) {
+    try {
+      const slim = Object.assign({}, appState, { chatHistory: (appState.chatHistory || []).slice(-20) });
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(slim));
+    } catch (e2) {
+      console.warn("saveState failed (storage unavailable or full)", e2);
+    }
+  }
 }
 
 function loadState() {
-  const saved = localStorage.getItem(STORAGE_KEY);
+  let saved = null;
+  try { saved = localStorage.getItem(STORAGE_KEY); } catch (e) { saved = null; }
   if (saved) {
     try {
       const parsed = JSON.parse(saved);
@@ -2911,29 +2944,8 @@ function loadState() {
             appState.courseCardCollapsed = true;
           }
         }
-        // 【自己治癒: T-2】T-2 が誤って自動補完で SUCCESS になっていたり、
-        // 実際の客観Wチェック合格証跡がないのに完了になっている場合は T-2 進行中へ修復
-        if (appState.sopResults && appState.sopResults["T-2"]) {
-          const t2Res = appState.sopResults["T-2"];
-          const snippet = t2Res.logSnippet || "";
-          const isRealApproval = snippet.includes("VERIFIED_APPROVED") || snippet.includes("Wチェック承認") || (snippet.includes("合格") && !snippet.includes("ステップ T-3 進行に伴い"));
-          if (!isRealApproval) {
-            delete appState.sopResults["T-2"];
-            appState.currentStep = "T-2";
-            appState.errorStep = null;
-          }
-        }
-        // 【自己治癒: T-3】T-3 の客観ログ（pytest や agent.py 等）の承認がないのに SUCCESS になっている場合は未完了に修復
-        if (appState.sopResults && appState.sopResults["T-3"]) {
-          const t3Res = appState.sopResults["T-3"];
-          const snippet = t3Res.logSnippet || "";
-          const isRealT3Approval = snippet.includes("pytest") || snippet.includes("agent.py") || snippet.includes("単体テスト") || snippet.includes("テストPASS");
-          if (!isRealT3Approval) {
-            delete appState.sopResults["T-3"];
-            appState.currentStep = "T-3";
-            appState.errorStep = null;
-          }
-        }
+        // 旧実装の「自己治癒」（応答文の先頭100文字で合格を再判定して進捗を巻き戻す処理）は廃止。
+        // 研修の進捗はサーバのセッションステートが正であり、起動時に /api/session/sync で同期する。
       }
       return true;
     } catch(e) { console.warn("Failed to load saved state", e); }
@@ -2941,9 +2953,17 @@ function loadState() {
   return false;
 }
 
-function resetSessionConfirm() {
+async function resetSessionConfirm() {
   if (confirm("作業履歴と手順書記録をリセットして、新規セッションを開始しますか？")) {
-    localStorage.removeItem(STORAGE_KEY);
+    // サーバ側の会話履歴・研修ステートも破棄する（旧実装はフロントのみ初期化し、LLMが旧文脈を引きずっていた）
+    try {
+      await fetch("/api/session/reset", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_id: getSessionUserId() })
+      });
+    } catch (e) { console.warn("session reset failed", e); }
+    try { localStorage.removeItem(STORAGE_KEY); } catch (e) {}
     location.reload();
   }
 }
@@ -3392,7 +3412,7 @@ async function changeOperationModeFromHdr(newMode) {
     const res = await fetch("/api/mode", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ mode: newMode, course: courseParam })
+      body: JSON.stringify({ mode: newMode, course: courseParam, user_id: getSessionUserId() })
     });
     const data = await res.json();
     if (data.status === "success") {
@@ -3402,8 +3422,13 @@ async function changeOperationModeFromHdr(newMode) {
         if (data.approval) appState.approval = data.approval;
         if (data.branch_rules) appState.branchRules = data.branch_rules;
         updateSopItemsFromDb(data.sop, data.sequence);
-        appState.sopResults = {};
-        appState.currentStep = (data.sequence && data.sequence.length > 0) ? data.sequence[0] : "1-1";
+        if (data.mode === "TRAINING" && data.state) {
+          // 研修モードはサーバのステートを採用（誤ってモードを切り替えても進捗は失われない）
+          applyServerState(data.state, { refreshSop: false });
+        } else {
+          appState.sopResults = {};
+          appState.currentStep = (data.sequence && data.sequence.length > 0) ? data.sequence[0] : "1-1";
+        }
         appState.errorStep = null;
         appState.escalationActive = false;
         renderFlowChart();
@@ -3415,7 +3440,7 @@ async function changeOperationModeFromHdr(newMode) {
       showToast(`✓ 運用モードを【${data.mode}】に変更しました`);
       if (newMode === "TRAINING") {
         const cName = appState.trainingCourse === "hitman_clone" ? "コースB: HITMANクローン構築" : "コースA: オリジナルAIツール開発";
-        sendMessage(`【運用モード切替: 研修モード（${cName}）】\n受講生の実践研修モードに切り替えました。手順フローを「T-1: 開発環境構築とスキル同期」へ更新しました。最初のステップ（${appState.currentStep}）のガイダンスとAntiGravity投入用プロンプトを提示してください。`);
+        sendMessage(`【運用モード切替: 研修モード（${cName}）】\n受講生の実践研修モードに切り替えました。現在のステップ（${appState.currentStep}）のガイダンスとAntiGravity投入用プロンプトを提示してください。`);
       } else if (newMode === "SPECIAL_PAIR") {
         sendMessage("【運用モード切替: エスカレ特別モード（2人体制）】\n上長同席の特別モードに切り替えました。全コマンド投入において相互ダブルチェックを実施してください。");
       } else {
@@ -3430,50 +3455,134 @@ async function changeOperationModeFromHdr(newMode) {
 }
 
 async function switchTrainingCourse(course) {
+  // 選択中のコースのボタン（「✓ 選択中（確定・折りたたむ）」）は折りたたむだけ。
+  // 旧実装はここで進捗をリセットして T-2 を再提示させており、ループの原因になっていた。
+  if (appState.trainingCourseSelected && appState.trainingCourse === course) {
+    appState.courseCardCollapsed = true;
+    updateCourseSelectionUI();
+    saveState();
+    return;
+  }
   try {
     showToast("🎓 研修コースを切り替え中…");
     const res = await fetch("/api/training/course", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ course: course })
+      body: JSON.stringify({ course: course, user_id: getSessionUserId() })
     });
     const data = await res.json();
-    appState.trainingCourse = data.course || course;
-    appState.trainingCourseSelected = true;
     appState.courseCardCollapsed = true;
     if (data.sop) {
       if (data.parameters) appState.parameters = data.parameters;
       if (data.approval) appState.approval = data.approval;
       if (data.branch_rules) appState.branchRules = data.branch_rules;
       updateSopItemsFromDb(data.sop, data.sequence);
-      const t1Done = (appState.sopResults["T-1"] && appState.sopResults["T-1"].verdict === "SUCCESS") || appState.currentStep === "T-2";
-      if (!t1Done) {
-        appState.sopResults = {};
-        appState.currentStep = (data.sequence && data.sequence.length > 0) ? data.sequence[0] : "T-1";
-      } else {
-        const t1Val = appState.sopResults["T-1"];
-        appState.sopResults = { "T-1": t1Val };
-        appState.currentStep = "T-2";
-      }
-      appState.errorStep = null;
-      appState.escalationActive = false;
-      renderFlowChart();
-      renderSopTable();
-      renderApprovalAndParameters();
     }
+    if (data.state) {
+      applyServerState(data.state, { refreshSop: false });
+    } else {
+      appState.trainingCourse = data.course || course;
+      appState.trainingCourseSelected = true;
+    }
+    appState.errorStep = null;
+    appState.escalationActive = false;
+    renderFlowChart();
+    renderSopTable();
+    renderApprovalAndParameters();
     updateModeUI();
     saveState();
     showToast(`✓ 【${data.course_name || course}】に切り替えました`);
-    if (appState.currentStep === "T-2") {
-      sendMessage(`【受講コース選択: ${data.course_name || course}】\n研修モードの手順フローを${data.course_name || course}に確定しました。ステップ T-1 は完了済みです。続いて『ステップ T-2: 仕様・要件定義策定』の作業手順とAntiGravity投入用プロンプトを提示してください。`);
-    } else {
-      sendMessage(`【受講コース選択: ${data.course_name || course}】\n研修モードの手順フローを${data.course_name || course}に切り替えました。最初のステップ『${appState.currentStep}』の作業手順とAntiGravity投入用プロンプトを提示してください。`);
-    }
+    const stepNow = appState.currentStep;
+    const doneNote = (appState.sopResults["T-1"] && appState.sopResults["T-1"].verdict === "SUCCESS") ? "ステップ T-1 は合格済みです。" : "";
+    sendMessage(`【受講コース選択: ${data.course_name || course}】\n研修コースを${data.course_name || course}に確定しました。${doneNote}現在のステップ『${stepNow}』の作業手順とAntiGravity投入用プロンプトを提示してください。`);
   } catch(e) {
     alert("コース切替エラー: " + e.message);
   }
 }
 
+// --- Server State Sync (Single Source of Truth) ---
+// 研修モードの現在ステップ・合否・コースは、サーバ（ADKセッション）が返す state のみで更新する。
+// LLMの応答文を正規表現で解析してステップを推測する処理は研修モードでは使用しない。
+function applyServerState(st, opts = {}) {
+  if (!st || typeof st !== "object") return;
+  const prevCourse = appState.trainingCourse;
+  const prevIdea = appState.courseAIdea || "";
+  appState.serverState = st;
+  if (st.mode !== "TRAINING") return;
+
+  appState.mode = "TRAINING";
+  appState.trainingCourse = st.course || "original";
+  appState.trainingCourseSelected = !!st.course_selected || appState.trainingCourseSelected;
+  appState.courseAIdea = st.user_idea || "";
+  appState.currentStep = st.current_step || "T-1";
+  appState.escalationActive = false;
+  appState.escalationReason = "";
+
+  const now = new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+  const results = st.results || {};
+  const next = {};
+  Object.keys(appState.sopResults || {}).forEach(k => {
+    if (!k.startsWith("T-")) next[k] = appState.sopResults[k];
+  });
+  Object.keys(results).forEach(k => {
+    const prev = appState.sopResults ? appState.sopResults[k] : null;
+    next[k] = (prev && prev.verdict === "SUCCESS") ? prev : { verdict: "SUCCESS", timestamp: now, logSnippet: "HITMAN 客観Wチェック承認（サーバ判定）" };
+  });
+  const vt = st.verdict_this_turn;
+  if (vt && vt.verdict === "FAILED" && vt.step_id === appState.currentStep) {
+    appState.errorStep = appState.currentStep;
+    next[appState.currentStep] = { verdict: "FAILED", timestamp: now, logSnippet: `判定: ${vt.w_check_status || "FAILED"}` };
+  } else {
+    appState.errorStep = null;
+  }
+  appState.sopResults = next;
+  if (st.completed && !appState.endTime) {
+    appState.endTime = new Date().toLocaleString('ja-JP');
+  }
+
+  const needSop = opts.refreshSop !== false && (prevCourse !== appState.trainingCourse || prevIdea !== appState.courseAIdea);
+  if (needSop) refreshTrainingSop();
+
+  updateModeUI();
+  renderFlowChart();
+  renderSopTable();
+  saveState();
+}
+
+// サーバ復元用の種。直近のサーバステートが無い（本修正以前の保存データ）場合は、ローカルの進捗から組み立てる
+function clientStateForRestore() {
+  if (appState.serverState) return appState.serverState;
+  if (appState.mode !== "TRAINING") return null;
+  const results = {};
+  Object.keys(appState.sopResults || {}).forEach(k => {
+    if (k.startsWith("T-") && appState.sopResults[k] && appState.sopResults[k].verdict === "SUCCESS") results[k] = "SUCCESS";
+  });
+  return {
+    mode: "TRAINING",
+    course: appState.trainingCourse || "original",
+    course_selected: !!appState.trainingCourseSelected,
+    results: results,
+    user_idea: appState.courseAIdea || ""
+  };
+}
+
+// セッション固有の手順（確定した企画で上書きされた T-2 など）を再取得する
+async function refreshTrainingSop() {
+  try {
+    const res = await fetch(`/api/sop?mode=TRAINING&user_id=${encodeURIComponent(getSessionUserId())}`);
+    const data = await res.json();
+    if (data && data.sop) {
+      if (data.parameters) appState.parameters = data.parameters;
+      if (data.approval) appState.approval = data.approval;
+      updateSopItemsFromDb(data.sop, data.sequence);
+      renderFlowChart();
+      renderSopTable();
+      renderApprovalAndParameters();
+    }
+  } catch (e) {
+    console.warn("refreshTrainingSop failed", e);
+  }
+}
 
 // --- Training Environment Customization Logic ---
 function resolveStepVariables(text) {
@@ -3571,10 +3680,10 @@ async function saveTrainingEnvModal() {
     await fetch("/api/training/parameters", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ workspace_dir: ws, agent_name: agent, python_env: pyenv })
+      body: JSON.stringify({ workspace_dir: ws, agent_name: agent, python_env: pyenv, user_id: getSessionUserId() })
     });
 
-    const res = await fetch(`/api/sop?mode=TRAINING&course=${encodeURIComponent(appState.trainingCourse || 'original')}&workspace=${encodeURIComponent(ws)}&agent=${encodeURIComponent(agent)}&env=${encodeURIComponent(pyenv)}`);
+    const res = await fetch(`/api/sop?mode=TRAINING&course=${encodeURIComponent(appState.trainingCourse || 'original')}&workspace=${encodeURIComponent(ws)}&agent=${encodeURIComponent(agent)}&env=${encodeURIComponent(pyenv)}&user_id=${encodeURIComponent(getSessionUserId())}`);
     const data = await res.json();
     if (data && data.sop) {
       updateSopItemsFromDb(data.sop, data.sequence);
@@ -5113,7 +5222,8 @@ function createActionPromptBlock(promptText) {
   const chipsContainer = el("div", "ideation-chips-container");
   chipsContainer.style.cssText = "display:flex; flex-wrap:wrap; gap:6px; margin-top:8px;";
 
-  const curStep = String(appState.currentStep || "").toUpperCase();
+  const curStep = String(renderStepContext || appState.currentStep || "").toUpperCase();
+  const isIdeationStep = appState.mode === "TRAINING" && curStep === "T-2" && appState.trainingCourse !== "hitman_clone";
   let chips = [];
   if (curStep.includes("E-1") || (promptText && (promptText.includes("エスカレ") || promptText.includes("想定外")))) {
     chips = [
@@ -5127,6 +5237,12 @@ function createActionPromptBlock(promptText) {
       { label: "🛡️ 切り戻し手順を開始", prompt: "切り戻し手順を開始します。手順を案内してください。" },
       { label: "🔍 現状のバックアップ確認", prompt: "切り戻し対象のバックアップファイルの状態を確認したいです。" },
       { label: "❓ 切り戻しの注意点を教えて", prompt: "切り戻しを実施するにあたって、注意すべき点や確認事項を教えてください。" }
+    ];
+  } else if (appState.mode === "TRAINING" && !isIdeationStep) {
+    // T-2（コースA企画相談）以外では企画アイデアのチップを出さない
+    chips = [
+      { label: "❓ この手順について質問する", prompt: `ステップ ${curStep} の進め方でわからない点があります。` },
+      { label: "🧯 エラーが出た", prompt: "コマンドを実行したらエラーが出ました。エラー内容を貼り付けるので対処法を教えてください。" }
     ];
   } else {
     chips = [
@@ -5249,7 +5365,7 @@ function buildNode(id, comps, seen) {
         header.appendChild(topCopyBtn);
       } else {
         const foundAction = body.querySelector('.action-prompt-block');
-        if (!foundAction && appState.mode === "TRAINING" && appState.currentStep === "T-2") {
+        if (!foundAction && appState.mode === "TRAINING" && (renderStepContext || appState.currentStep) === "T-2" && appState.trainingCourse !== "hitman_clone") {
           currentSurfaceHasAction = true;
           const actionBlock = createActionPromptBlock("【アクション】チャットで企画を相談するか、「これで決定！」とお知らせください。");
           body.appendChild(actionBlock);
@@ -5385,7 +5501,7 @@ function renderSurface(messages, container) {
       for (const c of su.components) if (c && c.id && c.component) comps[c.id] = c.component;
     }
   }
-  let rootIds = roots.filter(r => comps[r]);
+  let rootIds = Array.from(new Set(roots)).filter(r => comps[r]);
   if (rootIds.length === 0) {
     const referenced = new Set();
     for (const id in comps) {
@@ -5687,7 +5803,7 @@ function formatMarkdownToHtml(src) {
   return html;
 }
 
-function renderReply(b, parts, saveHistory = true) {
+function renderReply(b, parts, saveHistory = true, serverState = null, stepContext = null) {
   const ws = document.getElementById("workspace");
   if (ws && ws.classList.contains("mobile-show-sop")) {
     const chatBadge = document.getElementById("mobile-chat-badge");
@@ -5698,9 +5814,28 @@ function renderReply(b, parts, saveHistory = true) {
   const a2ui = parts.filter(p => p && p.kind === "a2ui" && p.data).map(p => p.data);
 
   const textStr = texts.join("\n").trim();
+  renderStepContext = stepContext || (serverState && serverState.current_step) || appState.currentStep;
 
   // Autonomous W-Check Verdict Banners
-  if (textStr.includes("SECURITY_BLOCKED") || textStr.includes("セキュリティ遮断") || textStr.includes("重大セキュリティ警告")) {
+  // 研修モードでサーバ判定がある場合は、判定結果（w_check_status）だけでバナーを決める（文章の言い回しに依存しない）
+  const useServerVerdict = !!(serverState && serverState.mode === "TRAINING");
+  const vt = useServerVerdict ? serverState.verdict_this_turn : null;
+  const vts = vt ? vt.w_check_status : "";
+  const bannerKey = useServerVerdict
+    ? (vts === "SECURITY_BLOCKED" ? "security"
+      : vts === "COURSE_SELECTED" ? "course"
+      : vts === "VERIFIED_APPROVED" ? "approved"
+      : vts === "TRAINING_GUIDANCE" ? "guidance"
+      : vts === "BLOCKED_RETRY" ? "blocked" : "")
+    : (textStr.includes("SECURITY_BLOCKED") || textStr.includes("セキュリティ遮断") || textStr.includes("重大セキュリティ警告") ? "security"
+      : (textStr.includes("COURSE_SELECTED") || textStr.includes("受講コース確定")) ? "course"
+      : (textStr.includes("Wチェック承認") || textStr.includes("VERIFIED_APPROVED") || textStr.includes("修了認定")) ? "approved"
+      : (textStr.includes("TRAINING_GUIDANCE") || textStr.includes("【研修モード") || textStr.includes("教育ガイダンス") || textStr.includes("なぜ「自己申告」では承認できないのか")) ? "guidance"
+      : (textStr.includes("ロールバック必須") || textStr.includes("BRANCH_ROLLBACK")) ? "rollback"
+      : (textStr.includes("エスカレーション必須") || textStr.includes("BRANCH_ESCALATION")) ? "escalation"
+      : (textStr.includes("進行ブロック") || textStr.includes("BLOCKED_RETRY")) ? "blocked" : "");
+
+  if (bannerKey === "security") {
     const banner = el("div", "pair-check-box");
     banner.style.background = "#fef2f2";
     banner.style.borderColor = "#ef4444";
@@ -5708,15 +5843,15 @@ function renderReply(b, parts, saveHistory = true) {
     banner.style.marginBottom = "0.6rem";
     banner.innerHTML = `<span class="material-symbols-outlined" style="font-size:18px;color:#dc2626;">security</span><span><strong>【AI確認者 セキュリティ遮断 🚨】</strong> 危険な破壊的コマンドまたは不正プロンプトを検知しました。安全保護規程に基づき、手順の進行を即時ロックしています。</span>`;
     b.appendChild(banner);
-  } else if (textStr.includes("COURSE_SELECTED") || textStr.includes("受講コース確定")) {
+  } else if (bannerKey === "course") {
     const banner = el("div", "pair-check-box");
     banner.style.background = "#f0fdf4";
     banner.style.borderColor = "#86efac";
     banner.style.color = "#15803d";
     banner.style.marginBottom = "0.6rem";
-    banner.innerHTML = `<span class="material-symbols-outlined" style="font-size:18px;color:#16a34a;">verified</span><span><strong>【AI講師 受講コース確定 ✓】</strong> 受講コースを確定しました。仕様・要件定義ステップ（T-2）へ進んでください。</span>`;
+    banner.innerHTML = `<span class="material-symbols-outlined" style="font-size:18px;color:#16a34a;">verified</span><span><strong>【AI講師 受講コース確定 ✓】</strong> 受講コースを確定しました。現在のステップの手順に沿って進めてください。</span>`;
     b.appendChild(banner);
-  } else if (textStr.includes("Wチェック承認") || textStr.includes("VERIFIED_APPROVED") || textStr.includes("修了認定")) {
+  } else if (bannerKey === "approved") {
     const banner = el("div", "pair-check-box");
     banner.style.background = "#f0fdf4";
     banner.style.borderColor = "#86efac";
@@ -5724,7 +5859,7 @@ function renderReply(b, parts, saveHistory = true) {
     banner.style.marginBottom = "0.6rem";
     banner.innerHTML = `<span class="material-symbols-outlined" style="font-size:18px;color:#16a34a;">verified</span><span><strong>【AI確認者 有識者Wチェック承認 ✓】</strong> 期待結果ログとの整合性を自律検証しました。次手順へ進行してください。</span>`;
     b.appendChild(banner);
-  } else if (textStr.includes("TRAINING_GUIDANCE") || textStr.includes("【研修モード") || textStr.includes("教育ガイダンス") || textStr.includes("なぜ「自己申告」では承認できないのか")) {
+  } else if (bannerKey === "guidance") {
     const banner = el("div", "pair-check-box");
     banner.style.background = "#f0f9ff";
     banner.style.borderColor = "#7dd3fc";
@@ -5732,7 +5867,7 @@ function renderReply(b, parts, saveHistory = true) {
     banner.style.marginBottom = "0.6rem";
     banner.innerHTML = `<span class="material-symbols-outlined" style="font-size:18px;color:#0284c7;">school</span><span><strong>【AI講師 教育ガイダンス 🎓】</strong> 自己申告のみによる進行を検知しました。現場で自分自身を守る『客観エビデンス必須ルール』を学んで再実行してください。</span>`;
     b.appendChild(banner);
-  } else if (textStr.includes("ロールバック必須") || textStr.includes("BRANCH_ROLLBACK")) {
+  } else if (bannerKey === "rollback") {
     const banner = el("div", "pair-check-box");
     banner.style.background = "#fef2f2";
     banner.style.borderColor = "#fca5a5";
@@ -5740,7 +5875,7 @@ function renderReply(b, parts, saveHistory = true) {
     banner.style.marginBottom = "0.6rem";
     banner.innerHTML = `<span class="material-symbols-outlined" style="font-size:18px;color:#dc2626;">sync_problem</span><span><strong>【AI確認者 自律判定: ロールバック発動 🚨】</strong> 致命的エラーを検知。作業中断・旧バージョン復元手順（R-1）へ自律分岐します。</span>`;
     b.appendChild(banner);
-  } else if (textStr.includes("エスカレーション必須") || textStr.includes("BRANCH_ESCALATION")) {
+  } else if (bannerKey === "escalation") {
     const banner = el("div", "pair-check-box");
     banner.style.background = "#fffbeb";
     banner.style.borderColor = "#fcd34d";
@@ -5748,7 +5883,7 @@ function renderReply(b, parts, saveHistory = true) {
     banner.style.marginBottom = "0.6rem";
     banner.innerHTML = `<span class="material-symbols-outlined" style="font-size:18px;color:#d97706;">gavel</span><span><strong>【AI確認者 自律判定: エスカレーション発動 ⚡】</strong> 競合・不整合を検知。ゲート（E-1）へ自律分岐し、有識者協議を要求します。</span>`;
     b.appendChild(banner);
-  } else if (textStr.includes("進行ブロック") || textStr.includes("BLOCKED_RETRY")) {
+  } else if (bannerKey === "blocked") {
     const banner = el("div", "pair-check-box");
     banner.style.background = "#fef2f2";
     banner.style.borderColor = "#fca5a5";
@@ -5764,7 +5899,8 @@ function renderReply(b, parts, saveHistory = true) {
     textDiv.innerHTML = formatMarkdownToHtml(textStr);
     b.appendChild(textDiv);
 
-    if (appState.mode === "TRAINING" && ((textStr.includes("コースA") && textStr.includes("コースB")) || textStr.includes("2つのコース") || textStr.includes("HITMANクローン構築"))) {
+    // コース未選択の間だけコース選択カードを出す（旧実装は本文に「HITMANクローン構築」があるだけで毎回表示していた）
+    if (appState.mode === "TRAINING" && !appState.trainingCourseSelected && ((textStr.includes("コースA") && textStr.includes("コースB")) || textStr.includes("2つのコース"))) {
       const courseBox = el("div", "chat-course-showcase-container");
       courseBox.innerHTML = getCourseCardsHtml(true);
       b.appendChild(courseBox);
@@ -5778,15 +5914,25 @@ function renderReply(b, parts, saveHistory = true) {
   if (!b.childNodes.length) b.textContent = "(応答がありません)";
   log.scrollTop = log.scrollHeight;
 
+  renderStepContext = null;
+
   if (saveHistory) {
-    appState.chatHistory.push({ role: "agent", parts: parts });
-    detectStepTransitions(textStr, parts);
+    appState.chatHistory.push({ role: "agent", parts: parts, state: serverState || null, step: stepContext || appState.currentStep });
+    if (!useServerVerdict) {
+      // 通常/特別モード（本修正の対象外）は従来の応答文解析を維持
+      detectStepTransitions(textStr, parts);
+    }
     saveState();
   }
 }
 
 async function sendMessage(text) {
   if (!text) return;
+  if (chatInFlight) {
+    showToast("⏳ HITMANが応答中です。応答を待ってから送信してください。");
+    return;
+  }
+  chatInFlight = true;
   
   if (!appState.startTime) {
     appState.startTime = new Date().toLocaleString('ja-JP');
@@ -5812,20 +5958,29 @@ async function sendMessage(text) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         message: text,
-        user_id: appState.userId,
+        user_id: getSessionUserId(),
         mode: appState.mode || "NORMAL",
         course: appState.trainingCourse || "original",
-        current_step: appState.currentStep || "T-1"
+        current_step: appState.currentStep || "T-1",
+        // サーバのセッションが失われていた場合（コールドスタート等）のみ、復元の種として使われる
+        client_state: clientStateForRestore()
       })
     });
     const data = await res.json();
     if (data.metrics) {
       updateCostMetrics(data.metrics);
     }
-    renderReply(b, data.parts || []);
+    const st = data.state || null;
+    if (st && st.mode === "TRAINING") {
+      // 状態を先に確定してから描画する（旧実装は描画→推測の順で1ステップずれていた）
+      applyServerState(st);
+      if (st.session_restored) showToast("↻ サーバのセッションを直前の進捗から復元しました");
+    }
+    renderReply(b, data.parts || [], true, st, st ? st.current_step : null);
   } catch (e) {
     b.textContent = "通信エラーが発生しました: " + e.message;
   } finally {
+    chatInFlight = false;
     if (sendBtn) sendBtn.disabled = false;
     if (pasteBtn) pasteBtn.disabled = false;
   }
@@ -5986,7 +6141,7 @@ window.addEventListener("DOMContentLoaded", () => {
   // Sync SOP from backend
   const curMode = appState.mode || "NORMAL";
   const curCourse = appState.trainingCourse || "original";
-  fetch(`/api/sop?mode=${encodeURIComponent(curMode)}&course=${encodeURIComponent(curCourse)}`)
+  fetch(`/api/sop?mode=${encodeURIComponent(curMode)}&course=${encodeURIComponent(curCourse)}&user_id=${encodeURIComponent(getSessionUserId())}`)
     .then(res => res.json())
     .then(data => {
       if (data && data.sop) {
@@ -6008,7 +6163,7 @@ window.addEventListener("DOMContentLoaded", () => {
         bubble("user").textContent = item.text;
       } else if (item.role === "agent") {
         const b = bubble("agent");
-        renderReply(b, item.parts || [], false);
+        renderReply(b, item.parts || [], false, item.state || null, item.step || null);
       }
     });
     if (appState.rawLog) {
@@ -6024,6 +6179,17 @@ window.addEventListener("DOMContentLoaded", () => {
       if (ssl) ssl.textContent = `SQL: ${appState.sqlFileName || "db_update.sql"} (${appState.sqlContent.split('\n').length}行)`;
     }
     showToast("✓ 前回の作業状態を復元しました（途中から再開可能です）");
+    if (appState.mode === "TRAINING") {
+      // サーバのステートを正として同期（サーバ側セッションが消えていれば直前の進捗で復元）
+      fetch("/api/session/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_id: getSessionUserId(), client_state: clientStateForRestore() })
+      })
+        .then(r => r.json())
+        .then(d => { if (d && d.state && d.state.mode === "TRAINING") applyServerState(d.state); })
+        .catch(err => console.warn("session sync failed", err));
+    }
   } else {
     if (appState.mode === "TRAINING") {
       switchTrainingModeManual(true);
