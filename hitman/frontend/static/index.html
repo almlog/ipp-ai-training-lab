@@ -3727,27 +3727,21 @@ function _fallbackCopy(text, stepId) {
 
 const TEST_EVIDENCES = {
   original: {
-    "T-1": `$ mkdir ipp-agent-workspace && cd ipp-agent-workspace
-$ git clone https://github.com/almlog/ipp-ai-training-lab.git
-Cloning into 'ipp-ai-training-lab'...
-remote: Enumerating objects: 125, done.
-remote: Total 125 (delta 40), reused 110 (delta 30)
-Resolving deltas: 100% (40/40), done.
+    "T-1": `[skill:ipp-skill-check@v1]
+PS C:\\work> Get-ChildItem .agents\\skills -Name
+build-agent-frontend
+enable-a2ui
+ipp-skill-check
+memory-bank-setup
+novasmart-governance-lab
+pick-your-agent-project
+publish-to-github
+rag-engine-setup
+record-demo
+troubleshoot-lab-setup`,
 
-$ python --version
-Python 3.12.2
-
-$ ls -la ipp-ai-training-lab/.agents/skills/
-drwxr-xr-x 2 user staff 4096 Sep 7 20:20 build-agent-frontend
-drwxr-xr-x 2 user staff 4096 Sep 7 20:20 enable-a2ui
-drwxr-xr-x 2 user staff 4096 Sep 7 20:20 memory-bank-setup
-drwxr-xr-x 2 user staff 4096 Sep 7 20:20 pick-your-agent-project
-drwxr-xr-x 2 user staff 4096 Sep 7 20:20 publish-to-github
-drwxr-xr-x 2 user staff 4096 Sep 7 20:20 rag-engine-setup
-drwxr-xr-x 2 user staff 4096 Sep 7 20:20 troubleshoot-lab-setup
-drwxr-xr-x 2 user staff 4096 Sep 7 20:20 novasmart-governance-lab`,
-
-    "T-2": `# project_brief.md (自作AIエージェント要件定義)
+    "T-2": `[skill:pick-your-agent-project@v1]
+# project_brief.md (自作AIエージェント要件定義)
 ## 1. アプリ概要
 - アプリ名: my_agent (社内申請＆FAQアシスタント)
 - 目的: 社内申請手続きの問い合わせに24時間自律回答する。
@@ -3756,7 +3750,8 @@ drwxr-xr-x 2 user staff 4096 Sep 7 20:20 novasmart-governance-lab`,
 - UIコンポーネント: A2UI v0.8 リッチカード表示
 - ツール: consult_policy_faq, request_human_approval`,
 
-    "T-3": `【ステップ T-3: エージェントコア＆A2UI実装 完了ログ】
+    "T-3": `[skill:enable-a2ui@v1]
+【ステップ T-3: エージェントコア＆A2UI実装 完了ログ】
 $ ls -la ipp-agent-workspace/my_agent/
 -rw-r--r-- 1 user staff 1850 Sep 7 20:22 agent.py
 -rw-r--r-- 1 user staff  920 Sep 7 20:22 a2ui_utils.py
@@ -3782,14 +3777,16 @@ tests/test_agent.py::test_schema_validity PASSED                         [100%]
 
 ============================== 5 passed in 1.42s ==============================`,
 
-    "T-5": `【ステップ T-5: Cloud Run 本番デプロイ 完了ログ】
+    "T-5": `[skill:build-agent-frontend@v1]
+【ステップ T-5: Cloud Run 本番デプロイ 完了ログ】
 $ gcloud run deploy my-agent --source ipp-agent-workspace/my_agent --region asia-northeast1 --allow-unauthenticated
 Building Container... DONE
 Creating Revision... DONE
 Service [my-agent] has been deployed and is serving 100 percent of traffic.
 Service URL: https://my-agent-1070367799384.asia-northeast1.run.app`,
 
-    "T-6": `【ステップ T-6: 個人GitHub公開＆修了証発行 完了ログ】
+    "T-6": `[skill:publish-to-github@v1]
+【ステップ T-6: 個人GitHub公開＆修了証発行 完了ログ】
 $ gh auth status
 ✓ Logged in to github.com as shunpei-suzuki
 
@@ -3799,27 +3796,21 @@ To https://github.com/shunpei-suzuki/my-ai-agent.git
   },
 
   hitman_clone: {
-    "T-1": `$ mkdir ipp-agent-workspace && cd ipp-agent-workspace
-$ git clone https://github.com/almlog/ipp-ai-training-lab.git
-Cloning into 'ipp-ai-training-lab'...
-remote: Enumerating objects: 125, done.
-remote: Total 125 (delta 40), reused 110 (delta 30)
-Resolving deltas: 100% (40/40), done.
+    "T-1": `[skill:ipp-skill-check@v1]
+PS C:\\work> Get-ChildItem .agents\\skills -Name
+build-agent-frontend
+enable-a2ui
+ipp-skill-check
+memory-bank-setup
+novasmart-governance-lab
+pick-your-agent-project
+publish-to-github
+rag-engine-setup
+record-demo
+troubleshoot-lab-setup`,
 
-$ python --version
-Python 3.12.2
-
-$ ls -la ipp-ai-training-lab/.agents/skills/
-drwxr-xr-x 2 user staff 4096 Sep 7 20:20 build-agent-frontend
-drwxr-xr-x 2 user staff 4096 Sep 7 20:20 enable-a2ui
-drwxr-xr-x 2 user staff 4096 Sep 7 20:20 memory-bank-setup
-drwxr-xr-x 2 user staff 4096 Sep 7 20:20 pick-your-agent-project
-drwxr-xr-x 2 user staff 4096 Sep 7 20:20 publish-to-github
-drwxr-xr-x 2 user staff 4096 Sep 7 20:20 rag-engine-setup
-drwxr-xr-x 2 user staff 4096 Sep 7 20:20 troubleshoot-lab-setup
-drwxr-xr-x 2 user staff 4096 Sep 7 20:20 novasmart-governance-lab`,
-
-    "T-2": `# hitman_spec.md (HITMANクローン構築 仕様書)
+    "T-2": `[skill:pick-your-agent-project@v1]
+# hitman_spec.md (HITMANクローン構築 仕様書)
 ## 1. アプリ概要
 - アプリ名: my_hitman (Excel手順書 AIペアオペレーター)
 - 目的: レガシーSOPを自律解析し、客観WチェックとA2UIカードで安全作業をナビゲートする。
@@ -3829,7 +3820,8 @@ drwxr-xr-x 2 user staff 4096 Sep 7 20:20 novasmart-governance-lab`,
 - 判定エンジン: verify_step_output, is_pure_assertion_without_log
 - 安全制御: evaluate_escalation_gate, analyze_sql_impact`,
 
-    "T-3": `【ステップ T-3: HITMAN判定コア＆A2UI実装 完了ログ】
+    "T-3": `[skill:enable-a2ui@v1]
+【ステップ T-3: HITMAN判定コア＆A2UI実装 完了ログ】
 $ ls -la ipp-agent-workspace/my_hitman/
 -rw-r--r-- 1 user staff 3200 Sep 7 20:25 agent.py
 -rw-r--r-- 1 user staff 1200 Sep 7 20:25 a2ui_utils.py
@@ -3861,14 +3853,16 @@ tests/test_hitman.py::test_agent_response PASSED                       [100%]
 
 ============================== 6 passed in 1.58s ==============================`,
 
-    "T-5": `【ステップ T-5: Cloud Run 本番デプロイ 完了ログ】
+    "T-5": `[skill:build-agent-frontend@v1]
+【ステップ T-5: Cloud Run 本番デプロイ 完了ログ】
 $ gcloud run deploy my-hitman --source ipp-agent-workspace/my_hitman --region asia-northeast1 --allow-unauthenticated
 Building Container... DONE
 Creating Revision... DONE
 Service [my-hitman] has been deployed and is serving 100 percent of traffic.
 Service URL: https://my-hitman-1070367799384.asia-northeast1.run.app`,
 
-    "T-6": `【ステップ T-6: 個人GitHub公開＆修了証発行 完了ログ】
+    "T-6": `[skill:publish-to-github@v1]
+【ステップ T-6: 個人GitHub公開＆修了証発行 完了ログ】
 $ gh auth status
 ✓ Logged in to github.com as shunpei-suzuki
 
@@ -5865,7 +5859,7 @@ function renderReply(b, parts, saveHistory = true, serverState = null, stepConte
     banner.style.borderColor = "#7dd3fc";
     banner.style.color = "#0369a1";
     banner.style.marginBottom = "0.6rem";
-    banner.innerHTML = `<span class="material-symbols-outlined" style="font-size:18px;color:#0284c7;">school</span><span><strong>【AI講師 教育ガイダンス 🎓】</strong> 自己申告のみによる進行を検知しました。現場で自分自身を守る『客観エビデンス必須ルール』を学んで再実行してください。</span>`;
+    banner.innerHTML = `<span class="material-symbols-outlined" style="font-size:18px;color:#0284c7;">school</span><span><strong>【AI講師 教育ガイダンス 🎓】</strong> 提出内容だけでは確認できない点があります。下の案内に沿って、必要な客観ログ（実行結果）を提出してください。</span>`;
     b.appendChild(banner);
   } else if (bannerKey === "rollback") {
     const banner = el("div", "pair-check-box");

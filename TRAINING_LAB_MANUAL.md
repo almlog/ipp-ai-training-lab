@@ -233,6 +233,13 @@ HITMAN Cockpit は、受講生それぞれの PC ドライブ構成や会社セ�
 
 AntiGravity は素の状態でも賢いですが、本研修のリポジトリを読み込むと、**8つの「Skills（専門技能）」** と **2つの「MCP（直通電話）」** という強力な秘密道具を手に入れます。
 
+> [!IMPORTANT]
+> **スキルが使えるようになる条件（実機で確認済み）**
+> - AntiGravity がスキルとして読み込むのは、**開いているワークスペースの直下にある `.agents/skills/`** だけです。クローンしたリポジトリの中（下の階層）にあるスキルは読み込まれません。
+> - スキルは **会話を始めたとき** に読み込まれます。同じ会話の途中でスキルを置いても、その会話では使えません。
+>
+> そのため Step T-1 では、クローン後にスキルをワークスペース直下へコピーし、**新しい会話** で `/ipp-skill-check` を実行して、読み込まれたことを HITMAN で確認します。
+
 ### 🎒 8 つの Skills（専門技能パック）
 AntiGravity は、あなたが「◯◯を作って」と指示するだけで、適切なスキルを自動でポケットから取り出して活用します。
 
@@ -343,31 +350,38 @@ HITMAN Cockpit は、受講生が **`[⚙️ 研修環境設定]`** ボタンか
 2. **AntiGravity 画面**: チャット入力欄をクリックし、貼り付け（Ctrl + V / Cmd + V）して Enter キーで送信します。
 
 ```text
-【AntiGravityに貼り付けるプロンプト: Step T-1（デフォルト例）】
-あなたはIPPのAI研修専属メンターです。
-1. モデル選定: チャットのモデル設定でまず「gemini-3.8-flash」を選択してください。エラーや利用不可の場合は「gemini-3.6-flash」を選択してください。
-2. 作業ディレクトリ: 「ipp-agent-workspace」を作成し、以後のファイル作成や作業はすべてこのフォルダ内で行ってください。
-3. リポジトリクローン:
-   git clone https://github.com/almlog/ipp-ai-training-lab.git
-   を実行し、リポジトリ内の .agents/skills/ にある研修スキル群（pick-your-agent-project, build-agent-frontend, enable-a2ui 等）および .agents/mcp_config.json を読み込んで自己学習してください。
-4. 準備完了の確認: Pythonバージョン（3.11/3.12+）およびAPIキー疎通確認テストを行い、実行結果ログを出力してください。
-【重要制約】今回は環境構築とスキル同期のみを行ってください。エージェントの実装やデプロイはまだ行わず、準備完了ログを出力して待機してください。
+【AntiGravityに貼り付けるプロンプト: Step T-1（要点）】
+1. モデル選定: 「gemini-3.8-flash」（利用不可なら「gemini-3.6-flash」）
+2. 作業フォルダ作成とクローン（ワークスペースのルートで実行）:
+   mkdir ipp-agent-workspace
+   git clone https://github.com/almlog/ipp-ai-training-lab.git ipp-agent-workspace/ipp-ai-training-lab
+3. 研修スキルをワークスペース直下へコピー（Windows/Mac/Linux共通）:
+   python -c "import shutil; shutil.copytree(r'ipp-agent-workspace/ipp-ai-training-lab/.agents', '.agents', dirs_exist_ok=True)"
+4. python --version と .agents/skills の一覧を表示
+5. 受講生へ「新しい会話を開いて /ipp-skill-check を実行してください」と案内して終了
 ```
 
-3. **見守る**: AntiGravity が自動でターミナルを開き、コマンドを実行します。数十秒待つと、「完了しました」と出力されます。
-4. **HITMAN への提出**: AntiGravity のチャット欄に表示された **クローン完了ログや Python のバージョン情報** をコピーし、HITMAN のチャット欄に貼り付けて送信します。
+3. **見守る**: AntiGravity が自動でターミナルを開き、コマンドを実行します。
+4. **新しい会話を開く**: AntiGravity で **新しい会話** を開き、チャット欄に **`/ipp-skill-check`** と入力して送信します。
+   - `/` を入力したときの候補に `ipp-skill-check` が出てこない場合は、スキルがワークスペース直下にコピーされていません。手順3をやり直してください。
+5. **HITMAN への提出**: `/ipp-skill-check` が表示したコードブロックをコピーし、HITMAN のチャット欄に貼り付けて送信します。
 
 ```text
 【HITMANに貼り付けるエビデンスの例】
-Cloning into 'ipp-ai-training-lab'...
-remote: Enumerating objects: 120, done.
-Python 3.12.10
-Gemini API Connection: SUCCESS (Model: gemini-3.8-flash)
-Skills loaded: pick-your-agent-project, enable-a2ui, build-agent-frontend, memory-bank-setup, rag-engine-setup, publish-to-github
+[skill:ipp-skill-check@v1]
+PS C:\work> Get-ChildItem .agents\skills -Name
+build-agent-frontend
+enable-a2ui
+ipp-skill-check
+memory-bank-setup
+pick-your-agent-project
+publish-to-github
+rag-engine-setup
 ```
 
 #### 🚦 HITMAN の判定：
-- 🟢 **合格（VERIFIED_APPROVED）**: 「作業フォルダ作成とリポジトリのクローンを確認しました！」と表示され、**Step T-2 がアンロック** されます！
+- 🟢 **合格（VERIFIED_APPROVED）**: 「/ipp-skill-check の起動を確認しました」と表示され、**Step T-2 がアンロック** されます！以降の作業は、この新しい会話で進めてください。
+- 🟡 **案内（クローンのログだけを貼った場合）**: クローンのログだけでは「スキルが読み込まれたか」を確認できないため、新しい会話で `/ipp-skill-check` を実行するよう案内されます。
 - 🟡 **差し戻し**: 「準備できました」とだけ書いた場合、「客観的な実行ログが検知できません」と差し戻されます。AntiGravity の実行ログを貼り直してください。
 
 ---
@@ -424,7 +438,7 @@ AIペアオペレーター「HITMAN」クローンの仕様を設計します。
 【AntiGravityに貼り付けるプロンプト: Step T-3】
 project_brief.md の定義に基づき、Google ADK (Python) で自作エージェントを実装してください。
 作業ディレクトリ: ipp-agent-workspace/my_agent/
-スキル「enable-a2ui」および「google-agents-cli-adk-code-ja」を参照し、以下を構築してください：
+スキル「enable-a2ui」を参照し、以下を構築してください：
 1. agent.py:
    - Google ADK Agent (MODEL: gemini-3.8-flash / 3.6-flash)
    - 自作関数ツール（ログ解析、API連携、計算処理など）
@@ -488,7 +502,7 @@ tests/test_agent.py::test_agent_response PASSED                          [100%]
 
 ```text
 【AntiGravityに貼り付けるプロンプト: Step T-5】
-スキル「build-agent-frontend」および「google-agents-cli-deploy-ja」を活用して、作成したエージェントを Google Cloud Run へデプロイしてください。
+スキル「build-agent-frontend」を活用して、作成したエージェントを Google Cloud Run へデプロイしてください。
 1. frontend/ の配置: FastAPI プロキシ、チャットUI (static/index.html)、A2UI レンダラーの構築
 2. サービスアカウント権限: Cloud Run サービスアカウントに roles/aiplatform.user を付与
 3. デプロイコマンドの実行:

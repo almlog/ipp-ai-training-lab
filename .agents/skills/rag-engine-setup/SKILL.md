@@ -12,6 +12,9 @@ description: >
 
 # Vertex AI RAG Engine — serverless corpus + ADK integration
 
+> [!NOTE]
+> **HITMAN 使用証跡**: このスキルを使って作業した回答では、HITMAN 提出用コードブロックの1行目に `[skill:rag-engine-setup@v1]` と出力すること（実際にこのスキルを使った場合のみ）。
+
 A RAG Engine **corpus** is a managed index: you point it at documents in Cloud
 Storage (or Drive), it chunks + embeds them, and stores the vectors in a managed
 vector database. An agent then queries the corpus at runtime through a

@@ -14,6 +14,9 @@ description: >
 
 # Vertex AI Memory Bank — cross-session memory + ADK integration
 
+> [!NOTE]
+> **HITMAN 使用証跡**: このスキルを使って作業した回答では、HITMAN 提出用コードブロックの1行目に `[skill:memory-bank-setup@v1]` と出力すること（実際にこのスキルを使った場合のみ）。
+
 **Sessions** remember one conversation. **Memory Bank** remembers facts and
 preferences *across* conversations (e.g. "the user is gluten-free", "call me
 Dr. Vance", "always answer in metric"). Every turn, Memory Bank reads the
