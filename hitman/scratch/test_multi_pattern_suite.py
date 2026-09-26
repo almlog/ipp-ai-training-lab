@@ -12,7 +12,41 @@ if sys.platform == "win32":
 
 from playwright.async_api import async_playwright
 
-SCREENSHOT_DIR = r"C:\Users\suzuki.shunpei\.gemini\antigravity\brain\d986d8b6-8044-4ff1-813e-a01f5b05de39"
+SCREENSHOT_DIR = os.environ.get("HITMAN_SCREENSHOT_DIR", os.path.join(os.path.dirname(os.path.abspath(__file__)), "screenshots"))
+os.makedirs(SCREENSHOT_DIR, exist_ok=True)
+BASE_URL = os.environ.get("HITMAN_BASE_URL", "http://localhost:3000/")
+
+# T-1 は客観ログで合格してから T-2 へ進む（本修正で T-1 の自動補完は廃止）
+T1_LOG = (
+    "PS C:\\work> mkdir ipp-agent-workspace ; cd ipp-agent-workspace ; git clone https://github.com/almlog/ipp-ai-training-lab.git\n"
+    "Cloning into 'ipp-ai-training-lab'...\n"
+    "PS C:\\work\\ipp-agent-workspace> python --version\n"
+    "Python 3.12.1\n"
+    "PS C:\\work\\ipp-agent-workspace> Get-ChildItem ipp-ai-training-lab\\.agents\\skills\\\n"
+    "    Directory: C:\\work\\ipp-agent-workspace\\ipp-ai-training-lab\\.agents\\skills\n"
+    "d----  pick-your-agent-project\n"
+    "d----  enable-a2ui\n"
+)
+
+
+async def new_student_page(browser):
+    """受講生1人 = 独立したブラウザコンテキスト（localStorage とセッションIDが分離される）。"""
+    ctx = await browser.new_context(viewport={"width": 1280, "height": 900})
+    return await ctx.new_page()
+
+
+async def server_state(page):
+    return await page.evaluate("() => appState.serverState")
+
+
+async def start_training_and_pass_t1(page):
+    await page.goto(BASE_URL)
+    await page.wait_for_timeout(1500)
+    await page.locator("#mode-select-hdr").select_option("TRAINING")
+    await wait_until_ready(page)
+    await send_chat(page, T1_LOG)
+    st = await server_state(page)
+    assert st and st.get("current_step") == "T-2", f"T-1 ログで T-2 に進んでいません: {st}"
 
 async def wait_until_ready(page, timeout=45000):
     start = asyncio.get_event_loop().time()
@@ -50,18 +84,8 @@ async def test_pattern_1(browser):
     print("\n" + "="*50)
     print("[RUN] Pattern 1: Course A (Custom Idea -> Natural Confirm)")
     print("="*50)
-    page = await browser.new_page(viewport={"width": 1280, "height": 900})
-    await page.goto("http://localhost:3000/")
-    await page.wait_for_timeout(1500)
-
-    # 研修モードへ切り替え
-    await page.locator("#mode-select-hdr").select_option("TRAINING")
-    await wait_until_ready(page)
-    try:
-        await page.wait_for_selector("#log:has-text('T-1')", timeout=15000)
-    except Exception:
-        pass
-    await page.wait_for_timeout(1000)
+    page = await new_student_page(browser)
+    await start_training_and_pass_t1(page)
 
     # 1. アイデア相談
     idea_text = "社内の障害ログを自動解析して原因と解決コマンドを即答するSlackボットを作りたい"
@@ -98,18 +122,8 @@ async def test_pattern_2(browser):
     print("\n" + "="*50)
     print("[RUN] Pattern 2: Course B (Hesitant Scaffolding -> HITMAN Clone)")
     print("="*50)
-    page = await browser.new_page(viewport={"width": 1280, "height": 900})
-    await page.goto("http://localhost:3000/")
-    await page.wait_for_timeout(1500)
-
-    # 研修モードへ切り替え
-    await page.locator("#mode-select-hdr").select_option("TRAINING")
-    await wait_until_ready(page)
-    try:
-        await page.wait_for_selector("#log:has-text('T-1')", timeout=15000)
-    except Exception:
-        pass
-    await page.wait_for_timeout(1000)
+    page = await new_student_page(browser)
+    await start_training_and_pass_t1(page)
 
     # 1. 困惑・迷いの相談
     print("  -> Sending hesitant consultation...")
@@ -141,18 +155,8 @@ async def test_pattern_3(browser):
     print("\n" + "="*50)
     print("[RUN] Pattern 3: Course A (Idea Switch -> Final Confirm)")
     print("="*50)
-    page = await browser.new_page(viewport={"width": 1280, "height": 900})
-    await page.goto("http://localhost:3000/")
-    await page.wait_for_timeout(1500)
-
-    # 研修モードへ切り替え
-    await page.locator("#mode-select-hdr").select_option("TRAINING")
-    await wait_until_ready(page)
-    try:
-        await page.wait_for_selector("#log:has-text('T-1')", timeout=15000)
-    except Exception:
-        pass
-    await page.wait_for_timeout(1000)
+    page = await new_student_page(browser)
+    await start_training_and_pass_t1(page)
 
     # 1. 最初のアイデア相談
     print("  -> Sending first idea (FAQ bot)...")
@@ -183,18 +187,8 @@ async def test_pattern_4(browser):
     print("\n" + "="*50)
     print("[RUN] Pattern 4: Persistence across Reload (F5)")
     print("="*50)
-    page = await browser.new_page(viewport={"width": 1280, "height": 900})
-    await page.goto("http://localhost:3000/")
-    await page.wait_for_timeout(1500)
-
-    # 研修モードへ切り替え
-    await page.locator("#mode-select-hdr").select_option("TRAINING")
-    await wait_until_ready(page)
-    try:
-        await page.wait_for_selector("#log:has-text('T-1')", timeout=15000)
-    except Exception:
-        pass
-    await page.wait_for_timeout(1000)
+    page = await new_student_page(browser)
+    await start_training_and_pass_t1(page)
 
     # アイデア相談
     print("  -> Consulting idea before reload...")
@@ -230,18 +224,8 @@ async def test_pattern_5(browser):
     print("\n" + "="*50)
     print("[RUN] Pattern 5: Objective Verification Gate (Reject -> Pass -> T-3)")
     print("="*50)
-    page = await browser.new_page(viewport={"width": 1280, "height": 900})
-    await page.goto("http://localhost:3000/")
-    await page.wait_for_timeout(1500)
-
-    # 研修モードへ切り替え
-    await page.locator("#mode-select-hdr").select_option("TRAINING")
-    await wait_until_ready(page)
-    try:
-        await page.wait_for_selector("#log:has-text('T-1')", timeout=15000)
-    except Exception:
-        pass
-    await page.wait_for_timeout(1000)
+    page = await new_student_page(browser)
+    await start_training_and_pass_t1(page)
 
     # T-2 確定まで進める
     print("  -> Setting up T-2 confirmed state...")
@@ -285,6 +269,34 @@ async def test_pattern_5(browser):
     await page.close()
 
 
+async def test_pattern_6(browser):
+    """【パターン6: 受講生の同時利用】2人が同時に進めても進捗・企画が混ざらない"""
+    print("\n" + "="*50)
+    print("[RUN] Pattern 6: Two students in parallel are isolated")
+    print("="*50)
+    alice = await new_student_page(browser)
+    bob = await new_student_page(browser)
+    await start_training_and_pass_t1(alice)
+    await bob.goto(BASE_URL)
+    await bob.wait_for_timeout(1500)
+    await bob.locator("#mode-select-hdr").select_option("TRAINING")
+    await wait_until_ready(bob)
+
+    await send_chat(alice, "社内の障害ログを自動解析するボットを作りたい")
+    st_bob = await server_state(bob)
+    assert st_bob["current_step"] == "T-1", f"P6-1: Bob の進捗が Alice に引きずられています: {st_bob}"
+    assert not st_bob.get("user_idea"), f"P6-2: Alice の企画が Bob に漏れています: {st_bob}"
+
+    # 「選択中コース」ボタンの再クリックで進捗が消えないこと
+    await alice.evaluate("switchTrainingCourse(appState.trainingCourse)")
+    await alice.wait_for_timeout(500)
+    st_alice = await server_state(alice)
+    assert st_alice["current_step"] == "T-2" and st_alice["results"].get("T-1") == "SUCCESS", f"P6-3: 選択中コースの再クリックで進捗が変化: {st_alice}"
+    print("[PASS] Pattern 6: Students are isolated and re-selecting the course keeps progress")
+    await alice.close()
+    await bob.close()
+
+
 async def main():
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
@@ -296,6 +308,7 @@ async def main():
             ("Pattern 3: Course A (Idea Switch -> Final Confirm)", test_pattern_3),
             ("Pattern 4: Persistence across Reload (F5)", test_pattern_4),
             ("Pattern 5: Objective Verification Gate (Reject -> Pass -> T-3)", test_pattern_5),
+            ("Pattern 6: Two students in parallel are isolated", test_pattern_6),
         ]
         
         for name, fn in tests:
