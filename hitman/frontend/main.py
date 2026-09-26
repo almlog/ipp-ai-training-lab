@@ -8,11 +8,14 @@ Supports:
 2. Cloud production mode (connecting over A2A protocol when AGENT_ENGINE_RESOURCE_NAME is set)
 """
 
+import asyncio
 import json
+import logging
 import os
 import re
 import time
 import uuid
+from types import SimpleNamespace
 from dotenv import load_dotenv
 import httpx
 from fastapi import FastAPI, File, Request, UploadFile
@@ -20,6 +23,13 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 load_dotenv()
+
+logger = logging.getLogger("hitman.frontend")
+if not logger.handlers:
+    logging.basicConfig(level=logging.INFO)
+
+APP_NAME = "hitman"
+_USER_ID_RE = re.compile(r"^[A-Za-z0-9_.:-]{1,80}$")
 
 # Cloud deployment resource configuration
 RESOURCE = os.environ.get("AGENT_ENGINE_RESOURCE_NAME")
@@ -30,6 +40,8 @@ app = FastAPI(title="HITMAN Ops Assistant Frontend")
 
 # Local session store: user_id -> session_id
 _local_sessions: dict[str, str] = {}
+# In-process (direct) ADK session store: user_id -> session_id
+_direct_sessions: dict[str, str] = {}
 # Cloud A2A context store: user_id -> context_id
 _cloud_contexts: dict[str, str] = {}
 
@@ -50,21 +62,22 @@ async def _json_errors(request: Request, exc: Exception):
 def _parse_local_event_text(text: str) -> list[dict]:
     """Parse text from local agent, extracting prose and <a2ui-json> blocks."""
     parts: list[dict] = []
-    a2ui_match = _TAG_RE.search(text)
-    if a2ui_match:
-        a2ui_str = a2ui_match.group(1).strip()
+    matches = list(_TAG_RE.finditer(text))
+    if matches:
         prose = _TAG_RE.sub("", text).strip()
         if prose:
             parts.append({"kind": "text", "text": prose})
-        try:
-            a2ui_messages = json.loads(a2ui_str)
-            if isinstance(a2ui_messages, list):
-                for msg in a2ui_messages:
-                    parts.append({"kind": "a2ui", "data": msg})
-            elif isinstance(a2ui_messages, dict):
-                parts.append({"kind": "a2ui", "data": a2ui_messages})
-        except Exception:
-            parts.append({"kind": "text", "text": a2ui_str})
+        for a2ui_match in matches:
+            a2ui_str = a2ui_match.group(1).strip()
+            try:
+                a2ui_messages = json.loads(a2ui_str)
+                if isinstance(a2ui_messages, list):
+                    for msg in a2ui_messages:
+                        parts.append({"kind": "a2ui", "data": msg})
+                elif isinstance(a2ui_messages, dict):
+                    parts.append({"kind": "a2ui", "data": a2ui_messages})
+            except Exception:
+                parts.append({"kind": "text", "text": a2ui_str})
     else:
         if text.strip():
             parts.append({"kind": "text", "text": text.strip()})
@@ -223,24 +236,104 @@ def _get_direct_runner():
     return _direct_runner, _direct_session_service
 
 
+def _ensure_import_path():
+    import sys
+    root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    if root_dir not in sys.path:
+        sys.path.insert(0, root_dir)
+
+
+def _normalize_user_id(raw) -> str:
+    """ブラウザごとの識別子。フロントが発行するUUIDを想定し、不正値は既定値にする。"""
+    uid = str(raw or "").strip()
+    return uid if _USER_ID_RE.match(uid) else "web-user"
+
+
+# 同一ユーザーの同時リクエストでセッションステートが競合しないよう直列化する
+_user_locks: dict[str, asyncio.Lock] = {}
+
+
+def _user_lock(user_id: str) -> asyncio.Lock:
+    lock = _user_locks.get(user_id)
+    if lock is None:
+        lock = asyncio.Lock()
+        _user_locks[user_id] = lock
+    return lock
+
+
+async def _get_or_create_session(user_id: str):
+    """ユーザーのADKセッションを取得（無ければ作成）する。戻り値: (session, created)。
+
+    旧実装は get_session_sync(session_id=...) に必須引数 app_name/user_id を渡しておらず、
+    TypeError が握りつぶされて毎回新規セッションが作られていた（= LLMが会話履歴を一切見られない）。
+    """
+    _, svc = _get_direct_runner()
+    sid = _direct_sessions.get(user_id)
+    sess = None
+    if sid:
+        sess = await svc.get_session(app_name=APP_NAME, user_id=user_id, session_id=sid)
+    if sess is not None:
+        return sess, False
+    sess = await svc.create_session(app_name=APP_NAME, user_id=user_id)
+    _direct_sessions[user_id] = sess.id
+    return sess, True
+
+
+async def _commit_state(sess, before: dict, after: dict) -> None:
+    """UI操作によるステート変更を state_delta イベントとしてセッションへ反映する。"""
+    delta = {k: after.get(k) for k in set(before) | set(after) if after.get(k) != before.get(k)}
+    if not delta:
+        return
+    from google.adk.events import Event, EventActions
+    _, svc = _get_direct_runner()
+    await svc.append_event(
+        sess,
+        Event(
+            author="user",
+            invocation_id=f"hitman-ui-{uuid.uuid4().hex[:12]}",
+            actions=EventActions(state_delta=delta),
+        ),
+    )
+
+
+class _SessionState:
+    """`async with _SessionState(user_id) as (state, ctx, created):` でセッションステートを読み書きする。
+    ctx はツール関数に tool_context として渡せる（.state を持つ）。"""
+
+    def __init__(self, user_id: str, client_state: dict | None = None):
+        self.user_id = user_id
+        self.client_state = client_state
+
+    async def __aenter__(self):
+        _ensure_import_path()
+        from app.agent import HitmanState, seed_state_from_client
+        self.sess, self.created = await _get_or_create_session(self.user_id)
+        self.before = dict(self.sess.state)
+        self.store = dict(self.sess.state)
+        if self.created and self.client_state:
+            seed_state_from_client(self.store, self.client_state)
+        return HitmanState(self.store), SimpleNamespace(state=self.store), self.created
+
+    async def __aexit__(self, exc_type, exc, tb):
+        if exc_type is None:
+            await _commit_state(self.sess, self.before, self.store)
+        return False
+
+
+async def _snapshot_state(user_id: str) -> dict:
+    _ensure_import_path()
+    from app.agent import HitmanState
+    sess, _ = await _get_or_create_session(user_id)
+    return HitmanState(dict(sess.state)).snapshot()
+
+
 async def _chat_direct(user_id: str, message: str) -> list[dict]:
     """Execute ADK agent directly in-process when local HTTP server is not running."""
-    import asyncio
     from google.genai import types
 
-    runner, session_service = _get_direct_runner()
-    session_id = _local_sessions.get(user_id)
-    sess = None
-    if session_id:
-        try:
-            sess = session_service.get_session_sync(session_id=session_id)
-        except Exception:
-            sess = None
-
-    if not sess:
-        sess = session_service.create_session_sync(user_id=user_id, app_name="hitman")
-        session_id = sess.id
-        _local_sessions[user_id] = session_id
+    runner, _ = _get_direct_runner()
+    sess, _ = await _get_or_create_session(user_id)
+    session_id = sess.id
 
     content = types.Content(
         role="user",
@@ -270,7 +363,7 @@ async def _chat_direct(user_id: str, message: str) -> list[dict]:
                     "dns", "getaddrinfo", "timeout", "connection reset", "backend unavailable"
                 ])
                 if is_transient and attempt < max_retries - 1:
-                    wait_sec = 2.0 * (attempt + 1)
+                    wait_sec = 2.0 * (2 ** attempt)
                     logger.warning(
                         f"Transient error in LLM runner (attempt {attempt+1}/{max_retries}): {e}. Retrying in {wait_sec}s..."
                     )
@@ -279,16 +372,41 @@ async def _chat_direct(user_id: str, message: str) -> list[dict]:
                 raise last_error
 
     events = await _run_with_retry()
-    parts: list[dict] = []
+    return _collect_reply_parts(events)
+
+
+def _collect_reply_parts(events) -> list[dict]:
+    """ADKイベント列から応答パーツを組み立てる。
+
+    文章は全イベント分を順に採用し（同一文の重複は除外）、A2UIカードは
+    『カードを含む最後のモデル応答』のものだけを採用する。ツール呼び出し前後の
+    途中応答のカードまで並べると、同一応答内でカードが重複・混線するため。
+    """
+    text_parts: list[dict] = []
+    last_a2ui: list[dict] = []
+    seen: set[str] = set()
     for event in events:
-        if getattr(event, "author", None) in ("hitman", "model", "bot", "assistant"):
-            c = getattr(event, "content", None)
-            if c:
-                for p in getattr(c, "parts", []):
-                    txt = getattr(p, "text", None)
-                    if txt:
-                        parts.extend(_parse_local_event_text(txt))
-    return parts
+        if getattr(event, "author", None) not in ("hitman", "model", "bot", "assistant"):
+            continue
+        c = getattr(event, "content", None)
+        if not c:
+            continue
+        event_a2ui: list[dict] = []
+        for p in getattr(c, "parts", []) or []:
+            txt = getattr(p, "text", None)
+            if not txt:
+                continue
+            for part in _parse_local_event_text(txt):
+                if part.get("kind") == "a2ui":
+                    event_a2ui.append(part)
+                else:
+                    key = part.get("text", "").strip()
+                    if key and key not in seen:
+                        seen.add(key)
+                        text_parts.append(part)
+        if event_a2ui:
+            last_a2ui = event_a2ui
+    return text_parts + last_a2ui
 
 
 @app.get("/favicon.ico")
@@ -301,57 +419,80 @@ async def chat(req: Request):
     t0 = time.perf_counter()
     body = await req.json()
     message = body.get("message", "").strip()
-    user_id = body.get("user_id") or "web-user"
+    user_id = _normalize_user_id(body.get("user_id"))
     mode = body.get("mode")
     course = body.get("course")
     current_step = body.get("current_step")
+    client_state = body.get("client_state") if isinstance(body.get("client_state"), dict) else None
 
-    if mode or course or current_step:
-        try:
-            import app.agent as agent_module
+    use_direct = not RESOURCE and os.environ.get("USE_LOCAL_AGENT_SERVER", "false").lower() != "true"
+    _ensure_import_path()
+    import app.agent as agent_module
+
+    if not message:
+        return JSONResponse({"parts": [], "metrics": None, "state": None})
+
+    async with _user_lock(user_id):
+        state_before_seq = 0
+        session_restored = False
+        if use_direct:
+            # セッションステートが唯一の正。フロントからの current_step は研修モードでは使用しない。
+            async with _SessionState(user_id, client_state) as (st, ctx, created):
+                session_restored = bool(created and client_state)
+                if mode in (agent_module.MODE_NORMAL, agent_module.MODE_TRAINING, agent_module.MODE_SPECIAL_PAIR) and mode != st.mode:
+                    agent_module.set_operation_mode(mode, tool_context=ctx)
+                if st.mode != agent_module.MODE_TRAINING and current_step:
+                    # 通常/特別モードは従来通りフロントの手順進行を採用（本PRの対象外）
+                    st.current_step = current_step
+                state_before_seq = st.verdict_seq
+                effective_mode, effective_course, effective_step = st.mode, st.course, st.current_step
+                user_idea = st.user_idea
+        else:
+            # リモートエージェント接続時は従来通りグローバルへ同期（セッションステート非対応）
             if mode:
                 agent_module.ACTIVE_OPERATION_MODE = mode
             if course:
                 agent_module.ACTIVE_TRAINING_COURSE = course
             if current_step:
                 agent_module.CURRENT_STEP = current_step
-        except Exception as ex:
-            logger.warning(f"Failed to sync agent state: {ex}")
+            effective_mode = mode or agent_module.ACTIVE_OPERATION_MODE
+            effective_course = course or agent_module.ACTIVE_TRAINING_COURSE
+            effective_step = current_step or agent_module.CURRENT_STEP
+            user_idea = ""
 
-    if not message:
-        return JSONResponse({"parts": [], "metrics": None})
-
-    # Construct context-enriched message for LLM to ensure accurate step identification
-    import app.agent as agent_module
-    effective_step = current_step or getattr(agent_module, "CURRENT_STEP", "1-1")
-    effective_mode = mode or getattr(agent_module, "ACTIVE_OPERATION_MODE", "NORMAL")
-    effective_course = course or getattr(agent_module, "ACTIVE_TRAINING_COURSE", "original")
-
-    if not message.startswith("[HITMAN 運用コンテキスト"):
-        context_header = (
-            f"[HITMAN 運用コンテキスト: モード={effective_mode}, "
-            f"コース={effective_course}, 現在進行中ステップ={effective_step}]\n"
-        )
-        llm_message = f"{context_header}{message}"
-    else:
-        llm_message = message
-
-    try:
-        if RESOURCE:
-            parts = await _chat_cloud(user_id, llm_message)
-        elif os.environ.get("USE_LOCAL_AGENT_SERVER", "false").lower() == "true":
-            try:
-                parts = await _chat_local(user_id, llm_message)
-            except Exception:
-                parts = await _chat_direct(user_id, llm_message)
+        if not message.startswith("[HITMAN 運用コンテキスト"):
+            idea_part = f", 相談中/確定済みの企画={user_idea}" if user_idea else ""
+            context_header = (
+                f"[HITMAN 運用コンテキスト: モード={effective_mode}, "
+                f"コース={effective_course}, 現在進行中ステップ={effective_step}{idea_part}]\n"
+            )
+            llm_message = f"{context_header}{message}"
         else:
-            parts = await _chat_direct(user_id, llm_message)
-    except Exception as exc:
-        logger.error(f"Chat execution failed after retries: {exc}")
-        parts = [{
-            "kind": "text",
-            "text": f"⚠️ AIクラウドサービスとの通信で一時的な遅延またはエラーが発生しました（{type(exc).__name__}: {str(exc)[:120]}）。お手数ですが、もう一度送信をお試しください。"
-        }]
+            llm_message = message
+
+        try:
+            if RESOURCE:
+                parts = await _chat_cloud(user_id, llm_message)
+            elif not use_direct:
+                try:
+                    parts = await _chat_local(user_id, llm_message)
+                except Exception:
+                    parts = await _chat_direct(user_id, llm_message)
+            else:
+                parts = await _chat_direct(user_id, llm_message)
+        except Exception as exc:
+            logger.error(f"Chat execution failed after retries: {exc}")
+            parts = [{
+                "kind": "text",
+                "text": f"⚠️ AIクラウドサービスとの通信で一時的な遅延またはエラーが発生しました（{type(exc).__name__}: {str(exc)[:120]}）。お手数ですが、もう一度送信をお試しください。"
+            }]
+
+        state_payload = None
+        if use_direct:
+            state_payload = await _snapshot_state(user_id)
+            lv = state_payload.get("last_verdict")
+            state_payload["verdict_this_turn"] = lv if (lv and state_payload.get("verdict_seq", 0) > state_before_seq) else None
+            state_payload["session_restored"] = session_restored
 
     if not parts:
         parts = [{"kind": "text", "text": "(応答がありませんでした。もう一度お試しください。)"}]
@@ -397,25 +538,27 @@ async def chat(req: Request):
         "effective_cost_jpy": 0.0,
     }
 
-    return JSONResponse({"parts": parts, "metrics": metrics})
+    return JSONResponse({"parts": parts, "metrics": metrics, "state": state_payload})
 
 
 @app.get("/api/sop")
-async def get_sop(mode: str = None, course: str = None, workspace: str = None, agent: str = None, env: str = None):
-    import sys
-    root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    if root_dir not in sys.path:
-        sys.path.insert(0, root_dir)
+async def get_sop(mode: str = None, course: str = None, workspace: str = None, agent: str = None, env: str = None, user_id: str = None):
+    """手順書定義を返す（参照のみ。旧実装はGETでグローバルのモードを書き換えていた）。
+    user_id を渡すと、そのセッションのコース・環境設定・確定企画（T-2）を反映する。"""
+    _ensure_import_path()
     from app.agent import (
+        HitmanState,
         get_active_approval,
         get_active_branch_rules,
         get_active_parameters,
         get_active_sop,
         get_active_step_sequence,
-        set_operation_mode,
     )
-    if mode:
-        set_operation_mode(mode)
+    if user_id:
+        sess, _ = await _get_or_create_session(_normalize_user_id(user_id))
+        state = HitmanState(dict(sess.state))
+    else:
+        state = HitmanState({})
     custom_params = {}
     if workspace:
         custom_params["WORKSPACE_DIR"] = workspace
@@ -423,14 +566,55 @@ async def get_sop(mode: str = None, course: str = None, workspace: str = None, a
         custom_params["AGENT_NAME"] = agent
     if env:
         custom_params["PYTHON_ENV"] = env
+    eff_mode = mode or state.mode
 
     return JSONResponse(content={
-        "sop": get_active_sop(mode=mode, course=course, params=custom_params if custom_params else None),
-        "sequence": get_active_step_sequence(mode=mode, course=course),
-        "parameters": get_active_parameters(mode=mode),
-        "approval": get_active_approval(mode=mode, course=course),
+        "sop": get_active_sop(mode=eff_mode, course=course, params=custom_params if custom_params else None, state=state),
+        "sequence": get_active_step_sequence(mode=eff_mode, course=course, state=state),
+        "parameters": get_active_parameters(mode=eff_mode, state=state),
+        "approval": get_active_approval(mode=eff_mode, course=course, state=state),
         "branch_rules": get_active_branch_rules(),
+        "state": state.snapshot() if user_id else None,
     })
+
+
+@app.get("/api/session/state")
+async def api_session_state(user_id: str = None):
+    """セッションの現在ステート（研修の現在ステップ・合否結果・コース等）を返す。"""
+    uid = _normalize_user_id(user_id)
+    async with _user_lock(uid):
+        return JSONResponse(content={"state": await _snapshot_state(uid)})
+
+
+@app.post("/api/session/sync")
+async def api_session_sync(req: Request):
+    """ページ読込時の同期。サーバ側セッションが失われていれば client_state で復元し、現在ステートを返す。"""
+    body = await req.json()
+    uid = _normalize_user_id(body.get("user_id"))
+    client_state = body.get("client_state") if isinstance(body.get("client_state"), dict) else None
+    async with _user_lock(uid):
+        async with _SessionState(uid, client_state) as (st, _ctx, created):
+            snap = st.snapshot()
+            snap["session_restored"] = bool(created and client_state)
+    return JSONResponse(content={"state": snap})
+
+
+@app.post("/api/session/reset")
+async def api_session_reset(req: Request):
+    """ADKセッション（会話履歴・研修ステート）を破棄して新規セッションを開始する。"""
+    body = await req.json()
+    uid = _normalize_user_id(body.get("user_id"))
+    async with _user_lock(uid):
+        sid = _direct_sessions.pop(uid, None)
+        if sid:
+            _, svc = _get_direct_runner()
+            try:
+                await svc.delete_session(app_name=APP_NAME, user_id=uid, session_id=sid)
+            except Exception as ex:
+                logger.warning(f"Failed to delete session {sid}: {ex}")
+        _local_sessions.pop(uid, None)
+        _cloud_contexts.pop(uid, None)
+        return JSONResponse(content={"status": "success", "state": await _snapshot_state(uid)})
 
 
 @app.post("/api/training/parameters")
@@ -439,13 +623,14 @@ async def set_training_params(req: Request):
     ws = body.get("workspace_dir", "").strip()
     agent_name = body.get("agent_name", "").strip()
     py_env = body.get("python_env", "").strip()
+    uid = _normalize_user_id(body.get("user_id"))
 
-    import sys
-    root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    if root_dir not in sys.path:
-        sys.path.insert(0, root_dir)
+    _ensure_import_path()
     from app.agent import set_training_environment
-    res = set_training_environment(workspace_dir=ws, agent_name=agent_name, python_env=py_env)
+    async with _user_lock(uid):
+        async with _SessionState(uid) as (st, ctx, _):
+            res = set_training_environment(workspace_dir=ws, agent_name=agent_name, python_env=py_env, tool_context=ctx)
+            res["state"] = st.snapshot()
     return JSONResponse(content=res)
 
 
@@ -604,49 +789,39 @@ async def api_escalation_gate(req: Request):
 
 @app.post("/api/report/generate")
 async def api_report_generate(req: Request):
-    import sys
-    root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    if root_dir not in sys.path:
-        sys.path.insert(0, root_dir)
+    _ensure_import_path()
     from app.agent import generate_final_report
 
     body = await req.json()
-    start_time = body.get("start_time", "")
-    end_time = body.get("end_time", "")
-    duration_minutes = body.get("duration_minutes", 15)
-    mode = body.get("mode", "NORMAL")
-    supervisor_name = body.get("supervisor_name", "")
-    sop_results = body.get("sop_results", {})
-    escalation_record = body.get("escalation_record")
-
-    report = generate_final_report(
-        start_time=start_time,
-        end_time=end_time,
-        duration_minutes=duration_minutes,
-        mode=mode,
-        supervisor_name=supervisor_name,
-        sop_results=sop_results,
-        escalation_record=escalation_record,
-    )
+    uid = _normalize_user_id(body.get("user_id"))
+    async with _user_lock(uid):
+        async with _SessionState(uid) as (_st, ctx, _):
+            report = generate_final_report(
+                start_time=body.get("start_time", ""),
+                end_time=body.get("end_time", ""),
+                duration_minutes=body.get("duration_minutes", 15),
+                mode=body.get("mode", "NORMAL"),
+                supervisor_name=body.get("supervisor_name", ""),
+                sop_results=body.get("sop_results", {}),
+                escalation_record=body.get("escalation_record"),
+                tool_context=ctx,
+            )
     return JSONResponse(content=report)
 
 
 @app.get("/api/mode")
-async def api_get_mode():
-    import sys
-    root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    if root_dir not in sys.path:
-        sys.path.insert(0, root_dir)
+async def api_get_mode(user_id: str = None):
+    _ensure_import_path()
     from app.agent import get_operation_mode
-    return JSONResponse(content=get_operation_mode())
+    uid = _normalize_user_id(user_id)
+    async with _user_lock(uid):
+        async with _SessionState(uid) as (_st, ctx, _):
+            return JSONResponse(content=get_operation_mode(tool_context=ctx))
 
 
 @app.post("/api/mode")
 async def api_set_mode(req: Request):
-    import sys
-    root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    if root_dir not in sys.path:
-        sys.path.insert(0, root_dir)
+    _ensure_import_path()
     from app.agent import (
         get_active_approval,
         get_active_branch_rules,
@@ -657,27 +832,29 @@ async def api_set_mode(req: Request):
     )
 
     body = await req.json()
+    uid = _normalize_user_id(body.get("user_id"))
     mode = body.get("mode", "NORMAL")
     course = body.get("course", None)
     supervisor_name = body.get("supervisor_name", "")
     supervisor_role = body.get("supervisor_role", "")
-    res = set_operation_mode(mode, supervisor_name, supervisor_role)
-    effective_mode = res.get("mode", mode)
-    res["sop"] = get_active_sop(mode=effective_mode, course=course)
-    res["sequence"] = get_active_step_sequence(mode=effective_mode, course=course)
-    res["parameters"] = get_active_parameters(mode=effective_mode)
-    res["approval"] = get_active_approval(mode=effective_mode, course=course)
-    res["branch_rules"] = get_active_branch_rules()
+    async with _user_lock(uid):
+        async with _SessionState(uid) as (st, ctx, _):
+            res = set_operation_mode(mode, supervisor_name, supervisor_role, tool_context=ctx)
+            effective_mode = res.get("mode", mode)
+            res["sop"] = get_active_sop(mode=effective_mode, course=course, state=st)
+            res["sequence"] = get_active_step_sequence(mode=effective_mode, course=course, state=st)
+            res["parameters"] = get_active_parameters(mode=effective_mode, state=st)
+            res["approval"] = get_active_approval(mode=effective_mode, course=course, state=st)
+            res["branch_rules"] = get_active_branch_rules()
+            res["state"] = st.snapshot()
     return JSONResponse(content=res)
 
 
 @app.post("/api/training/course")
 async def api_training_course(req: Request):
-    """研修モードの受講コース（'original' / 'hitman_clone'）を切り替える。"""
-    import sys
-    root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    if root_dir not in sys.path:
-        sys.path.insert(0, root_dir)
+    """研修モードの受講コース（'original' / 'hitman_clone'）を確定する。
+    同じコースの再選択では進捗は変わらない。コース変更時は T-1 合格のみ引き継ぐ。"""
+    _ensure_import_path()
     from app.agent import (
         get_active_approval,
         get_active_branch_rules,
@@ -686,18 +863,24 @@ async def api_training_course(req: Request):
     )
 
     body = await req.json()
+    uid = _normalize_user_id(body.get("user_id"))
     course = body.get("course", "original")
-    res = set_training_course(course)
-    return JSONResponse(content={
-        "result": res,
-        "course": res.get("course"),
-        "course_name": res.get("course_name"),
-        "sop": res.get("sop"),
-        "sequence": res.get("step_sequence"),
-        "parameters": get_active_parameters(mode="TRAINING"),
-        "approval": get_active_approval(mode="TRAINING", course=course),
-        "branch_rules": get_active_branch_rules(),
-    })
+    async with _user_lock(uid):
+        async with _SessionState(uid) as (st, ctx, _):
+            res = set_training_course(course, tool_context=ctx)
+            payload = {
+                "result": {k: v for k, v in res.items() if k != "sop"},
+                "course": res.get("course"),
+                "course_name": res.get("course_name"),
+                "changed": res.get("changed"),
+                "sop": res.get("sop"),
+                "sequence": res.get("step_sequence"),
+                "parameters": get_active_parameters(mode="TRAINING", state=st),
+                "approval": get_active_approval(mode="TRAINING", course=res.get("course"), state=st),
+                "branch_rules": get_active_branch_rules(),
+                "state": st.snapshot(),
+            }
+    return JSONResponse(content=payload)
 
 
 @app.post("/api/supervisor/skip")
@@ -721,19 +904,19 @@ async def api_supervisor_skip(req: Request):
 
 @app.post("/api/training/guidance")
 async def api_training_guidance(req: Request):
-    import sys
-    root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    if root_dir not in sys.path:
-        sys.path.insert(0, root_dir)
+    _ensure_import_path()
     from app.agent import guide_training_app_creation
 
     body = await req.json()
+    uid = _normalize_user_id(body.get("user_id"))
     idea = body.get("idea", "")
     course_type = body.get("course_type", "custom")
     is_confirmed = body.get("is_confirmed", False)
-    res = guide_training_app_creation(idea, course_type, is_confirmed=is_confirmed)
+    async with _user_lock(uid):
+        async with _SessionState(uid) as (st, ctx, _):
+            res = guide_training_app_creation(idea, course_type, is_confirmed=is_confirmed, tool_context=ctx)
+            res["state"] = st.snapshot()
     return JSONResponse(content=res)
-
 
 
 # Static UI mount with no-cache headers for index.html
