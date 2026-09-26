@@ -191,3 +191,29 @@ def test_bundled_course_a_sample_passes_smoke():
     ))
     out = smoke.format_report(data, "python smoke_test.py ...")
     assert agent_module.judge_smoke_output(out)["status"] == "PASS", out
+
+
+def test_smoke_auth_detects_vertex_express_key_and_never_prints_it(monkeypatch, capsys):
+    """AQ. で始まるキーは Vertex AI Express として扱い、キーと同時指定できない PROJECT/LOCATION を外す。
+    キーの値そのものは出力しない（Antigravity がキーをコマンドに直書きして漏らした事例への対策）。"""
+    fake_key = "AQ.test-not-a-real-key-123"
+    # 関数が書き換える環境変数をすべて monkeypatch に登録し、テスト後に元へ戻す
+    # （存在しない変数の delenv は記録されないため、いったん setenv してから消す）
+    for name in ("GOOGLE_API_KEY", "GOOGLE_GENAI_USE_VERTEXAI", "GOOGLE_GENAI_USE_ENTERPRISE",
+                 "GOOGLE_CLOUD_PROJECT", "GOOGLE_CLOUD_LOCATION"):
+        monkeypatch.setenv(name, "placeholder")
+        monkeypatch.delenv(name)
+    monkeypatch.setenv("GEMINI_API_KEY", fake_key)
+    monkeypatch.setenv("GOOGLE_CLOUD_PROJECT", "some-project")
+    monkeypatch.setenv("GOOGLE_CLOUD_LOCATION", "global")
+    mode = smoke._configure_gemini_auth()
+    import os
+    assert "Vertex AI Express" in mode
+    assert os.environ["GOOGLE_GENAI_USE_VERTEXAI"] == "true" == os.environ["GOOGLE_GENAI_USE_ENTERPRISE"]
+    assert "GOOGLE_CLOUD_PROJECT" not in os.environ and "GOOGLE_CLOUD_LOCATION" not in os.environ
+    assert fake_key not in mode and fake_key not in capsys.readouterr().out
+
+    monkeypatch.setenv("GEMINI_API_KEY", "AIza-studio-key")
+    monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
+    assert "Developer API" in smoke._configure_gemini_auth()
+    assert os.environ["GOOGLE_GENAI_USE_VERTEXAI"] == "false"

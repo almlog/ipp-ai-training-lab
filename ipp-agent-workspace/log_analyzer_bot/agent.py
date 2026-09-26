@@ -11,6 +11,8 @@ from __future__ import annotations
 
 import re
 
+from a2ui.basic_catalog.provider import BasicCatalog
+from a2ui.schema.manager import A2uiSchemaManager
 from google.adk.agents import Agent
 
 from a2ui_utils import a2ui_callback
@@ -143,14 +145,35 @@ def recommend_fix_commands(error_type: str, service_name: str = "my-app") -> dic
     }
 
 
-INSTRUCTION = """あなたは社内の障害一次対応を支援する「社内障害ログ自動解析Bot」です。
+ROLE_DESCRIPTION = """あなたは社内の障害一次対応を支援する「社内障害ログ自動解析Bot」です。
 1. 利用者がエラーログやスタックトレースを貼り付けたら、必ず analyze_stacktrace を呼び出して解析する。
 2. 続けて、解析結果の error_type を使って recommend_fix_commands を呼び出す（サービス名が分かれば service_name に渡す）。
 3. 回答では、重大度・推定原因・根拠となったログ行を先に示し、その後に調査・復旧コマンドを実行順に示す。
 4. 【変更あり】のコマンドは、実行前に影響範囲の確認と上長承認が必要であることを必ず添える。
 5. ツールの結果に無い原因やコマンドを推測で付け足さない。原因が UNKNOWN の場合は、前後のログを追加で貼るよう依頼する。
-6. 結果は A2UI カード（重大度と原因のカード、推奨コマンドのカード）で表示する。ボタンは使わない。
 """
+
+# enable-a2ui スキルの手順（Step 2）どおり、A2UI v0.8 のスキーマと例をシステムプロンプトに入れる。
+# これが無いと、モデルは独自形式の JSON を出してしまい、カードが描画されない。
+_schema_manager = A2uiSchemaManager(version="0.8", catalogs=[BasicCatalog.get_config("0.8")])
+INSTRUCTION = _schema_manager.generate_system_prompt(
+    role_description=ROLE_DESCRIPTION,
+    workflow_description="障害ログを解析ツールで解析し、推奨コマンドを取得してから、日本語の説明と A2UI カードで回答する。",
+    ui_description=(
+        "Keep every surface tiny and flat: ONE Card > ONE Column > a few Text rows. "
+        "Never nest a Card inside a Card. "
+        "Use ONLY these components: Card, Column, Row, and Text. Do not use Table, Heading, "
+        "Buttons, actions, or forms (they do nothing). "
+        "No markdown in text inside A2UI components; use the usageHint property ('h1', 'h2', 'body'). "
+        "First write a short explanation in Japanese, then output the A2UI JSON array for ONE card: "
+        "severity and probable cause (h1/h2), the evidence log line (body), and the recommended commands "
+        "in execution order (one Text per command, usageHint 'body'). "
+        "Never wrap A2UI in <a2a_datapart_json> tags or 'kind'/'data'/'metadata' objects, and never use a "
+        "custom JSON format such as {\"cards\": [...]}."
+    ),
+    include_schema=True,
+    include_examples=True,
+)
 
 root_agent = Agent(
     model=MODEL,

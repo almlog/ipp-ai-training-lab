@@ -39,4 +39,5 @@ python .agents/skills/ipp-agent-smoke-test/scripts/smoke_test.py --agent-dir ipp
 - **tool_called: NG** — エージェントの instruction でツールを使う場面を明記する。ツールの docstring に「いつ使うか」を書く。
 - **no_stub_suspect: NG** — ツールが引数を使わず固定値を返している。入力（引数）に応じて実際に処理する実装にする。外部 API が使えない処理は、Gemini への入力とプロンプトで実現できる範囲に機能を絞る。
 - **replies_differ: NG** — 応答が固定文になっている。`main.py` などで LLM を通さずに返事を組み立てていないか確認する。
-- **API キーのエラー** — `GEMINI_API_KEY`（または `GOOGLE_API_KEY`）が設定されているか確認する。
+- **API キーのエラー** — キーはワークスペースの `.env`（または `--agent-dir` のフォルダの `.env`）に `GEMINI_API_KEY=...` として置く。スクリプトが自動で読み込み、`AQ.` で始まるキー（Vertex AI Express）かどうかも自動で判別する。
+- **API キーをコマンドライン・チャット・ログに直接書かないこと。** `$env:GEMINI_API_KEY="..."` のようにコマンドへ埋め込むと、実行履歴やチャットに平文で残る。キーを表示・出力してしまった場合は、すぐに無効化して再発行する。

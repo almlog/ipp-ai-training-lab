@@ -156,7 +156,55 @@ def format_report(data: dict, command: str) -> str:
     return "\n".join(lines)
 
 
+def _load_dotenv_files(agent_dir: str) -> None:
+    """.env を読み込む（既に設定済みの環境変数は上書きしない）。python-dotenv が無ければ簡易パーサで読む。"""
+    for path in (Path(agent_dir) / ".env", Path.cwd() / ".env", Path.cwd() / "hitman" / ".env"):
+        if not path.is_file():
+            continue
+        for line in path.read_text(encoding="utf-8", errors="ignore").splitlines():
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            k, v = line.split("=", 1)
+            k, v = k.strip(), v.strip().strip('"').strip("'")
+            if k and k not in os.environ:
+                os.environ[k] = v
+
+
+def _configure_gemini_auth() -> str:
+    """API キーの種類に応じて Gemini の接続方式を決める。キーの値は表示しない。
+
+    - AQ. で始まるキー（Vertex AI Express モード）: GOOGLE_GENAI_USE_VERTEXAI=true とし、
+      API キーと同時に指定できない GOOGLE_CLOUD_PROJECT / LOCATION をこのプロセス内でだけ外す
+    - それ以外のキー（Google AI Studio）: Gemini Developer API として使う
+    """
+    key = os.environ.get("GOOGLE_API_KEY") or os.environ.get("GEMINI_API_KEY") or ""
+    if key and not os.environ.get("GOOGLE_API_KEY"):
+        os.environ["GOOGLE_API_KEY"] = key
+    # google-genai の新しい版は GOOGLE_GENAI_USE_ENTERPRISE、古い版は GOOGLE_GENAI_USE_VERTEXAI を見る。
+    # 両方を同じ値にしておけば、どちらの版でも同じ動作になる（値が食い違うと警告が出る）。
+    if key.startswith("AQ."):
+        os.environ["GOOGLE_GENAI_USE_VERTEXAI"] = "true"
+        os.environ["GOOGLE_GENAI_USE_ENTERPRISE"] = "true"
+        os.environ.pop("GOOGLE_CLOUD_PROJECT", None)
+        os.environ.pop("GOOGLE_CLOUD_LOCATION", None)
+        return "Vertex AI Express（APIキー）"
+    if key:
+        os.environ["GOOGLE_GENAI_USE_VERTEXAI"] = "false"
+        os.environ["GOOGLE_GENAI_USE_ENTERPRISE"] = "false"
+        return "Gemini Developer API（APIキー）"
+    if os.environ.get("GOOGLE_CLOUD_PROJECT"):
+        return "Vertex AI（gcloud 認証）"
+    return ""
+
+
 def main(argv: list[str] | None = None) -> int:
+    # Windows のコンソール（CP932）でも、Gemini の応答に含まれる絵文字等で落ちないようにする
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")  # type: ignore[attr-defined]
+        except Exception:
+            pass
     ap = argparse.ArgumentParser(description="IPP AI研修: 自作エージェントのスモークテスト")
     ap.add_argument("--agent-dir", required=True, help="root_agent を定義した agent.py があるフォルダ")
     ap.add_argument("--q1", required=True, help="エージェントの用途に沿った質問1")
@@ -165,10 +213,13 @@ def main(argv: list[str] | None = None) -> int:
     if args.q1.strip() == args.q2.strip():
         print("q1 と q2 は異なる内容にしてください（入力に応じて結果が変わることを確認するため）", file=sys.stderr)
         return 2
-    if not (os.environ.get("GOOGLE_API_KEY") or os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_CLOUD_PROJECT")):
-        print("Gemini の認証情報が見つかりません（GEMINI_API_KEY 等を設定してください）", file=sys.stderr)
-    if os.environ.get("GEMINI_API_KEY") and not os.environ.get("GOOGLE_API_KEY"):
-        os.environ["GOOGLE_API_KEY"] = os.environ["GEMINI_API_KEY"]
+    _load_dotenv_files(args.agent_dir)
+    auth = _configure_gemini_auth()
+    if not auth:
+        print("Gemini の認証情報が見つかりません。.env に GEMINI_API_KEY を設定してください"
+              "（キーをコマンドやチャットに直接書かないこと）。", file=sys.stderr)
+        return 2
+    print(f"[smoke] 接続方式: {auth}", file=sys.stderr)
     root_agent, _ = load_root_agent(args.agent_dir)
     data = asyncio.run(run_smoke(root_agent, args.q1, args.q2))
     cmd = f"python .agents/skills/ipp-agent-smoke-test/scripts/smoke_test.py --agent-dir {args.agent_dir} --q1 \"{args.q1[:40]}\" --q2 \"{args.q2[:40]}\""

@@ -71,3 +71,5 @@ def test_root_agent_wires_tools_and_a2ui():
     assert names == {"analyze_stacktrace", "recommend_fix_commands"}
     assert root_agent.after_model_callback is not None
     assert "analyze_stacktrace" in root_agent.instruction
+    # enable-a2ui の手順どおり A2UI v0.8 のスキーマがシステムプロンプトに入っていること（独自JSON防止）
+    assert "surfaceUpdate" in root_agent.instruction and "beginRendering" in root_agent.instruction
