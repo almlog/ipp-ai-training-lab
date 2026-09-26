@@ -125,3 +125,13 @@ def test_bundled_sample_logs_pass_every_step(course):
         assert res["w_check_status"] == "VERIFIED_APPROVED", (step, res.get("message"))
         assert not res["skills_missing"], (step, res["skills_missing"])
     assert agent_module.HitmanState(store).snapshot()["completed"] is True
+
+
+@pytest.mark.parametrize("skill_dir", sorted(p.name for p in SKILLS_DIR.iterdir() if p.is_dir()))
+def test_skill_frontmatter_is_valid_yaml(skill_dir):
+    """frontmatter が YAML として読めないスキルは Antigravity に読み込まれない（record-demo で発生していた）。"""
+    import yaml
+    text = (SKILLS_DIR / skill_dir / "SKILL.md").read_text(encoding="utf-8")
+    fm = re.match(r"---\n(.*?)\n---\n", text, re.S).group(1)
+    data = yaml.safe_load(fm)
+    assert data["name"] == skill_dir and data["description"]

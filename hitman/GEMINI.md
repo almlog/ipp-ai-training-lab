@@ -1,3 +1,34 @@
+# HITMAN 設計ルール（このフォルダを変更するときは必ず守ること）
+
+この節のルールは、過去に実際に起きた不具合（ループ、勝手な進行、受講生間の状態混在、会話履歴の消失、ダミー実装の合格）を防ぐためのものです。
+ルールに反する変更が必要だと判断した場合は、実装せずに理由を説明して人間に確認してください。
+
+## 1. 研修の状態はセッションにだけ置く
+- 研修の状態（モード、コース、現在ステップ、合否、企画アイデア、T-2 の上書き）は ADK の session.state にだけ保存する。読み書きは `app/agent.py` の `HitmanState` を使う（ツールは `tool_context` 経由）。
+- モジュールのグローバル変数（`CURRENT_STEP`、`ACTIVE_TRAINING_COURSE`、`TRAINING_PARAMETERS` 等）や `TRAINING_SOP_ORIGINAL` / `TRAINING_SOP_HITMAN_CLONE` を実行時に書き換えない。全受講生で共有されてしまう。
+- 受講生ごとの表示の違い（企画名、エージェント名など）は、`get_training_sop` がセッションの値から都度計算する。
+
+## 2. ステップの進行は判定結果だけで決める
+- 研修ステップが進むのは `apply_training_verdict`（`verify_step_output` の VERIFIED_APPROVED）だけ。コースの変更は `select_training_course` だけ。
+- フロント（`frontend/static/index.html`）は `/chat` などが返す `state` をそのまま表示する。LLM の応答文を正規表現やキーワードで解析して、ステップ・合否・コースを決めない。
+- localStorage の内容を読み込み時に書き換える「自己治癒」処理を追加しない。サーバの state が正で、`/api/session/sync` で同期する。
+
+## 3. 合格条件は客観的な証跡で判定する
+- T-1: 新しい会話で `/ipp-skill-check` を実行した出力（`[skill:ipp-skill-check@v1]`）。
+- T-3: `ipp-agent-smoke-test` の出力。`SMOKE_JSON` の生データから再判定し、`SMOKE_DIGEST` で改変を検知する。
+- 合格させるためにキーワードを追加して判定を緩めない。受講生が通れない場合は、手順・案内・スキルの側を直す。
+
+## 4. スキル（リポジトリ直下の `.agents/skills/`）
+- Antigravity が読み込むのは「開いているワークスペース直下の `.agents/skills/`」だけで、新しい会話から有効になる（実機で確認済み）。
+- `SKILL.md` の frontmatter は YAML として正しく書き、`name` はフォルダ名と一致させる。各スキルは使用証跡 `[skill:<name>@v1]` の出力ルールを持つ。
+- HITMAN・画面・マニュアルから参照するスキルは、リポジトリに実在するものだけにする。
+
+## 5. テストとサンプル
+- 変更後は `uv run pytest tests/unit` を実行し、全件合格を確認する。テストを削除・緩和して通す変更は禁止。
+- 「ログ注入」用のサンプルログ（`index.html` の `TEST_EVIDENCES`、`knowledge/training_test_evidences.md`）は、実際のコマンド出力から作る。作り物のログを手で書かない（`test_skill_references.py` が現行の判定で T-1〜T-6 を通るか検査する）。
+
+---
+
 # Coding Agent Guide
 
 ## Prerequisites

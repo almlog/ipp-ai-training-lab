@@ -138,7 +138,12 @@ def _chat(client: TestClient, uid: str, message: str, **extra: Any) -> dict:
 
 T1_LOG = "[skill:ipp-skill-check@v1]\nPS C:\\work> Get-ChildItem .agents\\skills -Name\nenable-a2ui\nipp-skill-check\npick-your-agent-project"
 T2_LOG = "# Project Brief\n## エージェント名: LogBot\n## 解決課題: 障害ログ解析\n## ツール: analyze_log"
-T3_LOG = "-rw-r--r-- agent.py\nfrom google.adk.agents import Agent\nroot_agent = Agent(name='my_agent')"
+def _smoke_log() -> str:
+    from tests.unit.test_smoke_judge import _run, analyze_log
+    return _run(analyze_log)
+
+
+T3_LOG = _smoke_log()  # T-3 は実動作のスモークテスト出力で合格する
 T4_LOG = "============ test session starts ============\ncollected 5 items\n============ 5 passed in 0.21s ============"
 T5_LOG = "Deploying container to Cloud Run service [my-ai-agent]...\nService URL: https://my-ai-agent-abc.a.run.app"
 T6_LOG = "To https://github.com/student/my-agent.git\n * [new branch] main -> main"
@@ -227,6 +232,11 @@ def test_idea_consultation_does_not_move_step_and_is_per_user(client):
     sop_b = client.get("/api/sop", params={"user_id": b, "mode": "TRAINING"}).json()["sop"]
     assert "障害ログ" in sop_a["T-2"]["title"]
     assert "障害ログ" not in sop_b["T-2"]["title"]
+    # 企画からエージェント名（フォルダ・サービス名）を決めて T-3〜T-5 に反映。他の受講生には影響しない
+    assert "--agent-dir ipp-agent-workspace/log_analyzer_bot" in sop_a["T-3"]["command"]
+    assert "gcloud run deploy log-analyzer-bot" in sop_a["T-5"]["command"]
+    assert "社内障害ログ自動解析Bot" in sop_a["T-4"]["title"]
+    assert "ipp-agent-workspace/my_agent" in sop_b["T-3"]["command"]
 
 
 def test_conversation_history_is_kept_in_session(client, scripted):
