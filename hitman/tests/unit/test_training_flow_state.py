@@ -136,7 +136,7 @@ def _chat(client: TestClient, uid: str, message: str, **extra: Any) -> dict:
     return data
 
 
-T1_LOG = "PS C:\\> git clone https://github.com/almlog/ipp-ai-training-lab.git\nCloning into 'ipp-ai-training-lab'...\nPython 3.12.1"
+T1_LOG = "[skill:ipp-skill-check@v1]\nPS C:\\work> Get-ChildItem .agents\\skills -Name\nenable-a2ui\nipp-skill-check\npick-your-agent-project"
 T2_LOG = "# Project Brief\n## エージェント名: LogBot\n## 解決課題: 障害ログ解析\n## ツール: analyze_log"
 T3_LOG = "-rw-r--r-- agent.py\nfrom google.adk.agents import Agent\nroot_agent = Agent(name='my_agent')"
 T4_LOG = "============ test session starts ============\ncollected 5 items\n============ 5 passed in 0.21s ============"

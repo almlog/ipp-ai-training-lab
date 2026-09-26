@@ -16,16 +16,11 @@ SCREENSHOT_DIR = os.environ.get("HITMAN_SCREENSHOT_DIR", os.path.join(os.path.di
 os.makedirs(SCREENSHOT_DIR, exist_ok=True)
 BASE_URL = os.environ.get("HITMAN_BASE_URL", "http://localhost:3000/")
 
-# T-1 は客観ログで合格してから T-2 へ進む（本修正で T-1 の自動補完は廃止）
+# T-1 の合格には、新しい会話で /ipp-skill-check を実行した出力（スキル読み込みの証跡）が必要
 T1_LOG = (
-    "PS C:\\work> mkdir ipp-agent-workspace ; cd ipp-agent-workspace ; git clone https://github.com/almlog/ipp-ai-training-lab.git\n"
-    "Cloning into 'ipp-ai-training-lab'...\n"
-    "PS C:\\work\\ipp-agent-workspace> python --version\n"
-    "Python 3.12.1\n"
-    "PS C:\\work\\ipp-agent-workspace> Get-ChildItem ipp-ai-training-lab\\.agents\\skills\\\n"
-    "    Directory: C:\\work\\ipp-agent-workspace\\ipp-ai-training-lab\\.agents\\skills\n"
-    "d----  pick-your-agent-project\n"
-    "d----  enable-a2ui\n"
+    "[skill:ipp-skill-check@v1]\n"
+    "PS C:\\work> Get-ChildItem .agents\\skills -Name\n"
+    "build-agent-frontend\nenable-a2ui\nipp-skill-check\npick-your-agent-project\n"
 )
 
 

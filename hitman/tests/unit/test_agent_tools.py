@@ -457,20 +457,22 @@ def test_guide_training_app_creation():
     # 3. 画像認識スキル召喚テスト（ルービックキューブ3面写真攻略）
     res_vision = guide_training_app_creation("ルービックキューブの写真を3面分共有するだけで、完全攻略のルートを表示させるAIアプリ")
     assert res_vision["status"] == "success"
-    assert "gemini-multimodal-vision" in res_vision["summoned_skills"]
+    # 画像認識は実在しない専用スキルではなく、Gemini のマルチモーダル入力の設計ポイントとして要件に入る
+    assert "gemini-multimodal-vision" not in res_vision["summoned_skills"]
+    assert "マルチモーダル" in res_vision["prompt_for_antigravity"]
     assert "画像認識" in res_vision["prompt_for_antigravity"] or "写真" in res_vision["prompt_for_antigravity"]
     assert "enable-a2ui" in res_vision["summoned_skills"]
 
     # 4. RAGスキル召喚テスト（社内規程・マニュアル問い合わせBot）
     res_rag = guide_training_app_creation("社内就業規則やITセキュリティマニュアルの問い合わせ回答Bot")
     assert res_rag["status"] == "success"
-    assert "build-rag" in res_rag["summoned_skills"]
+    assert "rag-engine-setup" in res_rag["summoned_skills"]
     assert "RAG" in res_rag["prompt_for_antigravity"]
 
     # 5. 長期記憶スキル召喚テスト（ユーザーの好みを記憶するパーソナル推薦Bot）
     res_memory = guide_training_app_creation("会話履歴や過去のユーザー好みを記憶して個別最適な提案を行うエージェント")
     assert res_memory["status"] == "success"
-    assert "setup-memory-bank" in res_memory["summoned_skills"]
+    assert "memory-bank-setup" in res_memory["summoned_skills"]
 
 
 def test_guide_training_app_creation_consultation_and_confirmation_gate():
@@ -618,24 +620,36 @@ def test_training_step_verification_t1_to_t6():
     """研修ステップ T-1 〜 T-6 の客観ログ検証と合否判定の検証。"""
     from app.agent import verify_step_output
 
-    # T-1: 正常合格 vs 自己申告差し戻し
-    t1_pass = verify_step_output("T-1", "mkdir ipp-agent-workspace\ngit clone https://github.com/almlog/ipp-ai-training-lab.git\nCloning into 'ipp-ai-training-lab'...")
+    # T-1: 新しい会話での /ipp-skill-check の出力（スキルが読み込まれた証跡）で合格
+    t1_pass = verify_step_output(
+        "T-1",
+        "[skill:ipp-skill-check@v1]\n"
+        "$ ls .agents/skills\nbuild-agent-frontend  enable-a2ui  ipp-skill-check  pick-your-agent-project  rag-engine-setup",
+    )
     assert t1_pass["verdict"] == "SUCCESS"
     assert t1_pass["w_check_status"] == "VERIFIED_APPROVED"
+    assert t1_pass["skills_detected"] == ["ipp-skill-check"]
 
-    # Windows PowerShell の Get-ChildItem ログでも確実に合格すること
+    # Windows PowerShell の出力でも合格すること
     t1_win = verify_step_output(
         "T-1",
-        "PS C:\\Users\\suzuki\\ipp-agent-workspace> Get-ChildItem ipp-ai-training-lab\\.agents\\skills\\\n"
-        "    Directory: C:\\Users\\suzuki\\ipp-agent-workspace\\ipp-ai-training-lab\\.agents\\skills\n\n"
-        "Mode                 LastWriteTime         Length Name\n"
-        "----                 -------------         ------ ----\n"
-        "d----          2026/09/24     19:00                pick-your-agent-project\n"
-        "d----          2026/09/24     19:00                enable-a2ui\n"
-        "d----          2026/09/24     19:00                build-agent-frontend\n"
+        "[skill:ipp-skill-check@v1]\n"
+        "PS C:\\work> Get-ChildItem .agents\\skills -Name\n"
+        "build-agent-frontend\nenable-a2ui\nipp-skill-check\npick-your-agent-project\n",
     )
     assert t1_win["verdict"] == "SUCCESS"
-    assert t1_win["w_check_status"] == "VERIFIED_APPROVED"
+
+    # クローンのログだけでは合格しない（スキルが読み込まれた証明にならない）→ 具体的な案内付きで差し戻し
+    import app.agent as agent_module
+    agent_module.CURRENT_STEP = "T-1"
+    t1_clone_only = verify_step_output(
+        "T-1",
+        "PS C:\\work> git clone https://github.com/almlog/ipp-ai-training-lab.git ipp-agent-workspace/ipp-ai-training-lab\n"
+        "Cloning into 'ipp-agent-workspace/ipp-ai-training-lab'...\nPython 3.12.1",
+    )
+    assert t1_clone_only["verdict"] == "FAILED"
+    assert t1_clone_only["w_check_status"] == "TRAINING_GUIDANCE"
+    assert "/ipp-skill-check" in t1_clone_only["message"]
 
     t1_fail = verify_step_output("T-1", "環境構築完了しました！次はどうすればいいですか？")
     assert t1_fail["verdict"] == "FAILED"
