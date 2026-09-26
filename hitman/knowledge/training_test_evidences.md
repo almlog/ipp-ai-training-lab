@@ -14,30 +14,21 @@
 
 ## 🛠️ Step T-1: 開発環境構築とスキル同期 (エビデンス)
 
+> 新しい会話で `/ipp-skill-check` を実行した出力です（クローンのログだけでは合格しません）。
+
 ```text
-$ mkdir ipp-agent-workspace && cd ipp-agent-workspace
-$ git clone https://github.com/almlog/ipp-ai-training-lab.git
-Cloning into 'ipp-ai-training-lab'...
-remote: Enumerating objects: 125, done.
-remote: Counting objects: 100% (125/125), done.
-remote: Compressing objects: 100% (85/85), done.
-remote: Total 125 (delta 40), reused 110 (delta 30), pack-reused 0
-Receiving objects: 100% (125/125), 1.2 MiB | 4.5 MiB/s, done.
-Resolving deltas: 100% (40/40), done.
-
-$ python --version
-Python 3.12.2
-
-$ ls -la ipp-ai-training-lab/.agents/skills/
-total 0
-drwxr-xr-x 2 user staff 4096 Sep 7 20:20 build-agent-frontend
-drwxr-xr-x 2 user staff 4096 Sep 7 20:20 enable-a2ui
-drwxr-xr-x 2 user staff 4096 Sep 7 20:20 memory-bank-setup
-drwxr-xr-x 2 user staff 4096 Sep 7 20:20 pick-your-agent-project
-drwxr-xr-x 2 user staff 4096 Sep 7 20:20 publish-to-github
-drwxr-xr-x 2 user staff 4096 Sep 7 20:20 rag-engine-setup
-drwxr-xr-x 2 user staff 4096 Sep 7 20:20 troubleshoot-lab-setup
-drwxr-xr-x 2 user staff 4096 Sep 7 20:20 novasmart-governance-lab
+[skill:ipp-skill-check@v1]
+PS C:\work> Get-ChildItem .agents\skills -Name
+build-agent-frontend
+enable-a2ui
+ipp-skill-check
+memory-bank-setup
+novasmart-governance-lab
+pick-your-agent-project
+publish-to-github
+rag-engine-setup
+record-demo
+troubleshoot-lab-setup
 ```
 
 ---

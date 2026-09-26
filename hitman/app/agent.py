@@ -213,37 +213,62 @@ SOP_DATABASE = {
 # ==============================================================================
 TRAINING_STEP_SEQUENCE = ["T-1", "T-2", "T-3", "T-4", "T-5", "T-6"]
 
-# コースA: オリジナルAIツール開発コース（pick-your-agent-project活用）
-TRAINING_SOP_ORIGINAL = {
-    "T-1": {
+
+# ------------------------------------------------------------------------------
+# ステップ T-1（両コース共通）
+# Antigravity は「開いているワークスペースのルート直下の .agents/skills/」しかスキルとして読み込まない
+# （下の階層・会話途中で追加されたスキルは読み込まれないことを実機で確認済み）。
+# そのためクローン後にスキルをワークスペース直下へコピーし、新しい会話で /ipp-skill-check を
+# 起動させ、その出力（[skill:ipp-skill-check@v1] 証跡付き）を HITMAN で客観確認する。
+# ------------------------------------------------------------------------------
+SKILL_CHECK_MARKER = "[skill:ipp-skill-check@v1]"
+T1_COMMAND = (
+    "mkdir ipp-agent-workspace ; "
+    "git clone https://github.com/almlog/ipp-ai-training-lab.git ipp-agent-workspace/ipp-ai-training-lab ; "
+    "python -c \"import shutil; shutil.copytree(r'ipp-agent-workspace/ipp-ai-training-lab/.agents', '.agents', dirs_exist_ok=True)\""
+)
+
+
+def _t1_step(course_greeting: str) -> dict:
+    return {
         "step_id": "T-1",
         "title": "ステップ T-1: 開発環境構築とスキル同期",
-        "objective": "AntiGravityでモデルを選定（3.8 Flash優先、エラー時3.6 Flash）、専用フォルダを作成し、講師リポジトリをクローンして研修スキルを習得する。",
-        "command": "mkdir ipp-agent-workspace ; cd ipp-agent-workspace ; git clone https://github.com/almlog/ipp-ai-training-lab.git",
-        "expected_check": "ipp-agent-workspace 内に ipp-ai-training-lab が正常クローンされ、.agents/skills/ が認識されること（Windows/Mac/Linux対応）",
-        "cautions": "AntiGravity のモデル設定で「gemini-3.8-flash」を選択してください（エラーや未提供時は「gemini-3.6-flash」へフォールバック）。以後の全作業は必ず専用フォルダ（ipp-agent-workspace）内で行ってください。Windows環境（PowerShell）でもMac/Linuxでもそのまま実行可能です。",
+        "objective": "専用フォルダに講師リポジトリをクローンし、研修スキルをワークスペース直下へ配置して、Antigravity に読み込まれたことを確認する。",
+        "command": T1_COMMAND,
+        "expected_check": f"新しい会話で /ipp-skill-check が起動し、証跡行 {SKILL_CHECK_MARKER} と .agents/skills のスキル一覧が出力されること",
+        "cautions": (
+            "AntiGravity のモデル設定で「gemini-3.8-flash」を選択してください（エラーや未提供時は「gemini-3.6-flash」）。"
+            "スキルは『ワークスペース直下の .agents/skills/』に置いたものだけが、『新しい会話』から有効になります。"
+            "クローン後は必ず新しい会話を開き、/ipp-skill-check の結果を HITMAN に提出してください。"
+        ),
         "agy_prompt": (
             "【AntiGravity投入用プロンプト: Step T-1（環境構築・スキル同期）】\n"
             "あなたはIPPのAI実践研修専属メンターです。\n"
-            "まず受講生に以下の通り挨拶してください：\n"
-            "「お疲れ様です！IPP AI研修のAntiGravityです。ステップ T-1（開発環境構築とスキル同期）を開始します。専用作業フォルダの作成と研修スキル群の同期を自律実行します。」\n\n"
-            "【自律実行タスク】\n"
+            f"まず受講生に以下の通り挨拶してください：\n「{course_greeting}」\n\n"
+            "【自律実行タスク】（すべて、いま開いているワークスペースのルートフォルダで実行すること）\n"
             "1. モデル選定確認: チャット設定で「gemini-3.8-flash」（エラー時は3.6-flash）が選択されていることを確認する。\n"
-            "2. 作業ディレクトリ作成: 「ipp-agent-workspace」を作成し、以後の作業フォルダとする。\n"
-            "3. リポジトリクローン:\n"
-            "   git clone https://github.com/almlog/ipp-ai-training-lab.git\n"
-            "   を実行し、リポジトリ内の .agents/skills/ を読み込んで自己学習する。\n"
-            "4. 検証と生ログ出力:\n"
-            "   受講生が操作しているOS（Windows PowerShell / CMD / Mac・Linux bash）に合わせてターミナルで実行してください：\n"
-            "   - Windows (PowerShell): python --version; Get-ChildItem ipp-ai-training-lab\\.agents\\skills\\\n"
-            "   - Mac / Linux: python3 --version && ls ipp-ai-training-lab/.agents/skills/\n"
-            "   （※または python -c \"import sys, os; print(sys.version); print(os.listdir('ipp-ai-training-lab/.agents/skills'))\"）\n\n"
-            "【重要: HITMAN提出用生ログ出力規程】\n"
-            "「完了しました」等の自然言語による要約だけで回答を終わらせることは厳禁です。\n"
-            "受講生がHITMANの客観Wチェックに提出できるよう、必ず回答の最末尾に実行コマンドとターミナル標準出力（生ログ：git clone、Pythonバージョン、skillsフォルダ一覧等）をコードブロック形式で逐語出力してください。\n"
-            "出力後、受講生へ「上記コードブロック内のターミナルログをコピーして、HITMANのチャット欄に貼り付けてください。HITMANが客観Wチェックを行い、合格承認後にステップ T-2へ進みます！」と案内して待機してください。"
+            "2. 作業フォルダ作成とリポジトリのクローン:\n"
+            "   mkdir ipp-agent-workspace\n"
+            "   git clone https://github.com/almlog/ipp-ai-training-lab.git ipp-agent-workspace/ipp-ai-training-lab\n"
+            "3. 研修スキルをワークスペース直下へ配置（重要）:\n"
+            "   Antigravity は、ワークスペースのルート直下にある .agents/skills/ だけをスキルとして読み込みます。"
+            "クローンしたリポジトリの中（下の階層）にあるスキルは読み込まれないため、次のコマンドでルート直下へコピーしてください（Windows/Mac/Linux共通）：\n"
+            "   python -c \"import shutil; shutil.copytree(r'ipp-agent-workspace/ipp-ai-training-lab/.agents', '.agents', dirs_exist_ok=True)\"\n"
+            "4. 配置の確認: python --version を実行し、続けて .agents/skills の一覧を表示する"
+            "（Windows: Get-ChildItem .agents\\skills -Name ／ Mac・Linux: ls .agents/skills）。\n\n"
+            "【重要: スキルは新しい会話から有効になります】\n"
+            "スキルは会話の開始時に読み込まれるため、この会話の中ではまだ使えません。"
+            "作業が終わったら、受講生へ次の通り案内してこの会話を終えてください：\n"
+            "「準備ができました！スキルは新しい会話から有効になります。Antigravity で新しい会話を開き、"
+            "チャット欄に /ipp-skill-check と入力して送信してください。表示されたコードブロックを HITMAN のチャット欄に貼り付けると、"
+            "スキルの読み込みが確認されてステップ T-2 へ進みます。」\n"
+            "※ この会話では HITMAN 提出用のログは出力しないこと（提出するのは新しい会話での /ipp-skill-check の結果です）。"
         ),
-    },
+    }
+
+# コースA: オリジナルAIツール開発コース（pick-your-agent-project活用）
+TRAINING_SOP_ORIGINAL = {
+    "T-1": _t1_step("お疲れ様です！IPP AI研修のAntiGravityです。ステップ T-1（開発環境構築とスキル同期）を開始します。専用作業フォルダの作成と研修スキルの配置を自律実行します。"),
     "T-2": {
         "step_id": "T-2",
         "title": "ステップ T-2: オリジナル企画＆要件定義（Project Brief策定）",
@@ -267,6 +292,7 @@ TRAINING_SOP_ORIGINAL = {
             "2. もし受講生が「アイデアが思いつかない」「判断に迷う」となった場合は、直ちに「HITMAN画面で【コースB: HITMANクローン構築】を選択してください。完成版のお手本設計図があり100%成功できます！」とエスコートしてください。\n"
             "3. 作成後、ターミナルで `cat ipp-agent-workspace/project_brief.md` を実行してください。\n\n"
             "【重要: HITMAN提出用生ログ出力規程】\n"
+            "提出用コードブロックの1行目には、この作業で実際に使用したスキルの証跡行（例: [skill:enable-a2ui@v1]）をそのまま列挙してください（使っていないスキルの証跡は書かないこと）。\n"
             "必ず回答の最末尾に、作成した project_brief.md の内容を以下の通りコードブロック形式で全文逐語出力してください：\n\n"
             "```markdown\n"
             "(cat で出力された project_brief.md の内容全文)\n"
@@ -280,14 +306,14 @@ TRAINING_SOP_ORIGINAL = {
         "objective": "Google ADK (Agent Development Kit) を用いて自作エージェント本体、関数ツール、およびA2UIカード連携を実装する。",
         "command": "ls -la ipp-agent-workspace/my_agent/ && head -n 30 ipp-agent-workspace/my_agent/agent.py",
         "expected_check": "my_agent/ 配下に agent.py, main.py, a2ui_utils.py が配置され、ADKエージェントとA2UIコールバックが実装されていること",
-        "cautions": "スキル「enable-a2ui」および「google-agents-cli-adk-code-ja」を参照し、構文エラーがないことを確認してください。",
+        "cautions": "スキル「enable-a2ui」を参照し、構文エラーがないことを確認してください。",
         "agy_prompt": (
             "【AntiGravity投入用プロンプト: Step T-3（エージェント実装＆A2UI）】\n"
             "あなたはIPPのAI実践研修専属メンターです。\n"
             "受講生に以下を伝えてください：\n"
             "「お疲れ様です！ステップ T-3（エージェントコア＆A2UI実装）に入ります。project_brief.md に基づき、Google ADKエージェント本体、自作関数ツール、およびA2UIリッチカード表示を実装します。」\n\n"
             "【自律実行タスク】\n"
-            "1. スキル「enable-a2ui」および「google-agents-cli-adk-code-ja」を参照する。\n"
+            "1. スキル「enable-a2ui」を参照する。\n"
             "2. ディレクトリ「ipp-agent-workspace/my_agent/」配下に自律実装する：\n"
             "   - agent.py: ADK Agent本体、自作関数ツール、A2UIカード生成コールバック（after_model_callback）\n"
             "   - a2ui_utils.py: A2UIカード用サーフェス定義\n"
@@ -295,6 +321,7 @@ TRAINING_SOP_ORIGINAL = {
             "3. 実装後、ターミナルで以下を実行してください：\n"
             "   ls -la ipp-agent-workspace/my_agent/ && head -n 30 ipp-agent-workspace/my_agent/agent.py\n\n"
             "【重要: HITMAN提出用生ログ出力規程】\n"
+            "提出用コードブロックの1行目には、この作業で実際に使用したスキルの証跡行（例: [skill:enable-a2ui@v1]）をそのまま列挙してください（使っていないスキルの証跡は書かないこと）。\n"
             "自然言語による要約だけで終わらせることは厳禁です。必ず回答の最末尾に上記コマンドの実行結果を、以下の通り```bashのコードブロック形式で逐語出力してください：\n\n"
             "```bash\n"
             "$ ls -la ipp-agent-workspace/my_agent/ && head -n 30 ipp-agent-workspace/my_agent/agent.py\n"
@@ -319,6 +346,7 @@ TRAINING_SOP_ORIGINAL = {
             "1. 「ipp-agent-workspace/my_agent/tests/test_agent.py」を作成し、ツール呼び出しと応答生成を検証するpytest単体テストを実装する。\n"
             "2. ターミナルで `pytest ipp-agent-workspace/my_agent/tests/ -v` を実行し、全件 PASSED となることを確認する。\n\n"
             "【重要: HITMAN提出用生ログ出力規程】\n"
+            "提出用コードブロックの1行目には、この作業で実際に使用したスキルの証跡行（例: [skill:enable-a2ui@v1]）をそのまま列挙してください（使っていないスキルの証跡は書かないこと）。\n"
             "「テスト合格しました」等の言葉だけで済ませず、必ず pytest の標準出力（test session starts から passed in ... までの生ログ）を、以下の通り```bashのコードブロック形式で回答の最末尾に逐語出力してください：\n\n"
             "```bash\n"
             "$ pytest ipp-agent-workspace/my_agent/tests/ -v\n"
@@ -333,17 +361,18 @@ TRAINING_SOP_ORIGINAL = {
         "objective": "作成したエージェントフロントエンドを Cloud Run へコンテナデプロイし、本番公開URLを発行する。",
         "command": "gcloud run deploy my-ai-agent --source ipp-agent-workspace/my_agent --region asia-northeast1 --allow-unauthenticated",
         "expected_check": "Cloud Run へのデプロイが成功し、Service URL（https://...run.app）が出力されること",
-        "cautions": "スキル「build-agent-frontend」および「google-agents-cli-deploy-ja」を参照してください。",
+        "cautions": "スキル「build-agent-frontend」を参照してください。",
         "agy_prompt": (
             "【AntiGravity投入用プロンプト: Step T-5（Cloud Run本番デプロイ）】\n"
             "あなたはIPPのAI実践研修専属メンターです。\n"
             "受講生に以下を伝えてください：\n"
             "「お疲れ様です！ステップ T-5（Cloud Run 本番デプロイ）です。作成したAIエージェントを Google Cloud Run へコンテナデプロイし、本番Webサービスとして公開します。」\n\n"
             "【自律実行タスク】\n"
-            "1. スキル「build-agent-frontend」および「google-agents-cli-deploy-ja」を参照し、Dockerfile / FastAPIプロキシフロントエンドを準備する。\n"
+            "1. スキル「build-agent-frontend」を参照し、Dockerfile / FastAPIプロキシフロントエンドを準備する。\n"
             "2. Cloud Run へのデプロイを実行（またはコンテナビルド検証を行いService URLを発行）する。\n"
             "3. 発行された本番サービスURL（https://...run.app）を出力する。\n\n"
             "【重要: HITMAN提出用生ログ出力規程】\n"
+            "提出用コードブロックの1行目には、この作業で実際に使用したスキルの証跡行（例: [skill:enable-a2ui@v1]）をそのまま列挙してください（使っていないスキルの証跡は書かないこと）。\n"
             "必ずデプロイコマンドの標準出力（Building Container... から Service URL: https://...run.app まで）を、以下の通り```bashのコードブロック形式で回答の最末尾に逐語出力してください：\n\n"
             "```bash\n"
             "$ gcloud run deploy my-ai-agent ...\n"
@@ -368,6 +397,7 @@ TRAINING_SOP_ORIGINAL = {
             "1. スキル「publish-to-github」を活用し、gh CLIのデバイス認証フローを用いて安全に個人GitHubへ公開する。\n"
             "2. リポジトリURL（https://github.com/...）を出力する。\n\n"
             "【重要: HITMAN提出用生ログ出力規程】\n"
+            "提出用コードブロックの1行目には、この作業で実際に使用したスキルの証跡行（例: [skill:enable-a2ui@v1]）をそのまま列挙してください（使っていないスキルの証跡は書かないこと）。\n"
             "必ず GitHub 認証・プッシュの実行結果（gh auth status や git push の標準出力、リポジトリURL）を、以下の通り```bashのコードブロック形式で回答の最末尾に逐語出力してください：\n\n"
             "```bash\n"
             "$ git push origin main\n"
@@ -380,35 +410,7 @@ TRAINING_SOP_ORIGINAL = {
 
 # コースB: HITMANクローン構築コース（AIペアオペレーター構築体験）
 TRAINING_SOP_HITMAN_CLONE = {
-    "T-1": {
-        "step_id": "T-1",
-        "title": "ステップ T-1: 開発環境構築とスキル同期",
-        "objective": "AntiGravityでモデルを選定（3.8 Flash優先、エラー時3.6 Flash）、専用フォルダを作成し、講師リポジトリをクローンして研修スキルを習得する。",
-        "command": "mkdir ipp-agent-workspace ; cd ipp-agent-workspace ; git clone https://github.com/almlog/ipp-ai-training-lab.git",
-        "expected_check": "ipp-agent-workspace 内に ipp-ai-training-lab が正常クローンされ、.agents/skills/ が認識されること（Windows/Mac/Linux対応）",
-        "cautions": "AntiGravity のモデル設定で「gemini-3.8-flash」を選択してください（エラーや未提供時は「gemini-3.6-flash」へフォールバック）。以後の全作業は必ず専用フォルダ（ipp-agent-workspace）内で行ってください。Windows環境（PowerShell）でもMac/Linuxでもそのまま実行可能です。",
-        "agy_prompt": (
-            "【AntiGravity投入用プロンプト: Step T-1 (HITMANクローン)】\n"
-            "あなたはIPPのAI実践研修専属メンターです。\n"
-            "受講生に以下の通り挨拶してください：\n"
-            "「お疲れ様です！IPP AI研修のAntiGravityです。王道お手本コース【コースB: HITMANクローン構築】を開始します。専用作業フォルダの作成と研修スキル群の同期を自律実行します。」\n\n"
-            "【自律実行タスク】\n"
-            "1. モデル選定確認: チャット設定で「gemini-3.8-flash」（エラー時は3.6-flash）が選択されていることを確認する。\n"
-            "2. 作業ディレクトリ作成: 「ipp-agent-workspace」を作成し、以後の作業フォルダとする。\n"
-            "3. リポジトリクローン:\n"
-            "   git clone https://github.com/almlog/ipp-ai-training-lab.git\n"
-            "   を実行し、リポジトリ内の .agents/skills/ を読み込んで自己学習する。\n"
-            "4. 検証と生ログ出力:\n"
-            "   受講生が操作しているOS（Windows PowerShell / CMD / Mac・Linux bash）に合わせてターミナルで実行してください：\n"
-            "   - Windows (PowerShell): python --version; Get-ChildItem ipp-ai-training-lab\\.agents\\skills\\\n"
-            "   - Mac / Linux: python3 --version && ls ipp-ai-training-lab/.agents/skills/\n"
-            "   （※または python -c \"import sys, os; print(sys.version); print(os.listdir('ipp-ai-training-lab/.agents/skills'))\"）\n\n"
-            "【重要: HITMAN提出用生ログ出力規程】\n"
-            "「完了しました」等の自然言語による要約だけで回答を終わらせることは厳禁です。\n"
-            "受講生がHITMANの客観Wチェックに提出できるよう、必ず回答の最末尾に実行コマンドとターミナル標準出力（生ログ：git clone、Pythonバージョン、skillsフォルダ一覧等）をコードブロック形式で逐語出力してください。\n"
-            "出力後、受講生へ「上記コードブロック内のターミナルログをコピーして、HITMANのチャット欄に貼り付けてください。HITMANが客観Wチェックを行い、合格承認後にステップ T-2へ進みます！」と案内して待機してください。"
-        ),
-    },
+    "T-1": _t1_step("お疲れ様です！IPP AI研修のAntiGravityです。王道お手本コース【コースB: HITMANクローン構築】を開始します。専用作業フォルダの作成と研修スキルの配置を自律実行します。"),
     "T-2": {
         "step_id": "T-2",
         "title": "ステップ T-2: HITMAN仕様設計＆SOP定義",
@@ -429,6 +431,7 @@ TRAINING_SOP_HITMAN_CLONE = {
             "4. A2UIカード表示仕様: 手順書カード、コマンドコピーボタン\n\n"
             "作成後、ターミナルで `cat ipp-agent-workspace/hitman_spec.md` を実行してください。\n\n"
             "【重要: HITMAN提出用生ログ出力規程】\n"
+            "提出用コードブロックの1行目には、この作業で実際に使用したスキルの証跡行（例: [skill:enable-a2ui@v1]）をそのまま列挙してください（使っていないスキルの証跡は書かないこと）。\n"
             "必ず回答の最末尾に、作成した hitman_spec.md の内容を以下の通りコードブロック形式で全文逐語出力してください：\n\n"
             "```markdown\n"
             "(cat で出力された hitman_spec.md の内容全文)\n"
@@ -442,7 +445,7 @@ TRAINING_SOP_HITMAN_CLONE = {
         "objective": "手順書パーサー、ターミナルログ判定エンジン、A2UIカード生成、エスカレーションゲートを実装する。",
         "command": "ls -la ipp-agent-workspace/my_hitman/ && head -n 30 ipp-agent-workspace/my_hitman/agent.py",
         "expected_check": "my_hitman/ 配下に agent.py, excel_parser.py, a2ui_utils.py が配置され、判定エンジンとA2UIカードが実装されていること",
-        "cautions": "スキル「enable-a2ui」および「google-agents-cli-adk-code-ja」を参照してください。",
+        "cautions": "スキル「enable-a2ui」を参照してください。",
         "agy_prompt": (
             "【AntiGravity投入用プロンプト: Step T-3 (HITMANクローン)】\n"
             "あなたはIPPのAI実践研修専属メンターです。\n"
@@ -456,6 +459,7 @@ TRAINING_SOP_HITMAN_CLONE = {
             "実装後、ターミナルで以下を実行してください：\n"
             "ls -la ipp-agent-workspace/my_hitman/ && head -n 30 ipp-agent-workspace/my_hitman/agent.py\n\n"
             "【重要: HITMAN提出用生ログ出力規程】\n"
+            "提出用コードブロックの1行目には、この作業で実際に使用したスキルの証跡行（例: [skill:enable-a2ui@v1]）をそのまま列挙してください（使っていないスキルの証跡は書かないこと）。\n"
             "自然言語による要約だけで終わらせることは厳禁です。必ず回答の最末尾に上記コマンドの実行結果を、以下の通り```bashのコードブロック形式で逐語出力してください：\n\n"
             "```bash\n"
             "$ ls -la ipp-agent-workspace/my_hitman/ && head -n 30 ipp-agent-workspace/my_hitman/agent.py\n"
@@ -481,6 +485,7 @@ TRAINING_SOP_HITMAN_CLONE = {
             "2. 自己申告入力のブロック、エラー検知、正常ログでの合格承認を検証するテストを実装する。\n"
             "3. ターミナルで `pytest ipp-agent-workspace/my_hitman/tests/ -v` を実行し、全件 PASSED となることを確認する。\n\n"
             "【重要: HITMAN提出用生ログ出力規程】\n"
+            "提出用コードブロックの1行目には、この作業で実際に使用したスキルの証跡行（例: [skill:enable-a2ui@v1]）をそのまま列挙してください（使っていないスキルの証跡は書かないこと）。\n"
             "「テスト合格しました」等の言葉だけで済ませず、必ず pytest の標準出力（test session starts から passed in ... までの生ログ）を、以下の通り```bashのコードブロック形式で回答の最末尾に逐語出力してください：\n\n"
             "```bash\n"
             "$ pytest ipp-agent-workspace/my_hitman/tests/ -v\n"
@@ -495,7 +500,7 @@ TRAINING_SOP_HITMAN_CLONE = {
         "objective": "HITMANクローンを Cloud Run へコンテナデプロイし、公開URLを発行する。",
         "command": "gcloud run deploy my-hitman --source ipp-agent-workspace/my_hitman --region asia-northeast1 --allow-unauthenticated",
         "expected_check": "Cloud Run へのデプロイが成功し、Service URL（https://...run.app）が出力されること",
-        "cautions": "スキル「build-agent-frontend」および「google-agents-cli-deploy-ja」を参照してください。",
+        "cautions": "スキル「build-agent-frontend」を参照してください。",
         "agy_prompt": (
             "【AntiGravity投入用プロンプト: Step T-5 (HITMANクローン)】\n"
             "あなたはIPPのAI実践研修専属メンターです。\n"
@@ -505,6 +510,7 @@ TRAINING_SOP_HITMAN_CLONE = {
             "1. スキル「build-agent-frontend」を活用して Dockerfile / FastAPIプロキシを準備する。\n"
             "2. Cloud Run へのデプロイ（またはコンテナ検証）を実行し、本番サービスURLを発行する。\n\n"
             "【重要: HITMAN提出用生ログ出力規程】\n"
+            "提出用コードブロックの1行目には、この作業で実際に使用したスキルの証跡行（例: [skill:enable-a2ui@v1]）をそのまま列挙してください（使っていないスキルの証跡は書かないこと）。\n"
             "必ずデプロイコマンドの標準出力（Building Container... から Service URL: https://...run.app まで）を、以下の通り```bashのコードブロック形式で回答の最末尾に逐語出力してください：\n\n"
             "```bash\n"
             "$ gcloud run deploy my-hitman ...\n"
@@ -529,6 +535,7 @@ TRAINING_SOP_HITMAN_CLONE = {
             "1. スキル「publish-to-github」を活用し、gh CLIのデバイス認証フローで個人GitHubへプッシュする。\n"
             "2. リポジトリURL（https://github.com/...）を出力する。\n\n"
             "【重要: HITMAN提出用生ログ出力規程】\n"
+            "提出用コードブロックの1行目には、この作業で実際に使用したスキルの証跡行（例: [skill:enable-a2ui@v1]）をそのまま列挙してください（使っていないスキルの証跡は書かないこと）。\n"
             "必ず GitHub 認証・プッシュの実行結果（gh auth status や git push の標準出力、リポジトリURL）を、以下の通り```bashのコードブロック形式で回答の最末尾に逐語出力してください：\n\n"
             "```bash\n"
             "$ git push origin main\n"
@@ -759,6 +766,8 @@ class HitmanState:
             "verdict": result.get("verdict"),
             "w_check_status": result.get("w_check_status"),
             "branch_to": result.get("branch_to"),
+            "skills_detected": result.get("skills_detected", []),
+            "skills_missing": result.get("skills_missing", []),
         }
 
     def snapshot(self) -> dict:
@@ -1468,7 +1477,7 @@ def is_pure_assertion_without_log(raw: str) -> bool:
         "bash", "root@", "user@", "$ ", "# ", "0 error", "job for",
         "pytest", "passed", "test session starts", "collected ", "failed", "passed in",
         "git clone", "github.com", "altx-", "run.app", "service url", "deploying container",
-        "python", ".py", "brief", "hitman",
+        "python", ".py", "brief", "hitman", "[skill:", "get-childitem",
     ]
     has_terminal_sig = any(sig in clean_lower for sig in terminal_signatures)
 
@@ -1650,6 +1659,34 @@ def check_destructive_or_malicious_input(command_output: str) -> dict | None:
     return None
 
 
+# 各研修ステップで使われるはずの研修スキル（使用証跡が無ければ参考メッセージを付ける。合否には影響しない）
+EXPECTED_SKILLS_BY_STEP = {
+    "T-1": ["ipp-skill-check"],
+    "T-2": ["pick-your-agent-project"],
+    "T-3": ["enable-a2ui"],
+    "T-5": ["build-agent-frontend"],
+    "T-6": ["publish-to-github"],
+}
+
+
+def _annotate_skill_usage(result: dict, command_output: str) -> None:
+    """提出ログ内の [skill:名前@vN] 証跡を集計し、判定結果に記録する（観測用・非ブロッキング）。"""
+    import re
+    detected = sorted(set(re.findall(r"\[skill:([a-z0-9-]+)@v\d+\]", (command_output or "").lower())))
+    result["skills_detected"] = detected
+    step_id = result.get("step_id")
+    expected = EXPECTED_SKILLS_BY_STEP.get(step_id, [])
+    missing = [s for s in expected if s not in detected]
+    result["skills_missing"] = missing
+    if missing and result.get("w_check_status") == "VERIFIED_APPROVED" and step_id != "T-1":
+        names = "、".join(f"「{m}」" for m in missing)
+        result["message"] = (
+            result.get("message", "")
+            + f"\n\n（参考）今回のログには {names} スキルの使用証跡（[skill:…]）がありません。"
+            "スキルを使わずに作業した可能性があります。新しい会話で作業しているか、スキルがワークスペース直下にあるかを確認してください。"
+        )
+
+
 def verify_step_output(step_number: int | str, command_output: str, tool_context: Any = None) -> dict:
     """オペレーターがコマンドを実行した出力ログを有識者AI（確認者）として客観検証し、
     Wチェック判定（合格承認・リトライ遮断・自律分岐指示）を行う。
@@ -1671,6 +1708,7 @@ def verify_step_output(step_number: int | str, command_output: str, tool_context
         if TRAINING_STEP_SEQUENCE.index(step_str) > TRAINING_STEP_SEQUENCE.index(cur):
             step_number = cur
     result = _verify_step_output_impl(step_number, command_output, state)
+    _annotate_skill_usage(result, command_output)
     apply_training_verdict(state, result)
     if state.mode == MODE_TRAINING or str(result.get("step_id", "")).startswith("T-"):
         result["current_step"] = state.current_step
@@ -1868,32 +1906,49 @@ def _verify_step_output_impl(step_number: int | str, command_output: str, state:
     # ==============================================================================
     if step_str.startswith("T-") or "T-" in step_str or (ACTIVE_OPERATION_MODE == MODE_TRAINING and step_str in TRAINING_STEP_SEQUENCE):
         # T-1: 開発環境構築とスキル同期
+        # 合格条件は「新しい会話で /ipp-skill-check が起動した証跡」。クローンやフォルダ一覧のログだけでは、
+        # スキルが Antigravity に読み込まれたことの証明にならない（下の階層のスキルは読み込まれない）。
         if "T-1" in step_str:
             ws_cur = state.params.get("WORKSPACE_DIR", "ipp-agent-workspace")
-            ws_cur_clean = ws_cur.replace("\\", "/").rstrip("/").split("/")[-1].lower()
-            has_t1_sig = any(k in output_lower for k in (
-                ws_cur_clean, "ipp-agent-workspace", "altx-agent-workspace", "ipp-ai-training-lab", "git clone", "cloning into",
-                "gemini-3.8-flash", "gemini-3.6-flash", "python 3.", "3.11", "3.12", "3.13",
-                "virtualenv", ".venv", "mkdir", "new-item",
-                "directory:", "lastwritetime", "get-childitem",
-                ".agents", "pick-your-agent-project", "enable-a2ui", "build-agent-frontend"
+            has_marker = SKILL_CHECK_MARKER in output_lower
+            lists_skills = any(k in output_lower for k in (
+                "pick-your-agent-project", "enable-a2ui", "build-agent-frontend", "rag-engine-setup", "memory-bank-setup"
             ))
-            if not has_t1_sig:
-                return _make_no_log_response("T-1", f"作業フォルダ作成（{ws_cur}）、git clone、または環境確認（Windows/Mac/Linux）の実行ログが確認できません。", state=state)
-            return {
-                "verdict": "SUCCESS",
-                "w_check_status": "VERIFIED_APPROVED",
-                "step_id": "T-1",
-                "autonomous_verdict": f"【AI確認者 Wチェック承認 ✓】作業ディレクトリ（{ws_cur}）の作成、リポジトリクローン、および環境構築を確認しました。",
-                "message": (
-                    "【判定: 合格】（Wチェック承認: VERIFIED_APPROVED）\n"
-                    "開発環境の準備、リポジトリクローン、スキル同期を客観確認しました！\n"
-                    f"作業フォルダ（{ws_cur}）とスキル群が正しくセットアップされています（合格承認）。\n\n"
-                    "次のステップ ➔ ステップ T-2: アイデア策定・要件定義\n"
-                    "ゼロから全部一人で考えられなくても大丈夫です！\n"
-                    "現場で役立つ人気アイデアや、迷ったときの王道【コースB（HITMANクローン）】をAIからご提案します。下のチャット欄でお気軽にご相談ください！"
-                ),
-            }
+            if has_marker and lists_skills:
+                return {
+                    "verdict": "SUCCESS",
+                    "w_check_status": "VERIFIED_APPROVED",
+                    "step_id": "T-1",
+                    "autonomous_verdict": "【AI確認者 Wチェック承認 ✓】研修スキルがワークスペース直下に配置され、Antigravity に読み込まれていることを確認しました。",
+                    "message": (
+                        "【判定: 合格】（Wチェック承認: VERIFIED_APPROVED）\n"
+                        "/ipp-skill-check の起動を確認しました。研修スキルが Antigravity に正しく読み込まれています！\n\n"
+                        "次のステップ ➔ ステップ T-2: アイデア策定・要件定義\n"
+                        "以降の作業は、この新しい会話（スキルが有効な会話）で進めてください。"
+                    ),
+                }
+            has_setup_log = any(k in output_lower for k in (
+                ws_cur.replace("\\", "/").rstrip("/").split("/")[-1].lower(), "ipp-agent-workspace", "ipp-ai-training-lab",
+                "git clone", "cloning into", ".agents", "get-childitem", "python 3.",
+            ))
+            if has_setup_log or has_marker:
+                return {
+                    "verdict": "FAILED",
+                    "w_check_status": "TRAINING_GUIDANCE",
+                    "step_id": "T-1",
+                    "reason": "スキルが Antigravity に読み込まれた証跡（/ipp-skill-check の出力）がありません。",
+                    "autonomous_verdict": "【研修インストラクター 伴走ガイダンス】クローンまでは順調です！あとはスキルが読み込まれたことを確認しましょう。",
+                    "message": (
+                        "【研修モード・教育ガイダンス（ステップ T-1）】クローンの作業ログを確認しました。順調です！\n"
+                        "ただし、このログだけでは『スキルが Antigravity に読み込まれたか』までは確認できません。"
+                        "Antigravity は、ワークスペース直下の .agents/skills/ に置いたスキルを『新しい会話』から読み込みます。\n"
+                        "1. ワークスペース直下に .agents/skills/ ができているか確認（T-1 のコピーコマンドを実行済みか）\n"
+                        "2. Antigravity で新しい会話を開き、チャット欄に /ipp-skill-check と入力して送信\n"
+                        f"3. 表示されたコードブロック（1行目が {SKILL_CHECK_MARKER}）をそのままここに貼り付け\n"
+                        "/ipp-skill-check が候補に出てこない場合は、スキルが読み込まれていません。コピー先がワークスペースの直下になっているか確認してください。"
+                    ),
+                }
+            return _make_no_log_response("T-1", f"/ipp-skill-check の出力（1行目が {SKILL_CHECK_MARKER}）が確認できません。", state=state)
 
         # T-2: コース別 要件定義（Project Brief / HITMAN仕様書）
         if "T-2" in step_str:
@@ -2395,8 +2450,7 @@ def guide_training_app_creation(idea: str = "", course_type: str = "custom", is_
         "手書き", "ocr", "看板", "外観", "スキャン", "face", "image", "photo", "picture", "visual", "vision"
     ))
     if needs_vision:
-        summoned_skills.append("gemini-multimodal-vision")
-        skill_badges.append("📷 Gemini Multimodal Vision (写真・画像からの直接認識)")
+        # 画像認識は専用スキルではなく Gemini 本体のマルチモーダル入力で実現する（設計ポイントとして要件に記載）
         architecture_points.append(
             "- 【画像入力＆マルチモーダル解析】利用者が写真をアップロードできる受け口（Base64/Multipart）を設け、"
             "Gemini 3.8 Flash (Part.from_bytes) による画像認識・配色抽出・パリティ検証を行う自作ツールを実装すること"
@@ -2407,10 +2461,10 @@ def guide_training_app_creation(idea: str = "", course_type: str = "custom", is_
         "マニュアル", "規程", "社内", "文書", "pdf", "ドキュメント", "faq", "問い合わせ", "過去問", "事例", "ナレッジ", "手順書", "検索", "rag"
     ))
     if needs_rag:
-        summoned_skills.append("build-rag")
-        skill_badges.append("📚 build-rag (Vertex AI RAG Engine / 社内文書検索)")
+        summoned_skills.append("rag-engine-setup")
+        skill_badges.append("📚 rag-engine-setup (Vertex AI RAG Engine / 社内文書検索)")
         architecture_points.append(
-            "- 【ドキュメント検索 (RAG)】.agents/skills/build-rag を参照し、マニュアルや文書から根拠を正確に引いて回答する関数ツールを配備すること"
+            "- 【ドキュメント検索 (RAG)】.agents/skills/rag-engine-setup を参照し、マニュアルや文書から根拠を正確に引いて回答する関数ツールを配備すること"
         )
 
     # 3. 長期記憶（Memory Bank）スキルの召喚判定
@@ -2418,10 +2472,10 @@ def guide_training_app_creation(idea: str = "", course_type: str = "custom", is_
         "記憶", "覚える", "前回", "履歴", "パーソナライズ", "好み", "傾向", "継続", "セッション", "進捗", "タイム", "スコア", "練習"
     )) or needs_vision
     if needs_memory:
-        summoned_skills.append("setup-memory-bank")
-        skill_badges.append("🧠 setup-memory-bank (Vertex AI Memory Bank / 長期記憶)")
+        summoned_skills.append("memory-bank-setup")
+        skill_badges.append("🧠 memory-bank-setup (Vertex AI Memory Bank / 長期記憶)")
         architecture_points.append(
-            "- 【長期記憶 (Memory Bank)】.agents/skills/setup-memory-bank を参照し、ユーザーの過去の利用履歴や好みをセッションを跨いで蓄積・参照すること"
+            "- 【長期記憶 (Memory Bank)】.agents/skills/memory-bank-setup を参照し、ユーザーの過去の利用履歴や好みをセッションを跨いで蓄積・参照すること"
         )
 
     # 4. A2UI リッチカード表現スキル（常時召喚）
@@ -2456,7 +2510,8 @@ def guide_training_app_creation(idea: str = "", course_type: str = "custom", is_
         f"4. 必要な関数ツール定義（ツール名、引数、返り値のスキーマ）\n"
         f"5. A2UIカード表示仕様（カードレイアウト、視覚表現）\n"
         f"6. テストシナリオ（正常系・異常系・客観検証観点）\n\n"
-        f"作成完了後、ターミナルで `cat ipp-agent-workspace/project_brief.md` を実行してその内容を出力し、受講生へ案内してください：\n"
+        f"作成完了後、ターミナルで `cat ipp-agent-workspace/project_brief.md` を実行してその内容を出力し、受講生へ案内してください。\n"
+        f"提出用コードブロックの1行目には、実際に使用したスキルの証跡行（例: [skill:pick-your-agent-project@v1]）を列挙してください：\n"
         f"「この出力ログをコピーして、HITMANのチャット欄に貼り付けてください。HITMANが客観Wチェックを行い、ステップ T-3（エージェント実装）へ進みます！」"
     )
 
