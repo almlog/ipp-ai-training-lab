@@ -3750,19 +3750,22 @@ troubleshoot-lab-setup`,
 - UIコンポーネント: A2UI v0.8 リッチカード表示
 - ツール: consult_policy_faq, request_human_approval`,
 
-    "T-3": `[skill:enable-a2ui@v1]
-【ステップ T-3: エージェントコア＆A2UI実装 完了ログ】
-$ ls -la ipp-agent-workspace/my_agent/
--rw-r--r-- 1 user staff 1850 Sep 7 20:22 agent.py
--rw-r--r-- 1 user staff  920 Sep 7 20:22 a2ui_utils.py
-
-$ head -n 30 ipp-agent-workspace/my_agent/agent.py
-from google.adk.agents import Agent
-from google.adk.models import Gemini
-from a2ui_utils import a2ui_callback
-
-MODEL = "gemini-3.8-flash"
-root_agent = Agent(name="my_agent", model=Gemini(model=MODEL), after_model_callback=a2ui_callback)`,
+    "T-3": `[skill:ipp-agent-smoke-test@v1]
+$ python .agents/skills/ipp-agent-smoke-test/scripts/smoke_test.py --agent-dir ipp-agent-workspace/my_agent --q1 "No space left on device のエラーが出ました" --q2 "DB connection timeout が発生しました"
+agent: log_analyzer_agent  tools: analyze_log
+--- Q1: No space left on device のエラーが出ました
+tools called: analyze_log
+reply: 判定結果: {"cause": "ディスク容量不足", "action": "不要ファイルを削除"}
+--- Q2: DB connection timeout が発生しました
+tools called: analyze_log
+reply: 判定結果: {"cause": "DB接続タイムアウト", "action": "接続設定を確認"}
+check replies_nonempty: OK
+check replies_differ: OK
+check tool_called: OK
+check no_stub_suspect: OK
+SMOKE_RESULT: PASS
+SMOKE_JSON: {"agent":"log_analyzer_agent","checks":{"no_stub_suspect":true,"replies_differ":true,"replies_nonempty":true,"tool_called":true},"passed":true,"runs":[{"question":"No space left on device のエラーが出ました","reply_excerpt":"判定結果: {\\"cause\\": \\"ディスク容量不足\\", \\"action\\": \\"不要ファイルを削除\\"}","reply_hash":"d42e46111384","tool_calls":[{"args_hash":"707dbe93d704","name":"analyze_log"}],"tool_results":[{"name":"analyze_log","result_hash":"f2e02ff13bff"}]},{"question":"DB connection timeout が発生しました","reply_excerpt":"判定結果: {\\"cause\\": \\"DB接続タイムアウト\\", \\"action\\": \\"接続設定を確認\\"}","reply_hash":"fc6d1e7bf7d1","tool_calls":[{"args_hash":"e65b2cc49e50","name":"analyze_log"}],"tool_results":[{"name":"analyze_log","result_hash":"1b7071f99ea7"}]}],"stub_suspects":[],"tool_call_count":2,"tools":["analyze_log"],"version":1}
+SMOKE_DIGEST: bee42196d63f301f`,
 
     "T-4": `【ステップ T-4: 単体テスト＆自律Wチェック 完了ログ】
 $ pytest ipp-agent-workspace/my_agent/tests/ -v
@@ -3820,24 +3823,22 @@ troubleshoot-lab-setup`,
 - 判定エンジン: verify_step_output, is_pure_assertion_without_log
 - 安全制御: evaluate_escalation_gate, analyze_sql_impact`,
 
-    "T-3": `[skill:enable-a2ui@v1]
-【ステップ T-3: HITMAN判定コア＆A2UI実装 完了ログ】
-$ ls -la ipp-agent-workspace/my_hitman/
--rw-r--r-- 1 user staff 3200 Sep 7 20:25 agent.py
--rw-r--r-- 1 user staff 1200 Sep 7 20:25 a2ui_utils.py
-
-$ head -n 30 ipp-agent-workspace/my_hitman/agent.py
-from google.adk.agents import Agent
-from google.adk.models import Gemini
-from a2ui_utils import a2ui_callback
-
-MODEL = "gemini-3.8-flash"
-root_agent = Agent(
-    name="my_hitman",
-    model=Gemini(model=MODEL),
-    instruction="あなたは現場作業をナビゲートするAIペアオペレーターHITMANです。",
-    after_model_callback=a2ui_callback
-)`,
+    "T-3": `[skill:ipp-agent-smoke-test@v1]
+$ python .agents/skills/ipp-agent-smoke-test/scripts/smoke_test.py --agent-dir ipp-agent-workspace/my_hitman --q1 "Filesystem ... /backup" --q2 "Segmentation fault ..."
+agent: hitman_clone  tools: verify_log
+--- Q1: Filesystem Size Used Avail Use% Mounted on /dev/sdb1 100G 40G 60G 40% /backup
+tools called: verify_log
+reply: 判定結果: {"verdict": "SUCCESS", "status": "VERIFIED_APPROVED", "reason": "空き容量を確認"}
+--- Q2: Segmentation fault (core dumped) を検知しました
+tools called: verify_log
+reply: 判定結果: {"verdict": "FAILED", "status": "BRANCH_ROLLBACK", "reason": "致命的エラーを検知"}
+check replies_nonempty: OK
+check replies_differ: OK
+check tool_called: OK
+check no_stub_suspect: OK
+SMOKE_RESULT: PASS
+SMOKE_JSON: {"agent":"hitman_clone","checks":{"no_stub_suspect":true,"replies_differ":true,"replies_nonempty":true,"tool_called":true},"passed":true,"runs":[{"question":"Filesystem Size Used Avail Use% Mounted on /dev/sdb1 100G 40G 60G 40% /backup","reply_excerpt":"判定結果: {\\"verdict\\": \\"SUCCESS\\", \\"status\\": \\"VERIFIED_APPROVED\\", \\"reason\\": \\"空き容量を確認\\"}","reply_hash":"fd2324f4271b","tool_calls":[{"args_hash":"b06285344d7d","name":"verify_log"}],"tool_results":[{"name":"verify_log","result_hash":"8f78f83da9be"}]},{"question":"Segmentation fault (core dumped) を検知しました","reply_excerpt":"判定結果: {\\"verdict\\": \\"FAILED\\", \\"status\\": \\"BRANCH_ROLLBACK\\", \\"reason\\": \\"致命的エラーを検知\\"}","reply_hash":"c6088fad0ac8","tool_calls":[{"args_hash":"eb0c65122348","name":"verify_log"}],"tool_results":[{"name":"verify_log","result_hash":"a5bcc2d0c4e0"}]}],"stub_suspects":[],"tool_call_count":2,"tools":["verify_log"],"version":1}
+SMOKE_DIGEST: 309cd8364b310178`,
 
     "T-4": `【ステップ T-4: 単体テスト＆自律Wチェック 完了ログ】
 $ pytest ipp-agent-workspace/my_hitman/tests/ -v

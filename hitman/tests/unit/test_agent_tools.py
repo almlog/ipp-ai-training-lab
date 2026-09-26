@@ -392,7 +392,7 @@ def test_verify_step_output_training_mode_maintains_current_step_on_assertion():
     assert result["w_check_status"] == "TRAINING_GUIDANCE"
     assert result["step_id"] == "T-3"
     assert "ステップ T-3" in result["message"]
-    assert "agent.py" in result["message"]
+    assert "smoke_test.py" in result["message"]  # T-3 の提出物はスモークテストの出力
 
     # step_number="T-1" を渡した場合も T-3 が維持されること
     result_t1 = verify_step_output("T-1", user_assertion)
@@ -662,8 +662,11 @@ def test_training_step_verification_t1_to_t6():
     assert t2_fail["verdict"] == "FAILED"
 
     # T-3: エージェント実装 vs ログ不在
-    t3_pass = verify_step_output("T-3", "agent.py created\nimport google.adk\nroot_agent = Agent(name='my_agent')")
-    assert t3_pass["verdict"] == "SUCCESS"
+    # T-3 は実動作のスモークテスト出力で判定（詳細は test_smoke_judge.py）。コードの一覧だけでは合格しない
+    t3_code_only = verify_step_output("T-3", "agent.py created\nimport google.adk\nroot_agent = Agent(name='my_agent')")
+    assert t3_code_only["verdict"] == "FAILED"
+    import app.agent as agent_module
+    agent_module.CURRENT_STEP = "T-4"
 
     # T-4: 単体テスト全件PASSED vs FAILED検知
     t4_pass = verify_step_output("T-4", "==================== 5 passed in 0.18s ====================")

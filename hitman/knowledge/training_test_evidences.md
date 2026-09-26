@@ -57,38 +57,28 @@ troubleshoot-lab-setup
 
 ---
 
-## 🤖 Step T-3: エージェントコア＆A2UI実装 (エビデンス)
+## 🤖 Step T-3: エージェントの実動作確認（スモークテスト エビデンス）
 
-```python
-$ ls -la ipp-agent-workspace/my_agent/
-total 24
--rw-r--r-- 1 user staff 1850 Sep 7 20:22 agent.py
--rw-r--r-- 1 user staff  920 Sep 7 20:22 a2ui_utils.py
--rw-r--r-- 1 user staff 1200 Sep 7 20:22 main.py
--rw-r--r-- 1 user staff  350 Sep 7 20:22 pyproject.toml
-drwxr-xr-x 2 user staff 4096 Sep 7 20:22 tests
+> `ipp-agent-smoke-test` スキルでエージェントに異なる2つの質問を送った出力です。HITMAN は SMOKE_JSON の生データから再判定し、SMOKE_DIGEST で改変を検知するため、**このブロックは一字一句変えずに貼り付けてください**（1文字でも変えると「書き換えられています」と判定されます）。
 
-$ head -n 30 ipp-agent-workspace/my_agent/agent.py
-# agent.py - Google ADK Agent for my_agent
-from google.adk.agents import Agent
-from google.adk.models import Gemini
-from a2ui_utils import a2ui_callback
-
-MODEL = "gemini-3.8-flash"
-
-def consult_policy_faq(query: str) -> dict:
-    return {"status": "success", "query": query, "answer": "申請手順をご案内します。"}
-
-root_agent = Agent(
-    name="my_agent",
-    model=Gemini(model=MODEL),
-    instruction="社内課題解決アシスタントとしてA2UIカードで丁寧に回答...",
-    tools=[consult_policy_faq],
-    after_model_callback=a2ui_callback,
-)
+```text
+[skill:ipp-agent-smoke-test@v1]
+$ python .agents/skills/ipp-agent-smoke-test/scripts/smoke_test.py --agent-dir ipp-agent-workspace/my_agent --q1 "No space left on device のエラーが出ました" --q2 "DB connection timeout が発生しました"
+agent: log_analyzer_agent  tools: analyze_log
+--- Q1: No space left on device のエラーが出ました
+tools called: analyze_log
+reply: 判定結果: {"cause": "ディスク容量不足", "action": "不要ファイルを削除"}
+--- Q2: DB connection timeout が発生しました
+tools called: analyze_log
+reply: 判定結果: {"cause": "DB接続タイムアウト", "action": "接続設定を確認"}
+check replies_nonempty: OK
+check replies_differ: OK
+check tool_called: OK
+check no_stub_suspect: OK
+SMOKE_RESULT: PASS
+SMOKE_JSON: {"agent":"log_analyzer_agent","checks":{"no_stub_suspect":true,"replies_differ":true,"replies_nonempty":true,"tool_called":true},"passed":true,"runs":[{"question":"No space left on device のエラーが出ました","reply_excerpt":"判定結果: {\"cause\": \"ディスク容量不足\", \"action\": \"不要ファイルを削除\"}","reply_hash":"d42e46111384","tool_calls":[{"args_hash":"707dbe93d704","name":"analyze_log"}],"tool_results":[{"name":"analyze_log","result_hash":"f2e02ff13bff"}]},{"question":"DB connection timeout が発生しました","reply_excerpt":"判定結果: {\"cause\": \"DB接続タイムアウト\", \"action\": \"接続設定を確認\"}","reply_hash":"fc6d1e7bf7d1","tool_calls":[{"args_hash":"e65b2cc49e50","name":"analyze_log"}],"tool_results":[{"name":"analyze_log","result_hash":"1b7071f99ea7"}]}],"stub_suspects":[],"tool_call_count":2,"tools":["analyze_log"],"version":1}
+SMOKE_DIGEST: bee42196d63f301f
 ```
-
----
 
 ## 🧪 Step T-4: ローカルテスト＆自律Wチェック (エビデンス)
 
