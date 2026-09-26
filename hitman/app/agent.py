@@ -565,6 +565,7 @@ TRAINING_APPROVAL_METADATA = {
 ACTIVE_TRAINING_COURSE = "original"  # "original" または "hitman_clone"
 
 import copy
+import re
 import csv
 import io
 import json
@@ -619,10 +620,14 @@ K_USER_IDEA = "training:user_idea"
 K_RESULTS = "training:results"
 K_T2_OVERRIDE = "training:t2_override"
 K_COURSE_SELECTED = "training:course_selected"
+K_AGENT_SLUG = "training:agent_slug"        # 確定した企画のエージェント名（フォルダ名）
+K_PLAN_CONFIRMED = "training:plan_confirmed"  # T-2 の企画が受講生の合意で確定しているか
+K_T3_NONCE = "training:t3_nonce"            # T-3 スモークテスト用の受講生ごとの確認コード
 
 STATE_KEYS = (
     K_MODE, K_CURRENT_STEP, K_LAST_VERDICT, K_VERDICT_SEQ, K_COURSE, K_PARAMS,
     K_USER_IDEA, K_RESULTS, K_T2_OVERRIDE, K_COURSE_SELECTED, "hitman:suggestions",
+    K_AGENT_SLUG, K_PLAN_CONFIRMED, K_T3_NONCE,
 )
 
 # ToolContext なし呼び出し用のフォールバック格納先（グローバル変数に載らない項目）
@@ -735,6 +740,31 @@ class HitmanState:
     def t2_override(self, v: dict) -> None:
         self._s[K_T2_OVERRIDE] = dict(v or {})
 
+    @property
+    def agent_slug(self) -> str:
+        return self._get(K_AGENT_SLUG, "")
+
+    @agent_slug.setter
+    def agent_slug(self, v: str) -> None:
+        self._s[K_AGENT_SLUG] = v or ""
+
+    @property
+    def plan_confirmed(self) -> bool:
+        return bool(self._get(K_PLAN_CONFIRMED, False))
+
+    @plan_confirmed.setter
+    def plan_confirmed(self, v: bool) -> None:
+        self._s[K_PLAN_CONFIRMED] = bool(v)
+
+    @property
+    def t3_nonce(self) -> str:
+        return self._get(K_T3_NONCE, "")
+
+    def issue_t3_nonce(self) -> str:
+        import secrets
+        self._s[K_T3_NONCE] = "T3-" + secrets.token_hex(3).upper()
+        return self._s[K_T3_NONCE]
+
     # --- 合否結果 ---
     @property
     def results(self) -> dict:
@@ -780,6 +810,9 @@ class HitmanState:
             "sequence": list(TRAINING_STEP_SEQUENCE) if self.mode == MODE_TRAINING else list(ACTIVE_STEP_SEQUENCE),
             "completed": self.mode == MODE_TRAINING and self.results.get(TRAINING_STEP_SEQUENCE[-1]) == "SUCCESS",
             "suggestions": list(self._get("hitman:suggestions", [])),
+            "agent_slug": self.agent_slug,
+            "plan_confirmed": self.plan_confirmed,
+            "t3_nonce": self.t3_nonce,
         }
 
 
@@ -814,6 +847,9 @@ def select_training_course(state: HitmanState, course_type: str) -> dict:
         t1_done = state.results.get("T-1") == "SUCCESS"
         state.results = {"T-1": "SUCCESS"} if t1_done else {}
         state.t2_override = {}
+        state.plan_confirmed = False
+        state.agent_slug = ""
+        state._s[K_T3_NONCE] = ""
         state.current_step = "T-2" if t1_done else "T-1"
     elif state.current_step not in TRAINING_STEP_SEQUENCE:
         state.current_step = "T-1"
@@ -844,6 +880,8 @@ def apply_training_verdict(state: HitmanState, result: dict) -> None:
     results[step_id] = "SUCCESS"
     state.results = results
     idx = TRAINING_STEP_SEQUENCE.index(step_id)
+    if step_id == "T-2":
+        state.issue_t3_nonce()  # T-3 のスモークテストで使う、この受講生専用の確認コード
     if idx + 1 < len(TRAINING_STEP_SEQUENCE):
         state.current_step = TRAINING_STEP_SEQUENCE[idx + 1]
     else:
@@ -883,6 +921,12 @@ def seed_state_from_client(store: Any, client_state: dict | None) -> bool:
         st.current_step = TRAINING_STEP_SEQUENCE[min(done, len(TRAINING_STEP_SEQUENCE) - 1)]
         if client_state.get("user_idea"):
             st.user_idea = str(client_state["user_idea"])[:200]
+        slug = str(client_state.get("agent_slug") or "")
+        if re.fullmatch(r"[a-z][a-z0-9_]{2,40}", slug):
+            st.agent_slug = slug
+        st.plan_confirmed = bool(client_state.get("plan_confirmed")) or "T-2" in clean
+        if "T-2" in clean:
+            st.issue_t3_nonce()
     return True
 
 
@@ -989,11 +1033,20 @@ def get_training_sop(course_type: str = None, params: dict = None, state: "Hitma
     elif p.get("AGENT_NAME", "my_agent") != "my_agent":
         agent_name = p["AGENT_NAME"]  # 研修環境設定で受講生が明示的に指定した名前を優先
     else:
-        # コースA: セッションの企画アイデアからエージェント名を決める（例: 障害ログ → log_analyzer_bot）
+        # コースA: 企画相談で決めたエージェント名を最優先。無ければ企画アイデアから決める（例: 障害ログ → log_analyzer_bot）
         agent_name, short_name, service_name = derive_agent_slug_and_name(state.user_idea)
+        if state.agent_slug and state.agent_slug != agent_name:
+            agent_name = state.agent_slug
+            service_name = state.agent_slug.replace("_", "-")
+            short_name = (state.user_idea or state.agent_slug)[:24]
         if agent_name == "my_agent":
             short_name = ""
     py_env = p.get("PYTHON_ENV", "uv (自動管理)")
+    nonce_text = state.t3_nonce or "<T-2合格後にHITMANが発行する確認コード>"
+    for field in ("command", "agy_prompt"):
+        val = base_sop["T-3"].get(field)
+        if isinstance(val, str):
+            base_sop["T-3"][field] = val.replace('--q2 "<質問2>"', f'--q2 "<質問2>" --nonce {nonce_text}')
     if short_name:
         for sid in ("T-3", "T-4", "T-5", "T-6"):
             if isinstance(base_sop[sid].get("title"), str) and short_name not in base_sop[sid]["title"]:
@@ -1750,8 +1803,12 @@ def _smoke_checks(runs: list[dict]) -> tuple[dict, list[str]]:
     return checks, sorted(stub_suspects)
 
 
-def judge_smoke_output(text: str) -> dict:
-    """スモークテストの出力を判定する。status: PASS / FAIL / TAMPERED / BROKEN / ABSENT"""
+def judge_smoke_output(text: str, expected_nonce: str | None = None, expected_agent_dir: str | None = None) -> dict:
+    """スモークテストの出力を判定する。status: PASS / FAIL / TAMPERED / BROKEN / MISMATCH / ABSENT
+
+    expected_nonce / expected_agent_dir を渡すと、その受講生のセッションで発行した確認コードと、
+    確定した企画のエージェントフォルダで実行されたものかを照合する（見本・他人の出力の使い回しを検出）。
+    """
     import re
     raw = text or ""
     if SMOKE_MARKER not in raw.lower():
@@ -1768,6 +1825,16 @@ def judge_smoke_output(text: str) -> dict:
     if _smoke_digest(data) != m_dig.group(1):
         return {"status": "TAMPERED", "reason": "スモークテストの出力が書き換えられています（SMOKE_DIGEST が一致しません）。",
                 "hints": ["出力は一字一句変えずに貼り付けてください。結果が FAIL の場合は、原因を直して再実行してください。"], "data": data}
+    if expected_nonce is not None:
+        if not expected_nonce:
+            return {"status": "MISMATCH", "reason": "この受講生の確認コードがまだ発行されていません（T-2 合格後に発行されます）。",
+                    "hints": ["T-2 を合格させてから、T-3 のカードに表示された確認コードで実行してください。"], "data": data}
+        if data.get("nonce") != expected_nonce:
+            return {"status": "MISMATCH", "reason": "確認コードが一致しません。見本や他の受講生の出力ではなく、自分で実行した結果を提出してください。",
+                    "hints": [f"T-3 のカードに表示された確認コード（{expected_nonce}）を --nonce に付けて、スモークテストを実行し直してください。"], "data": data}
+    if expected_agent_dir and data.get("agent_dir") != expected_agent_dir:
+        return {"status": "MISMATCH", "reason": f"確定した企画のエージェント（{expected_agent_dir}）ではなく、別のフォルダ（{data.get('agent_dir') or '不明'}）のエージェントを実行しています。",
+                "hints": [f"--agent-dir に ipp-agent-workspace/{expected_agent_dir} を指定して、企画どおりのエージェントを実行してください。"], "data": data}
     runs = data.get("runs") or []
     if len(runs) != 2:
         return {"status": "BROKEN", "reason": "質問2つ分の実行記録がありません。", "hints": [], "data": data}
@@ -2077,22 +2144,55 @@ def _verify_step_output_impl(step_number: int | str, command_output: str, state:
             return _make_no_log_response("T-1", f"/ipp-skill-check の出力（1行目が {SKILL_CHECK_MARKER}）が確認できません。", state=state)
 
         # T-2: コース別 要件定義（Project Brief / HITMAN仕様書）
+        # 合格条件: ① 企画が受講生の合意で確定している ② 提出物が確定した企画のもの（エージェント名を含む）。
+        # 旧実装は「# 」「agent」等の文字があるだけで合格し、相談中に別の企画のサンプルを貼っても通っていた。
         if "T-2" in step_str:
+            # コースB（HITMANクローン）は作るもの（my_hitman）が最初から決まっているため企画確定は不要
+            if not state.plan_confirmed and state.mode == MODE_TRAINING and state.course != "hitman_clone":
+                return {
+                    "verdict": "FAILED",
+                    "w_check_status": "TRAINING_GUIDANCE",
+                    "step_id": "T-2",
+                    "reason": "企画がまだ確定していません。",
+                    "autonomous_verdict": "【研修インストラクター 伴走ガイダンス】まずは HITMAN と一緒に企画を確定させましょう。",
+                    "message": (
+                        "【研修モード・教育ガイダンス（ステップ T-2）】要件定義書を提出する前に、企画を確定させる必要があります。\n"
+                        "HITMAN のチャットで作りたいものを相談し、内容に合意したら『この企画で進めます』と伝えてください。"
+                        "確定すると、企画に合わせた AntiGravity 用プロンプトが発行されます。そのプロンプトで作った project_brief.md を提出してください。"
+                    ),
+                }
+            is_hitman_course = state.course == "hitman_clone"
             has_t2_sig = any(k in output_lower for k in (
-                "project_brief", "hitman_spec", "brief", "# ", "## ", "tool", "ツール", "課題",
-                "要件", "目的", "a2ui", "memory", "エージェント名", "agent", "spec"
+                ("hitman_spec", "## ", "wチェック", "sop") if is_hitman_course else ("project_brief", "## ", "エージェント名", "ツール", "tool")
             ))
             if not has_t2_sig:
                 return _make_no_log_response("T-2", "project_brief.md または hitman_spec.md の内容・要件定義の出力が確認できません。", state=state)
+            if not is_hitman_course and state.mode == MODE_TRAINING:
+                expected = (state.agent_slug or "").lower()
+                variants = {expected, expected.replace("_", "-")} - {""}
+                if variants and not any(v in output_lower for v in variants):
+                    return {
+                        "verdict": "FAILED",
+                        "w_check_status": "BLOCKED_RETRY",
+                        "step_id": "T-2",
+                        "reason": f"提出された要件定義書が、確定した企画（エージェント名: {expected}）のものではありません。",
+                        "autonomous_verdict": "【AI確認者 判定】確定した企画と提出物が一致しません。",
+                        "message": (
+                            f"【判定: 不合格】提出された要件定義書に、確定した企画のエージェント名『{expected}』が見当たりません。\n"
+                            f"確定した企画: {state.user_idea}\n"
+                            "この企画用に発行された AntiGravity プロンプトで project_brief.md を作成し、その cat 出力を貼り付けてください。"
+                            "別の企画にしたい場合は、先に HITMAN と相談して企画を確定し直してください。"
+                        ),
+                    }
             return {
                 "verdict": "SUCCESS",
                 "w_check_status": "VERIFIED_APPROVED",
                 "step_id": "T-2",
-                "autonomous_verdict": "【AI確認者 Wチェック承認 ✓】エージェント要件定義（解決課題、ツール設計、A2UIカード仕様）を確認しました。",
+                "autonomous_verdict": "【AI確認者 Wチェック承認 ✓】確定した企画の要件定義（解決課題、ツール設計、A2UIカード仕様）を確認しました。",
                 "message": (
-                    "【判定: 合格】要件定義書（Project Brief / 設計書）の策定を確認しました！\n"
-                    "解決すべき現場課題とツール構成が明確に定義されています。\n"
+                    "【判定: 合格】確定した企画の要件定義書（Project Brief / 設計書）を確認しました！\n"
                     "続いて『ステップ T-3: エージェントコア＆A2UI実装』へ進んでください。"
+                    "T-3 のカードに、この受講生専用の確認コード（スモークテスト用）が表示されます。"
                 ),
             }
 
@@ -2100,7 +2200,16 @@ def _verify_step_output_impl(step_number: int | str, command_output: str, state:
         # 合格条件は「実際にエージェントを動かした記録（スモークテスト）」。ファイル一覧やコードの冒頭だけでは、
         # 固定値を返すだけのダミー実装でも合格してしまうため。判定は表示上の PASS ではなく生データから行う。
         if "T-3" in step_str:
-            smoke = judge_smoke_output(command_output)
+            expected_dir = None
+            if state.mode == MODE_TRAINING:
+                sop_now = get_training_sop(state.course, state=state)
+                m_dir = re.search(r"--agent-dir\s+\S*?([A-Za-z0-9_]+)\s", sop_now["T-3"]["command"] + " ")
+                expected_dir = m_dir.group(1) if m_dir else None
+            smoke = judge_smoke_output(
+                command_output,
+                expected_nonce=state.t3_nonce if state.mode == MODE_TRAINING else None,
+                expected_agent_dir=expected_dir,
+            )
             if smoke["status"] == "PASS":
                 tools = "、".join(smoke["data"].get("tools") or []) or "自作ツール"
                 return {
@@ -2114,7 +2223,7 @@ def _verify_step_output_impl(step_number: int | str, command_output: str, state:
                         "続いて『ステップ T-4: ローカルテスト＆自律Wチェック』へ進んでください。"
                     ),
                 }
-            if smoke["status"] in ("FAIL", "TAMPERED", "BROKEN"):
+            if smoke["status"] in ("FAIL", "TAMPERED", "BROKEN", "MISMATCH"):
                 return {
                     "verdict": "FAILED",
                     "w_check_status": "BLOCKED_RETRY",
@@ -2465,7 +2574,7 @@ def _plan_skills_and_points(idea: str) -> tuple[list[str], list[str]]:
     return skills, points
 
 
-def update_project_plan(idea_summary: str = "", status: str = "consulting", course: str = "original", tool_context: Any = None) -> dict:
+def update_project_plan(idea_summary: str = "", status: str = "consulting", course: str = "original", agent_name: str = "", tool_context: Any = None) -> dict:
     """【研修モード ステップ T-2】受講生と相談中の企画を記録する。企画の内容が出た・変わった・確定したときに呼ぶ。
 
     会話の理解はあなた（LLM）が行うこと。受講生の発言をそのまま渡さず、アイデアの要点を1文に要約して渡す。
@@ -2476,6 +2585,8 @@ def update_project_plan(idea_summary: str = "", status: str = "consulting", cour
             確定時に空なら、直前に記録した企画を使う。
         status: "consulting"（相談中）または "confirmed"（受講生が合意して確定）。
         course: "original"（コースA: オリジナル）または "hitman_clone"（コースB: HITMANクローン）。受講生が明示的に選んだ場合だけ変える。
+        agent_name: 企画に合ったエージェント名（英小文字・数字・アンダースコア、例: calendar_task_journal_bot）。
+            作業フォルダ名・以降の全ステップで使われる。チャットで受講生に示す名前と必ず一致させること。未指定なら自動で決める。
 
     Returns:
         記録した企画、推奨スキル、設計ポイント、エージェント名、次にやること（確定時は AntiGravity 用プロンプトと提出コマンド）。
@@ -2487,8 +2598,14 @@ def update_project_plan(idea_summary: str = "", status: str = "consulting", cour
     idea = (idea_summary or "").strip()[:200]
     if not idea and confirmed and course_norm == "original":
         idea = state.user_idea
-    if idea:
+    if idea and idea != state.user_idea:
         state.user_idea = idea
+        state.plan_confirmed = False  # 企画が変わったら確定をやり直す
+    slug = (agent_name or "").strip().lower()
+    if re.fullmatch(r"[a-z][a-z0-9_]{2,40}", slug):
+        state.agent_slug = slug
+    if not confirmed:
+        state.plan_confirmed = False
 
     if confirmed:
         if course_norm == "original" and not idea:
@@ -2499,6 +2616,9 @@ def update_project_plan(idea_summary: str = "", status: str = "consulting", cour
                 "message": "確定する企画の内容がありません。受講生と企画の中身を確認してから、idea_summary を付けて確定してください。",
             }
         select_training_course(state, course_norm)
+        state.plan_confirmed = True
+        if slug and re.fullmatch(r"[a-z][a-z0-9_]{2,40}", slug):
+            state.agent_slug = slug  # コース変更で消えた場合に備えて再設定
 
     if course_norm == "hitman_clone":
         # 相談中はコースを切り替えずに説明だけ返す（切り替えは確定時の select_training_course のみ）
@@ -2524,6 +2644,10 @@ def update_project_plan(idea_summary: str = "", status: str = "consulting", cour
 
     skills, points = _plan_skills_and_points(idea)
     slug, short_name, service_name = derive_agent_slug_and_name(idea)
+    if state.agent_slug:
+        slug = state.agent_slug
+    elif idea:
+        state.agent_slug = slug
     base = {
         "status": "success",
         "course": "コースA: オリジナルアプリ開発コース（自作AIツール開発）",
@@ -3032,7 +3156,9 @@ a2ui_instruction = schema_manager.generate_system_prompt(
         "`update_project_plan` が返す idea_examples は参考情報であり、そのまま列挙しない。アイデアが決まらない受講生には、選択肢の1つとしてコースB（HITMANクローン）も紹介してよい。"
         "2. 企画の内容が出た・変わったときは、受講生の発言をそのまま渡さず、要点を1文に要約して `update_project_plan(idea_summary=要約, status='consulting')` を呼ぶ。"
         "返ってきた推奨スキル・設計ポイント・エージェント名を、受講生の企画に即して説明する。"
-        "3. 受講生が『この企画で進める』と明確に合意したときだけ、`update_project_plan(idea_summary=要約, status='confirmed')` を呼び、返ってきた AntiGravity 用プロンプトと提出コマンドを案内する。"
+        "3. 受講生が『この企画で進める』と明確に合意したときだけ、`update_project_plan(idea_summary=要約, status='confirmed', agent_name=英小文字スネークケースの名前（例: photo_diary_agent）)` を呼び、返ってきた AntiGravity 用プロンプトと提出コマンドを案内する。"
+        "確定後は、ツールが返した agent_name をフォルダ名・エージェント名として一貫して使う（自分で別の名前を作らない）。"
+        "T-2 の要件定義書にはこのエージェント名が必要で、別の企画のサンプルを貼っても合格しない。T-2 合格後に T-3 用の確認コード（T3-xxxxxx）が発行されるので、T-3 ではカードのコマンド（--nonce 付き）をそのまま使うよう案内する。"
         "迷い・質問・『〜は作れる？』は合意ではない。コースBは受講生が自分で選んだときだけ course='hitman_clone' にする（勝手にすり替えない）。"
         "4. 相談中の返答では毎回、最後に `offer_choices` を呼び、受講生が次に返せそうな返答を2〜4個（受講生の立場の短い一文）表示する。会話の流れに合わせて毎回作り直し、固定の選択肢を使い回さない。"
         "5. 受講生は既に T-1 を完了しているため、T-1 のカードを出したり T-1 に巻き戻したりしない。確定前に要件定義ログの提出を求めない。"

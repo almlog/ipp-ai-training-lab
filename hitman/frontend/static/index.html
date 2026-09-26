@@ -3540,6 +3540,7 @@ function applyServerState(st, opts = {}) {
   if (!st || typeof st !== "object") return;
   const prevCourse = appState.trainingCourse;
   const prevIdea = appState.courseAIdea || "";
+  const prevBind = appState.serverState ? `${appState.serverState.agent_slug || ""}|${appState.serverState.t3_nonce || ""}` : "";
   appState.serverState = st;
   if (st.mode !== "TRAINING") return;
 
@@ -3573,7 +3574,9 @@ function applyServerState(st, opts = {}) {
     appState.endTime = new Date().toLocaleString('ja-JP');
   }
 
-  const needSop = opts.refreshSop !== false && (prevCourse !== appState.trainingCourse || prevIdea !== appState.courseAIdea);
+  // 企画の確定（エージェント名）や T-3 確認コードの発行でもカードのコマンドが変わるため再取得する
+  const bindKey = `${st.agent_slug || ""}|${st.t3_nonce || ""}`;
+  const needSop = opts.refreshSop !== false && (prevCourse !== appState.trainingCourse || prevIdea !== appState.courseAIdea || prevBind !== bindKey);
   if (needSop) refreshTrainingSop();
 
   updateModeUI();

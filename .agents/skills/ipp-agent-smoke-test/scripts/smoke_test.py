@@ -122,7 +122,7 @@ def evaluate(runs: list[dict]) -> dict:
             "passed": all(checks.values())}
 
 
-async def run_smoke(root_agent, q1: str, q2: str) -> dict:
+async def run_smoke(root_agent, q1: str, q2: str, nonce: str = "", agent_dir: str = "") -> dict:
     from google.adk.runners import InMemoryRunner
 
     runs = []
@@ -131,7 +131,11 @@ async def run_smoke(root_agent, q1: str, q2: str) -> dict:
         runs.append(await _ask(runner, q))
     result = evaluate(runs)
     return {
-        "version": 1,
+        "version": 2,
+        # HITMAN が受講生ごとに発行する確認コードと、実行したエージェントのフォルダ名。
+        # SMOKE_DIGEST の対象に含まれるため、見本や他人の出力の使い回しを HITMAN が検出できる。
+        "nonce": (nonce or "").strip(),
+        "agent_dir": Path(agent_dir).name if agent_dir else "",
         "agent": getattr(root_agent, "name", "unknown"),
         "tools": sorted(getattr(t, "__name__", getattr(t, "name", type(t).__name__)) for t in (getattr(root_agent, "tools", None) or [])),
         "runs": runs,
@@ -140,7 +144,7 @@ async def run_smoke(root_agent, q1: str, q2: str) -> dict:
 
 
 def format_report(data: dict, command: str) -> str:
-    lines = [MARKER, f"$ {command}", f"agent: {data['agent']}  tools: {', '.join(data['tools']) or '(なし)'}"]
+    lines = [MARKER, f"$ {command}", f"agent: {data['agent']}  dir: {data.get('agent_dir', '')}  nonce: {data.get('nonce', '')}  tools: {', '.join(data['tools']) or '(なし)'}"]
     for i, r in enumerate(data["runs"], start=1):
         called = ", ".join(c["name"] for c in r["tool_calls"]) or "(ツール呼び出しなし)"
         lines.append(f"--- Q{i}: {r['question']}")
@@ -209,6 +213,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--agent-dir", required=True, help="root_agent を定義した agent.py があるフォルダ")
     ap.add_argument("--q1", required=True, help="エージェントの用途に沿った質問1")
     ap.add_argument("--q2", required=True, help="質問1とは内容が異なる質問2")
+    ap.add_argument("--nonce", default="", help="HITMAN の T-3 カードに表示される確認コード")
     args = ap.parse_args(argv)
     if args.q1.strip() == args.q2.strip():
         print("q1 と q2 は異なる内容にしてください（入力に応じて結果が変わることを確認するため）", file=sys.stderr)
@@ -221,8 +226,8 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     print(f"[smoke] 接続方式: {auth}", file=sys.stderr)
     root_agent, _ = load_root_agent(args.agent_dir)
-    data = asyncio.run(run_smoke(root_agent, args.q1, args.q2))
-    cmd = f"python .agents/skills/ipp-agent-smoke-test/scripts/smoke_test.py --agent-dir {args.agent_dir} --q1 \"{args.q1[:40]}\" --q2 \"{args.q2[:40]}\""
+    data = asyncio.run(run_smoke(root_agent, args.q1, args.q2, nonce=args.nonce, agent_dir=args.agent_dir))
+    cmd = f"python .agents/skills/ipp-agent-smoke-test/scripts/smoke_test.py --agent-dir {args.agent_dir} --q1 \"{args.q1[:40]}\" --q2 \"{args.q2[:40]}\" --nonce {args.nonce}"
     print("```text")
     print(format_report(data, cmd))
     print("```")

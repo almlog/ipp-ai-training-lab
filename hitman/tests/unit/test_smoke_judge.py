@@ -79,9 +79,9 @@ Q1 = "No space left on device のエラーが出ました"
 Q2 = "DB connection timeout が発生しました"
 
 
-def _run(tool, call_tools=True) -> str:
+def _run(tool, call_tools=True, nonce: str = "", agent_dir: str = "") -> str:
     agent = Agent(name="log_bot", model=ToolCallingLlm(call_tools=call_tools), instruction="ログを解析する", tools=[tool])
-    data = asyncio.run(smoke.run_smoke(agent, Q1, Q2))
+    data = asyncio.run(smoke.run_smoke(agent, Q1, Q2, nonce=nonce, agent_dir=agent_dir))
     return "```text\n" + smoke.format_report(data, "python smoke_test.py ...") + "\n```"
 
 
@@ -117,6 +117,29 @@ def test_tampered_output_is_rejected():
     assert agent_module.judge_smoke_output(forged2)["status"] == "TAMPERED"
 
 
+def test_smoke_output_bound_to_other_student_or_folder_is_rejected():
+    """T-2 で決めた企画と無関係なスモーク出力（サンプルの貼り付け・他人の出力）は通さない。"""
+    store: dict = {}
+    ctx = type("Ctx", (), {"state": store})()
+    agent_module.set_operation_mode("TRAINING", tool_context=ctx)
+    agent_module.set_training_course("original", tool_context=ctx)
+    st = agent_module.HitmanState(store)
+    st.results = {"T-1": "SUCCESS", "T-2": "SUCCESS"}
+    st.current_step = "T-3"
+    st.agent_slug = "schedule_wbs_agent"
+    nonce = st.issue_t3_nonce()
+    for out in (
+        _run(analyze_log),  # 確認コードなし（サンプルの貼り付け相当）
+        _run(analyze_log, nonce="T3-000000", agent_dir="schedule_wbs_agent"),  # 他人の確認コード
+        _run(analyze_log, nonce=nonce, agent_dir="log_analyzer_bot"),  # 企画と別のフォルダ
+    ):
+        res = agent_module.verify_step_output("T-3", out, tool_context=ctx)
+        assert res["w_check_status"] == "BLOCKED_RETRY", res["message"]
+        assert st.current_step == "T-3"
+    res = agent_module.verify_step_output("T-3", _run(analyze_log, nonce=nonce, agent_dir="schedule_wbs_agent"), tool_context=ctx)
+    assert res["w_check_status"] == "VERIFIED_APPROVED", res["message"]
+
+
 def test_truncated_output_is_broken():
     out = _run(analyze_log)
     truncated = "\n".join(l for l in out.splitlines() if not l.startswith("SMOKE_DIGEST"))
@@ -137,9 +160,12 @@ def test_verify_step_t3_uses_smoke_result(tool, expected):
     ctx = type("Ctx", (), {"state": store})()
     agent_module.set_operation_mode("TRAINING", tool_context=ctx)
     agent_module.set_training_course("original", tool_context=ctx)
-    agent_module.HitmanState(store).results = {"T-1": "SUCCESS", "T-2": "SUCCESS"}
-    agent_module.HitmanState(store).current_step = "T-3"
-    res = agent_module.verify_step_output("T-3", _run(tool), tool_context=ctx)
+    st = agent_module.HitmanState(store)
+    st.results = {"T-1": "SUCCESS", "T-2": "SUCCESS"}
+    st.current_step = "T-3"
+    st.agent_slug = "log_analyzer_bot"
+    nonce = st.issue_t3_nonce()
+    res = agent_module.verify_step_output("T-3", _run(tool, nonce=nonce, agent_dir="log_analyzer_bot"), tool_context=ctx)
     assert res["w_check_status"] == expected
     assert agent_module.HitmanState(store).current_step == ("T-4" if expected == "VERIFIED_APPROVED" else "T-3")
 

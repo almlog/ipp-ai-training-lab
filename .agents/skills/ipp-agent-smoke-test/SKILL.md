@@ -25,10 +25,11 @@ description: IPP AI研修のステップT-3で、受講生が作った ADK エ�
 2. ワークスペースのルートで次を実行する（Gemini の API キーが環境変数に設定されていること）：
 
 ```bash
-python .agents/skills/ipp-agent-smoke-test/scripts/smoke_test.py --agent-dir ipp-agent-workspace/my_agent --q1 "<質問1>" --q2 "<質問2>"
+python .agents/skills/ipp-agent-smoke-test/scripts/smoke_test.py --agent-dir ipp-agent-workspace/<エージェント名> --q1 "<質問1>" --q2 "<質問2>" --nonce <確認コード>
 ```
 
-   - `--agent-dir` は `root_agent` を定義した `agent.py` があるフォルダ（コースBは `ipp-agent-workspace/my_hitman`）。
+   - `--agent-dir` は、HITMAN の T-3 カードに書かれているフォルダ（企画で決めたエージェント名。コースBは `ipp-agent-workspace/my_hitman`）。
+   - `--nonce` は、HITMAN の T-3 カードに表示される**受講生ごとの確認コード**。HITMAN は、出力のフォルダ名と確認コードがその受講生のものと一致しないと合格にしない（見本や他人の出力は使えない）。
 3. スクリプトが出力したコードブロックを、**一字一句変えずに** 回答の最後にそのまま出力する。
 4. 受講生へ「上のコードブロックをコピーして HITMAN に貼り付けてください」と案内する。
 

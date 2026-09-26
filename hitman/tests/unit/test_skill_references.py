@@ -112,19 +112,39 @@ def _bundled_evidences() -> dict:
 
 
 @pytest.mark.parametrize("course", ["original", "hitman_clone"])
-def test_bundled_sample_logs_pass_every_step(course):
-    """デモ用サンプルログが、現行の判定ルールで T-1〜T-6 を順に合格できること（判定ルールとの乖離を防ぐ）。"""
+def test_bundled_sample_logs_follow_current_rules(course):
+    """デモ用サンプルログ（🧪ログ注入）が現行の判定ルールと乖離していないこと。
+    - T-2: コースAは企画未確定なら不合格。確定した企画（サンプルと同じエージェント名）なら合格
+    - T-3: サンプルは受講生ごとの確認コードを持たないため、貼り付けだけでは合格しない（実機で起きた誤合格の防止）
+    - T-1/T-4/T-5/T-6: そのまま合格"""
+    from tests.unit.test_smoke_judge import _run, analyze_log
+
     evid = _bundled_evidences()[course]
     assert sorted(evid) == ["T-1", "T-2", "T-3", "T-4", "T-5", "T-6"]
     store: dict = {}
     ctx = type("Ctx", (), {"state": store})()
     agent_module.set_operation_mode("TRAINING", tool_context=ctx)
     agent_module.set_training_course(course, tool_context=ctx)
-    for step in ["T-1", "T-2", "T-3", "T-4", "T-5", "T-6"]:
-        res = agent_module.verify_step_output(step, evid[step], tool_context=ctx)
+    st = agent_module.HitmanState(store)
+
+    def ok(step, text):
+        res = agent_module.verify_step_output(step, text, tool_context=ctx)
         assert res["w_check_status"] == "VERIFIED_APPROVED", (step, res.get("message"))
         assert not res["skills_missing"], (step, res["skills_missing"])
-    assert agent_module.HitmanState(store).snapshot()["completed"] is True
+
+    ok("T-1", evid["T-1"])
+    slug = "my_hitman" if course == "hitman_clone" else "my_agent"
+    if course == "original":
+        res = agent_module.verify_step_output("T-2", evid["T-2"], tool_context=ctx)
+        assert res["verdict"] == "FAILED" and st.current_step == "T-2"
+        st.agent_slug, st.plan_confirmed = slug, True  # サンプルと同じ企画で確定した想定
+    ok("T-2", evid["T-2"])
+    res = agent_module.verify_step_output("T-3", evid["T-3"], tool_context=ctx)
+    assert res["w_check_status"] == "BLOCKED_RETRY" and st.current_step == "T-3", res.get("message")
+    ok("T-3", "[skill:ipp-agent-smoke-test@v1]\n" + _run(analyze_log, nonce=st.t3_nonce, agent_dir=slug))
+    for step in ["T-4", "T-5", "T-6"]:
+        ok(step, evid[step])
+    assert st.snapshot()["completed"] is True
 
 
 @pytest.mark.parametrize("skill_dir", sorted(p.name for p in SKILLS_DIR.iterdir() if p.is_dir()))
