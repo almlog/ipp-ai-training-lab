@@ -69,9 +69,12 @@ def _default_script(req: LlmRequest) -> LlmResponse:
         return _call("verify_step_output", {"step_number": m.group(1), "command_output": m.group(2)})
     m = re.search(r"IDEA:(.*)", text, re.S)
     if m:
-        return _call("guide_training_app_creation", {"idea": m.group(1).strip(), "course_type": "original", "is_confirmed": False})
+        return _call("update_project_plan", {"idea_summary": m.group(1).strip(), "status": "consulting"})
     if "CONFIRM" in text:
-        return _call("guide_training_app_creation", {"idea": "これで決定！", "course_type": "original", "is_confirmed": True})
+        return _call("update_project_plan", {"idea_summary": "", "status": "confirmed"})
+    m = re.search(r"CHOICES:(.*)", text, re.S)
+    if m:
+        return _call("offer_choices", {"choices": [c.strip() for c in m.group(1).split("|") if c.strip()]})
     # ツールを呼ばない雑談応答（紛らわしい文言のみ）
     return LlmResponse(content=types.Content(role="model", parts=[types.Part(text=TRICKY_TEXT)]))
 
@@ -337,3 +340,13 @@ def test_toggling_mode_resumes_at_first_incomplete_step(client):
     client.post("/api/mode", json={"user_id": uid, "mode": "NORMAL"})
     st = client.post("/api/mode", json={"user_id": uid, "mode": "TRAINING"}).json()["state"]
     assert st["current_step"] == "T-3"
+
+
+def test_offer_choices_are_returned_for_the_turn_and_reset_next_turn(client):
+    """LLM が offer_choices で出した返答候補がそのターンの state に載り、次のターンには持ち越されない。"""
+    uid = "u-choices"
+    _start_training(client, uid)
+    data = _chat(client, uid, "CHOICES:ログ解析Botで進めたい|もう少し詳しく聞きたい|別のアイデアも見たい")
+    assert data["state"]["suggestions"] == ["ログ解析Botで進めたい", "もう少し詳しく聞きたい", "別のアイデアも見たい"]
+    data2 = _chat(client, uid, "ありがとう")
+    assert data2["state"]["suggestions"] == []

@@ -445,6 +445,8 @@ async def chat(req: Request):
                     # 通常/特別モードは従来通りフロントの手順進行を採用（本PRの対象外）
                     st.current_step = current_step
                 state_before_seq = st.verdict_seq
+                # 返答候補（offer_choices）はターンごとに作り直す。前のターンの候補を持ち越さない
+                ctx.state["hitman:suggestions"] = []
                 effective_mode, effective_course, effective_step = st.mode, st.course, st.current_step
                 user_idea = st.user_idea
         else:

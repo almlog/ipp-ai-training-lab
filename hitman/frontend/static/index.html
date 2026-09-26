@@ -2714,6 +2714,8 @@ function getSessionUserId() {
 
 // 描画中の応答が属するステップ（履歴の再描画時に「今の」ステップで過去カードを描かないため）
 let renderStepContext = null;
+// 研修モードでサーバの state に基づいて描画中か（固定チップの差し込みを止め、LLM の返答候補を使う）
+let renderServerDriven = false;
 // 送信中フラグ（Enterキー・クイック送信での二重送信防止）
 let chatInFlight = false;
 
@@ -5391,7 +5393,7 @@ function buildNode(id, comps, seen) {
         header.appendChild(topCopyBtn);
       } else {
         const foundAction = body.querySelector('.action-prompt-block');
-        if (!foundAction && appState.mode === "TRAINING" && (renderStepContext || appState.currentStep) === "T-2" && appState.trainingCourse !== "hitman_clone") {
+        if (!foundAction && !renderServerDriven && appState.mode === "TRAINING" && (renderStepContext || appState.currentStep) === "T-2" && appState.trainingCourse !== "hitman_clone") {
           currentSurfaceHasAction = true;
           const actionBlock = createActionPromptBlock("【アクション】チャットで企画を相談するか、「これで決定！」とお知らせください。");
           body.appendChild(actionBlock);
@@ -5424,7 +5426,7 @@ function buildNode(id, comps, seen) {
       const isActionKeyword = /^(?:作成したい|チャット|メッセージ|入力|アイデア|相談|決定|お考え|教えて|下のチャット|希望|アクション)/i.test(pureCmd) ||
                               /(?:チャットで|メッセージで|入力して|相談して|決定して)/.test(pureCmd);
       const isGenericHeading = /(?:アーキテクチャ|スキル|確認|チェック|目的|概要|注意事項|前提条件|成果物|フレームワーク|要件)/.test(pureCmd);
-      const isActionPrompt = isCommandHint && pureCmd && !isShellCmd && isActionKeyword && !isGenericHeading && !currentSurfaceHasAction;
+      const isActionPrompt = !renderServerDriven && isCommandHint && pureCmd && !isShellCmd && isActionKeyword && !isGenericHeading && !currentSurfaceHasAction;
 
       if (isActionPrompt) {
         currentSurfaceHasAction = true;
@@ -5838,7 +5840,27 @@ function formatMarkdownToHtml(src) {
   return html;
 }
 
-function renderReply(b, parts, saveHistory = true, serverState = null, stepContext = null) {
+// LLM が offer_choices で出した返答候補をボタンとして表示する（押すと入力欄に入る。送信は受講生が行う）
+function renderSuggestionChips(container, suggestions) {
+  if (!Array.isArray(suggestions) || suggestions.length === 0) return;
+  const row = el("div", "ideation-chips-container llm-choice-row");
+  row.style.cssText = "display:flex; flex-wrap:wrap; gap:6px; margin-top:10px;";
+  suggestions.forEach(text => {
+    const chipBtn = el("button", "ideation-chip-btn");
+    chipBtn.type = "button";
+    chipBtn.style.cssText = "font-size:12px; font-weight:600; padding:4px 10px; border-radius:14px; border:1px solid #93c5fd; background:#ffffff; color:#1d4ed8; cursor:pointer;";
+    chipBtn.textContent = text;
+    chipBtn.onclick = (e) => {
+      e.stopPropagation();
+      const inputEl = document.getElementById("input") || input;
+      if (inputEl) { inputEl.value = text; inputEl.focus(); }
+    };
+    row.appendChild(chipBtn);
+  });
+  container.appendChild(row);
+}
+
+function renderReply(b, parts, saveHistory = true, serverState = null, stepContext = null, showChips = true) {
   const ws = document.getElementById("workspace");
   if (ws && ws.classList.contains("mobile-show-sop")) {
     const chatBadge = document.getElementById("mobile-chat-badge");
@@ -5854,6 +5876,7 @@ function renderReply(b, parts, saveHistory = true, serverState = null, stepConte
   // Autonomous W-Check Verdict Banners
   // 研修モードでサーバ判定がある場合は、判定結果（w_check_status）だけでバナーを決める（文章の言い回しに依存しない）
   const useServerVerdict = !!(serverState && serverState.mode === "TRAINING");
+  renderServerDriven = useServerVerdict;
   const vt = useServerVerdict ? serverState.verdict_this_turn : null;
   const vts = vt ? vt.w_check_status : "";
   const bannerKey = useServerVerdict
@@ -5946,10 +5969,16 @@ function renderReply(b, parts, saveHistory = true, serverState = null, stepConte
     b.classList.add("rich");
     renderSurface(a2ui, b);
   }
+  if (useServerVerdict && showChips) {
+    // 前の応答の候補ボタンは片付ける（候補はターンごとに作り直され、空のターンもある）
+    document.querySelectorAll(".llm-choice-row").forEach(r => r.remove());
+    renderSuggestionChips(b, serverState.suggestions);
+  }
   if (!b.childNodes.length) b.textContent = "(応答がありません)";
   log.scrollTop = log.scrollHeight;
 
   renderStepContext = null;
+  renderServerDriven = false;
 
   if (saveHistory) {
     appState.chatHistory.push({ role: "agent", parts: parts, state: serverState || null, step: stepContext || appState.currentStep });
@@ -6192,13 +6221,15 @@ window.addEventListener("DOMContentLoaded", () => {
     .catch(err => console.warn("Failed to sync SOP from backend:", err));
 
   if (hasSaved && appState.chatHistory.length > 0) {
-    // Restore chat bubbles
-    appState.chatHistory.forEach(item => {
+    // Restore chat bubbles（返答候補のボタンは最後の応答にだけ出す）
+    let lastAgentIdx = -1;
+    appState.chatHistory.forEach((item, i) => { if (item.role === "agent") lastAgentIdx = i; });
+    appState.chatHistory.forEach((item, i) => {
       if (item.role === "user") {
         bubble("user").textContent = item.text;
       } else if (item.role === "agent") {
         const b = bubble("agent");
-        renderReply(b, item.parts || [], false, item.state || null, item.step || null);
+        renderReply(b, item.parts || [], false, item.state || null, item.step || null, i === lastAgentIdx);
       }
     });
     if (appState.rawLog) {

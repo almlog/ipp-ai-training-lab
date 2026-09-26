@@ -13,17 +13,22 @@
 - フロント（`frontend/static/index.html`）は `/chat` などが返す `state` をそのまま表示する。LLM の応答文を正規表現やキーワードで解析して、ステップ・合否・コースを決めない。
 - localStorage の内容を読み込み時に書き換える「自己治癒」処理を追加しない。サーバの state が正で、`/api/session/sync` で同期する。
 
-## 3. 合格条件は客観的な証跡で判定する
+## 3. 会話の理解は LLM、ツールは記録と事実の提供
+- T-2 の企画相談では、受講生の発言をツールに生のまま渡してキーワードで「確定・相談中・コース」を判定する実装にしない。LLM が要約と判断（`update_project_plan(idea_summary, status, course)`）を明示的に渡す。
+- ツールは定型の会話文を返さない（LLM がそれを読み上げるだけになり、会話が固定化する）。返すのは記録内容・推奨スキル・次にやることなどの事実。
+- 返答候補のボタンは LLM が `offer_choices` で毎ターン作る。フロントに固定のチップを追加しない。
+
+## 4. 合格条件は客観的な証跡で判定する
 - T-1: 新しい会話で `/ipp-skill-check` を実行した出力（`[skill:ipp-skill-check@v1]`）。
 - T-3: `ipp-agent-smoke-test` の出力。`SMOKE_JSON` の生データから再判定し、`SMOKE_DIGEST` で改変を検知する。
 - 合格させるためにキーワードを追加して判定を緩めない。受講生が通れない場合は、手順・案内・スキルの側を直す。
 
-## 4. スキル（リポジトリ直下の `.agents/skills/`）
+## 5. スキル（リポジトリ直下の `.agents/skills/`）
 - Antigravity が読み込むのは「開いているワークスペース直下の `.agents/skills/`」だけで、新しい会話から有効になる（実機で確認済み）。
 - `SKILL.md` の frontmatter は YAML として正しく書き、`name` はフォルダ名と一致させる。各スキルは使用証跡 `[skill:<name>@v1]` の出力ルールを持つ。
 - HITMAN・画面・マニュアルから参照するスキルは、リポジトリに実在するものだけにする。
 
-## 5. テストとサンプル
+## 6. テストとサンプル
 - 変更後は `uv run pytest tests/unit` を実行し、全件合格を確認する。テストを削除・緩和して通す変更は禁止。
 - 「ログ注入」用のサンプルログ（`index.html` の `TEST_EVIDENCES`、`knowledge/training_test_evidences.md`）は、実際のコマンド出力から作る。作り物のログを手で書かない（`test_skill_references.py` が現行の判定で T-1〜T-6 を通るか検査する）。
 
