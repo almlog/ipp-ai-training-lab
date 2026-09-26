@@ -155,3 +155,39 @@ def test_code_listing_alone_no_longer_passes_t3():
         "T-3", "$ ls -la my_agent\n-rw-r--r-- agent.py\nfrom google.adk.agents import Agent\nroot_agent = Agent(name='x')", tool_context=ctx)
     assert res["verdict"] == "FAILED" and res["w_check_status"] == "TRAINING_GUIDANCE"
     assert "ipp-agent-smoke-test" in res["message"]
+
+
+class GeminiLikeLogBot(BaseLlm):
+    """見本（障害ログ解析Bot）用: ログ → analyze_stacktrace → recommend_fix_commands → 回答 の順に動くダミー。"""
+
+    model: str = "gemini-like"
+
+    async def generate_content_async(self, llm_request: LlmRequest, stream: bool = False):
+        last = llm_request.contents[-1]
+        fr = next((p.function_response for p in last.parts or [] if p.function_response), None)
+
+        def call(name, args):
+            return LlmResponse(content=types.Content(role="model", parts=[types.Part(
+                function_call=types.FunctionCall(name=name, args=args, id=f"c-{uuid.uuid4().hex[:6]}"))]))
+
+        if fr is None:
+            text = next((p.text for p in last.parts or [] if p.text), "")
+            yield call("analyze_stacktrace", {"log_content": text})
+        elif fr.name == "analyze_stacktrace":
+            yield call("recommend_fix_commands", {"error_type": fr.response["error_type"]})
+        else:
+            cmds = " / ".join(c["cmd"] for c in fr.response["commands"])
+            yield LlmResponse(content=types.Content(role="model", parts=[types.Part(text=f"{fr.response['error_type']}: {cmds}")]))
+
+
+def test_bundled_course_a_sample_passes_smoke():
+    """同梱の見本（ipp-agent-workspace/log_analyzer_bot）が、ダミーでない実装としてスモークテストに合格すること。"""
+    root, _ = smoke.load_root_agent(str(REPO_ROOT / "ipp-agent-workspace" / "log_analyzer_bot"))
+    root.model = GeminiLikeLogBot()
+    data = asyncio.run(smoke.run_smoke(
+        root,
+        "OSError: [Errno 28] No space left on device: '/var/backup/app.tar.gz'",
+        "psycopg2.OperationalError: could not connect to server: Connection refused (port 5432)",
+    ))
+    out = smoke.format_report(data, "python smoke_test.py ...")
+    assert agent_module.judge_smoke_output(out)["status"] == "PASS", out
