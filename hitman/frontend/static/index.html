@@ -2098,10 +2098,10 @@ html, body {
       <div class="status-dot"></div>
       <span>稼働中</span>
     </div>
-    <button class="btn-reset" onclick="resetSessionConfirm()" title="現在の作業状態と履歴をリセットして新規開始">
+    <button class="btn-reset" onclick="resetSessionConfirm()" title="ローカルキャッシュを完全クリアして初期化（表示ずれの修復）">
       <span class="material-symbols-outlined" style="font-size:16px;">restart_alt</span>
-      <span class="hdr-btn-txt-long">新規作業開始</span>
-      <span class="hdr-btn-txt-short">リセット</span>
+      <span class="hdr-btn-txt-long">キャッシュ初期化</span>
+      <span class="hdr-btn-txt-short">初期化</span>
     </button>
   </div>
 </header>
@@ -2172,6 +2172,10 @@ html, body {
           <button type="button" class="btn-config-env" onclick="openTrainingEnvModal()" title="作業フォルダ・パス・エージェント名・仮想環境設定を変更">
             <span class="material-symbols-outlined" style="font-size:13px;">settings</span>
             <span>⚙️ 研修環境設定</span>
+          </button>
+          <button type="button" class="btn-config-env" onclick="resetSessionConfirm()" title="ローカルキャッシュを完全クリアして初期化（表示ずれの修復）" style="background:#fee2e2;border-color:#fca5a5;color:#b91c1c;">
+            <span class="material-symbols-outlined" style="font-size:13px;">restart_alt</span>
+            <span>↺ 初期化</span>
           </button>
         </div>
       </div>
@@ -2617,9 +2621,12 @@ html, body {
         <span style="font-size:0.72rem;color:#64748b;display:block;margin-top:3px;">※受講生の本番環境ではチェックを外して非表示にできます。現在は検証・デモ用にONになっています。</span>
       </div>
 
-      <div style="margin-top:0.8rem;border-top:1px dashed #cbd5e1;padding-top:0.8rem;">
-        <button type="button" class="btn-report-hdr" style="background:#7c3aed;color:#fff;border-color:#6d28d9;width:100%;justify-content:center;padding:0.5rem;" onclick="pasteTestDummyLog(); closeTrainingEnvModal();">
-          🛠️ 講師検証用: 現在ステップの合格テストログを入力欄に注入
+      <div style="margin-top:0.8rem;border-top:1px dashed #cbd5e1;padding-top:0.8rem;display:flex;gap:0.5rem;flex-wrap:wrap;">
+        <button type="button" class="btn-report-hdr" style="background:#fee2e2;color:#b91c1c;border-color:#fca5a5;flex:1;justify-content:center;padding:0.5rem;" onclick="resetSessionConfirm()">
+          🗑️ キャッシュを完全消去して初期化
+        </button>
+        <button type="button" class="btn-report-hdr" style="background:#7c3aed;color:#fff;border-color:#6d28d9;flex:1;justify-content:center;padding:0.5rem;" onclick="pasteTestDummyLog(); closeTrainingEnvModal();">
+          🛠️ 講師検証用: 合格テストログ注入
         </button>
       </div>
     </div>
@@ -2636,6 +2643,20 @@ html, body {
 </div>
 
 <script>
+
+// --- URL Reset Handler (?reset=true or ?clear=1) ---
+(function checkUrlReset() {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("reset") === "true" || params.get("clear") === "1") {
+      localStorage.clear();
+      sessionStorage.clear();
+      window.location.replace(window.location.origin + window.location.pathname);
+    }
+  } catch(e) {
+    console.error("URL reset error:", e);
+  }
+})();
 
 // --- Mobile View Switcher Logic ---
 function switchMobileView(view) {
@@ -2828,14 +2849,78 @@ function updateSopItemsFromDb(sopDb, seq) {
   }
 
   SOP_ITEMS = items;
-  if (appState.mode === "TRAINING" && appState.courseAIdea && appState.trainingCourse !== "hitman_clone") {
-    const t2 = items.find(i => i.id === "T-2");
-    if (t2) {
-      t2.title = `ステップ T-2: 仕様・要件定義策定（${appState.courseAIdea}）`;
-    }
-  }
+  syncCourseASopTitles();
   if (seq && Array.isArray(seq) && seq.length > 0) {
     STEP_SEQUENCE = seq;
+  }
+}
+
+function deriveAgentSlugAndName(idea) {
+  const raw = String(idea || "").trim();
+  if (!raw || raw.includes("オリジナル") || raw.includes("自作")) {
+    return { slug: "my_agent", shortName: "自作AIエージェント", serviceName: "my-ai-agent" };
+  }
+  const lower = raw.toLowerCase();
+  if (lower.includes("ログ") || lower.includes("log") || lower.includes("障害") || lower.includes("エラー")) {
+    return { slug: "log_analyzer_bot", shortName: "社内障害ログ自動解析Bot", serviceName: "log-analyzer-bot" };
+  } else if (lower.includes("マニュアル") || lower.includes("規程") || lower.includes("faq") || lower.includes("就業規則")) {
+    return { slug: "faq_manual_bot", shortName: "規程・マニュアルFAQ検索Bot", serviceName: "faq-manual-bot" };
+  } else if (lower.includes("日報") || lower.includes("要約") || lower.includes("報告") || lower.includes("レポート")) {
+    return { slug: "report_summary_ai", shortName: "日報・業務報告要約AI", serviceName: "report-summary-ai" };
+  } else if (lower.includes("キューブ") || lower.includes("ルービック") || lower.includes("rubik")) {
+    return { slug: "rubik_solver_agent", shortName: "ルービックキューブ攻略ナビゲーター", serviceName: "rubik-solver-agent" };
+  } else if (lower.includes("ガント") || lower.includes("wbs") || lower.includes("カレンダー") || lower.includes("スケジュール") || lower.includes("予定")) {
+    return { slug: "schedule_wbs_agent", shortName: "WBS＆スケジュール管理Bot", serviceName: "schedule-wbs-agent" };
+  } else if (lower.includes("シフト") || lower.includes("勤怠")) {
+    return { slug: "shift_attendance_bot", shortName: "シフト・勤怠管理Bot", serviceName: "shift-attendance-bot" };
+  } else if (lower.includes("議事録")) {
+    return { slug: "meeting_minutes_ai", shortName: "議事録自動作成AI", serviceName: "meeting-minutes-ai" };
+  } else if (lower.includes("申請") || lower.includes("承認")) {
+    return { slug: "approval_workflow_bot", shortName: "社内申請ワークフローBot", serviceName: "approval-workflow-bot" };
+  }
+  const clean = raw.slice(0, 20) + (raw.length > 20 ? "..." : "");
+  return { slug: "custom_agent", shortName: clean, serviceName: "custom-agent" };
+}
+
+function syncCourseASopTitles() {
+  if (appState.mode !== "TRAINING" || appState.trainingCourse === "hitman_clone" || !appState.courseAIdea) {
+    return;
+  }
+  const { slug, shortName, serviceName } = deriveAgentSlugAndName(appState.courseAIdea);
+
+  const t2 = SOP_ITEMS.find(i => i.id === "T-2");
+  if (t2) {
+    t2.title = `ステップ T-2: 仕様・要件定義策定（${appState.courseAIdea}）`;
+    t2.cmd = "cat ipp-agent-workspace/project_brief.md";
+    t2.check = "要件定義書（project_brief.md）策定";
+  }
+
+  const t3 = SOP_ITEMS.find(i => i.id === "T-3");
+  if (t3) {
+    t3.title = `ステップ T-3: エージェントコア＆A2UI実装（${shortName}）`;
+    t3.cmd = `ls -la ipp-agent-workspace/${slug}/ && head -n 30 ipp-agent-workspace/${slug}/agent.py`;
+    t3.check = "ADK Agent・A2UIカード実装完了";
+  }
+
+  const t4 = SOP_ITEMS.find(i => i.id === "T-4");
+  if (t4) {
+    t4.title = `ステップ T-4: ローカルテスト＆自律Wチェック（${shortName}）`;
+    t4.cmd = `pytest ipp-agent-workspace/${slug}/tests/ -v`;
+    t4.check = "Pytest全件PASSED（エラー0件）";
+  }
+
+  const t5 = SOP_ITEMS.find(i => i.id === "T-5");
+  if (t5) {
+    t5.title = `ステップ T-5: Cloud Run 本番デプロイ（${shortName}）`;
+    t5.cmd = `gcloud run deploy ${serviceName} --source ipp-agent-workspace/${slug} --region asia-northeast1 --allow-unauthenticated`;
+    t5.check = "Service URL発行・健全稼働";
+  }
+
+  const t6 = SOP_ITEMS.find(i => i.id === "T-6");
+  if (t6) {
+    t6.title = `ステップ T-6: 個人GitHub公開＆修了証発行（${shortName}）`;
+    t6.cmd = "gh repo view --web || git remote -v";
+    t6.check = "GitHub公開・修了認定完了";
   }
 }
 
@@ -2911,6 +2996,21 @@ function loadState() {
             appState.courseCardCollapsed = true;
           }
         }
+        // 【完全自己治癒】先行ステップ未完了時の不正後続完了キャッシュのパージ
+        const trainingSeq = ["T-1", "T-2", "T-3", "T-4", "T-5", "T-6"];
+        let broken = false;
+        for (let i = 0; i < trainingSeq.length; i++) {
+          const s = trainingSeq[i];
+          const isDone = !!appState.sopResults && !!appState.sopResults[s] && appState.sopResults[s].verdict === "SUCCESS";
+          if (!isDone) {
+            broken = true;
+          } else if (broken) {
+            // 先行ステップが未完了なのに完了になっている不正データを破棄
+            console.warn(`[Self-Healing] Step ${s} had corrupted SUCCESS verdict while prerequisite steps were incomplete. Purging.`);
+            delete appState.sopResults[s];
+          }
+        }
+
         // 【自己治癒: T-2】T-2 が誤って自動補完で SUCCESS になっていたり、
         // 実際の客観Wチェック合格証跡がないのに完了になっている場合は T-2 進行中へ修復
         if (appState.sopResults && appState.sopResults["T-2"]) {
@@ -2919,20 +3019,19 @@ function loadState() {
           const isRealApproval = snippet.includes("VERIFIED_APPROVED") || snippet.includes("Wチェック承認") || (snippet.includes("合格") && !snippet.includes("ステップ T-3 進行に伴い"));
           if (!isRealApproval) {
             delete appState.sopResults["T-2"];
-            appState.currentStep = "T-2";
-            appState.errorStep = null;
+            // T-2 を取り消したので、それ以降の後続ステップもすべてパージ
+            for (let j = 2; j < trainingSeq.length; j++) {
+              delete appState.sopResults[trainingSeq[j]];
+            }
           }
         }
-        // 【自己治癒: T-3】T-3 の客観ログ（pytest や agent.py 等）の承認がないのに SUCCESS になっている場合は未完了に修復
-        if (appState.sopResults && appState.sopResults["T-3"]) {
-          const t3Res = appState.sopResults["T-3"];
-          const snippet = t3Res.logSnippet || "";
-          const isRealT3Approval = snippet.includes("pytest") || snippet.includes("agent.py") || snippet.includes("単体テスト") || snippet.includes("テストPASS");
-          if (!isRealT3Approval) {
-            delete appState.sopResults["T-3"];
-            appState.currentStep = "T-3";
-            appState.errorStep = null;
-          }
+
+        // currentStepの整合性チェック: 最初の未完了ステップを特定
+        const firstUnfinished = trainingSeq.find(s => !appState.sopResults || !appState.sopResults[s] || appState.sopResults[s].verdict !== "SUCCESS") || "T-6";
+        if (trainingSeq.indexOf(appState.currentStep) > trainingSeq.indexOf(firstUnfinished)) {
+          console.warn(`[Self-Healing] currentStep (${appState.currentStep}) was ahead of first incomplete step (${firstUnfinished}). Resetting to ${firstUnfinished}.`);
+          appState.currentStep = firstUnfinished;
+          appState.errorStep = null;
         }
       }
       return true;
@@ -2942,9 +3041,15 @@ function loadState() {
 }
 
 function resetSessionConfirm() {
-  if (confirm("作業履歴と手順書記録をリセットして、新規セッションを開始しますか？")) {
-    localStorage.removeItem(STORAGE_KEY);
-    location.reload();
+  if (confirm("作業履歴・進行ステップ・保存キャッシュをすべて消去して、新規セッションに初期化しますか？\n（不整合や表示のズレが完全にクリアされます）")) {
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+      localStorage.clear();
+      sessionStorage.clear();
+    } catch(e) {
+      console.warn("Storage clear error", e);
+    }
+    window.location.href = window.location.pathname + "?reset_done=" + Date.now();
   }
 }
 
@@ -3804,6 +3909,86 @@ Content-Type: application/json
   }
 };
 
+function getTestEvidences(course) {
+  const c = course || appState.trainingCourse || "original";
+  if (c === "hitman_clone") {
+    return TEST_EVIDENCES.hitman_clone;
+  }
+  if (!appState.courseAIdea) {
+    return TEST_EVIDENCES.original;
+  }
+  const { slug, shortName, serviceName } = deriveAgentSlugAndName(appState.courseAIdea);
+  return {
+    "T-1": TEST_EVIDENCES.original["T-1"],
+    "T-2": `$ cat ipp-agent-workspace/project_brief.md
+# project_brief.md (コースA: 現場課題解決AIエージェント要件定義)
+
+# ${shortName}: Project Brief (要件定義書)
+- **エージェント名**: ${slug} (${shortName})
+- **開発者**: IPP AI研修 受講生
+- **解決する現場課題**: 
+  ${appState.courseAIdea}に関する課題をAIエージェントで解決し、現場作業の自動化・効率化を実現する。
+
+## 1. コア機能・技術仕様
+1. **使用モデル**: gemini-3.8-flash（エラー解析・コード推論）、フォールバック: gemini-3.6-flash
+2. **自作関数ツール (Tools)**:
+   - analyze_task_data(input_text: str) -> dict
+   - execute_action_plan(action_type: str) -> dict
+
+## 2. A2UI リッチカード表示仕様
+- 処理結果ステータスカード (StatusCard)
+- 推奨アクション提示カード (ActionCard)
+
+## 3. 長期記憶 (Memory Bank) 活用方針
+- ユーザー設定および過去の対応履歴をセッションを跨いで保持
+
+## 4. 実行環境・成果物
+- 実行フレームワーク: Google ADK (Agent Development Kit 1.5.0) + Python 3.12
+- フロントエンド / 公開先: FastAPI Proxy + Cloud Run (リージョン: asia-northeast1)`,
+
+    "T-3": `【ステップ T-3: エージェントコア＆A2UI実装 完了ログ】
+$ ls -la ipp-agent-workspace/${slug}/
+-rw-r--r-- 1 user staff 1850 Sep 7 20:22 agent.py
+-rw-r--r-- 1 user staff  920 Sep 7 20:22 a2ui_utils.py
+
+$ head -n 30 ipp-agent-workspace/${slug}/agent.py
+from google.adk.agents import Agent
+from google.adk.models import Gemini
+from a2ui_utils import a2ui_callback
+
+MODEL = "gemini-3.8-flash"
+root_agent = Agent(name="${slug}", model=Gemini(model=MODEL), after_model_callback=a2ui_callback)`,
+
+    "T-4": `【ステップ T-4: 単体テスト＆自律Wチェック 完了ログ】
+$ pytest ipp-agent-workspace/${slug}/tests/ -v
+============================= test session starts =============================
+collected 5 items
+
+tests/test_agent.py::test_agent_initialization PASSED                   [ 20%]
+tests/test_agent.py::test_custom_tool PASSED                            [ 40%]
+tests/test_agent.py::test_a2ui_callback_integration PASSED               [ 60%]
+tests/test_agent.py::test_error_handling PASSED                          [ 80%]
+tests/test_agent.py::test_schema_validity PASSED                         [100%]
+
+============================== 5 passed in 1.42s ==============================`,
+
+    "T-5": `【ステップ T-5: Cloud Run 本番デプロイ 完了ログ】
+$ gcloud run deploy ${serviceName} --source ipp-agent-workspace/${slug} --region asia-northeast1 --allow-unauthenticated
+Building Container... DONE
+Creating Revision... DONE
+Service [${serviceName}] has been deployed and is serving 100 percent of traffic.
+Service URL: https://${serviceName}-1070367799384.asia-northeast1.run.app`,
+
+    "T-6": `【ステップ T-6: 個人GitHub公開＆修了証発行 完了ログ】
+$ gh auth status
+✓ Logged in to github.com as shunpei-suzuki
+
+$ git push origin main
+To https://github.com/shunpei-suzuki/${serviceName}.git
+ * [new branch]      main -> main`
+  };
+}
+
 function escapeHtml(str) {
   if (!str) return "";
   return str
@@ -3985,14 +4170,18 @@ function switchTestEvidencesCourse(course) {
 function renderTestEvidencesList() {
   const container = document.getElementById("test-evidences-list");
   if (!container) return;
-  const evs = TEST_EVIDENCES[currentEvidencesCourse] || TEST_EVIDENCES.original;
+  const evs = getTestEvidences(currentEvidencesCourse);
+  const isClone = currentEvidencesCourse === "hitman_clone";
+  const { shortName } = deriveAgentSlugAndName(appState.courseAIdea);
+  const appDisp = isClone ? "HITMANクローン" : shortName;
+
   const stepTitles = {
     "T-1": "Step T-1: 開発環境構築とスキル同期 (Git clone & Python 3.12)",
-    "T-2": currentEvidencesCourse === "hitman_clone" ? "Step T-2: 仕様設計 (hitman_spec.md)" : "Step T-2: 要件定義 (project_brief.md)",
-    "T-3": "Step T-3: エージェントコア＆A2UI実装 (ADK Agent & a2ui_utils.py)",
-    "T-4": "Step T-4: ローカル単体テスト (Pytest 5 passed / 6 passed)",
-    "T-5": "Step T-5: Google Cloud Run 本番デプロイ (Service URL: https://...run.app)",
-    "T-6": "Step T-6: 個人GitHub公開 ＆ 修了証発行 (Git push & Repo URL)",
+    "T-2": isClone ? "Step T-2: 仕様設計 (hitman_spec.md)" : `Step T-2: 要件定義 (${appState.courseAIdea ? appState.courseAIdea : 'project_brief.md'})`,
+    "T-3": `Step T-3: エージェントコア＆A2UI実装 (${appDisp})`,
+    "T-4": `Step T-4: ローカル単体テスト (${appDisp})`,
+    "T-5": `Step T-5: Google Cloud Run 本番デプロイ (${appDisp})`,
+    "T-6": `Step T-6: 個人GitHub公開 ＆ 修了証発行 (${appDisp})`,
   };
 
   let html = "";
@@ -4023,7 +4212,7 @@ function renderTestEvidencesList() {
 }
 
 function injectEvidencesLog(stepId, course) {
-  const evs = TEST_EVIDENCES[course] || TEST_EVIDENCES.original;
+  const evs = getTestEvidences(course);
   const log = evs[stepId] || "";
   const inputEl = document.getElementById("input");
   if (inputEl) {
@@ -4037,7 +4226,7 @@ function injectEvidencesLog(stepId, course) {
 }
 
 function copyEvidencesLog(stepId, course) {
-  const evs = TEST_EVIDENCES[course] || TEST_EVIDENCES.original;
+  const evs = getTestEvidences(course);
   const log = evs[stepId] || "";
   if (navigator.clipboard && navigator.clipboard.writeText) {
     navigator.clipboard.writeText(log).then(() => {
@@ -4048,7 +4237,7 @@ function copyEvidencesLog(stepId, course) {
 
 function injectStepDummyLog(stepId) {
   const course = appState.trainingCourse || "original";
-  const evs = TEST_EVIDENCES[course] || TEST_EVIDENCES.original;
+  const evs = getTestEvidences(course);
   const log = evs[stepId] || "";
   const inputEl = document.getElementById("input");
   if (inputEl) {
@@ -4747,6 +4936,7 @@ function exportReportMarkdown() {
 
 // --- Render Flow & SOP Sheet ---
 function renderFlowChart() {
+  syncCourseASopTitles();
   const mobileStepBadge = document.getElementById("mobile-step-badge");
   if (mobileStepBadge) {
     mobileStepBadge.textContent = appState.currentStep || "進行中";
@@ -5537,10 +5727,8 @@ function detectStepTransitions(text, parts) {
     const rawIdea = ideaMatch[1].trim();
     if (rawIdea && rawIdea.length < 50 && !rawIdea.includes("コース")) {
       appState.courseAIdea = rawIdea;
-      const t2Step = SOP_ITEMS.find(s => s.id === "T-2");
-      if (t2Step) {
-        t2Step.title = `ステップ T-2: 仕様・要件定義策定（${rawIdea}）`;
-      }
+      syncCourseASopTitles();
+      renderFlowChart();
     }
   }
 
@@ -5549,9 +5737,14 @@ function detectStepTransitions(text, parts) {
                             text.includes("セキュリティ遮断") ||
                             text.includes("重大セキュリティ警告");
 
-  // 1. Success / Approved verification check (Never approve if security blocked)
+  // 1. Success / Approved verification check (Never approve if security blocked or rejected)
+  const isRejected = text.includes("差し戻し") || text.includes("自己申告") ||
+                     text.includes("CLAIM_BLOCKED") || text.includes("BLOCKED_RETRY") ||
+                     text.includes("【自律判定: 再投入ブロック】") || text.includes("【判定: 不合格】") ||
+                     text.includes("【判定：不合格】");
+
   // 【厳格化】日常会話の「確認できました」「正常に完了」等を除外し、客観ログ検証の合格トークンに限定
-  const isApproved = !isSecurityBlocked && (
+  const isApproved = !isSecurityBlocked && !isRejected && (
                      text.includes("VERIFIED_APPROVED") ||
                      text.includes("Wチェック承認") ||
                      text.includes("【AI確認者 有識者Wチェック承認") ||
@@ -5630,9 +5823,14 @@ function detectStepTransitions(text, parts) {
 
     syncStepProgression(nextStep, text);
     return;
-  } else if (text.includes("差し戻し") || text.includes("自己申告") || text.includes("CLAIM_BLOCKED") || text.includes("BLOCKED_RETRY") || text.includes("【自律判定: 再投入ブロック】") || text.includes("【判定: 不合格】")) {
-    // 差し戻し・再投入要求時は、受講生が現在取り組んでいるステップ（appState.currentStep）を絶対に維持する（巻き戻し厳禁）
+  } else if (isRejected) {
+    // 差し戻し・再投入要求時は、受講生が現在取り組んでいるステップ（appState.currentStep）を絶対に維持する（巻き戻し・勝手な進行厳禁）
     appState.errorStep = appState.currentStep;
+    updateModeUI();
+    renderFlowChart();
+    renderSopTable();
+    saveState();
+    return;
   } else {
     // カードやメッセージから提示されたステップへの自動追従（承認なしのガイダンス等）
     const detected = extractStepFromMessage(text, parts);
@@ -6001,16 +6199,18 @@ window.addEventListener("DOMContentLoaded", () => {
     })
     .catch(err => console.warn("Failed to sync SOP from backend:", err));
 
-  if (hasSaved && appState.chatHistory.length > 0) {
-    // Restore chat bubbles
-    appState.chatHistory.forEach(item => {
-      if (item.role === "user") {
-        bubble("user").textContent = item.text;
-      } else if (item.role === "agent") {
-        const b = bubble("agent");
-        renderReply(b, item.parts || [], false);
-      }
-    });
+  if (hasSaved) {
+    if (appState.chatHistory && appState.chatHistory.length > 0) {
+      // Restore chat bubbles
+      appState.chatHistory.forEach(item => {
+        if (item.role === "user") {
+          bubble("user").textContent = item.text;
+        } else if (item.role === "agent") {
+          const b = bubble("agent");
+          renderReply(b, item.parts || [], false);
+        }
+      });
+    }
     if (appState.rawLog) {
       const lv = document.getElementById("raw-log-viewer") || document.getElementById("log-viewer-content");
       if (lv) lv.textContent = appState.rawLog;
