@@ -112,19 +112,39 @@ def _bundled_evidences() -> dict:
 
 
 @pytest.mark.parametrize("course", ["original", "hitman_clone"])
-def test_bundled_sample_logs_pass_every_step(course):
-    """デモ用サンプルログが、現行の判定ルールで T-1〜T-6 を順に合格できること（判定ルールとの乖離を防ぐ）。"""
+def test_bundled_sample_logs_follow_current_rules(course):
+    """デモ用サンプルログ（🧪ログ注入）が現行の判定ルールと乖離していないこと。
+    - T-2: コースAは企画未確定なら不合格。確定した企画（サンプルと同じエージェント名）なら合格
+    - T-3: サンプルは受講生ごとの確認コードを持たないため、貼り付けだけでは合格しない（実機で起きた誤合格の防止）
+    - T-1/T-4/T-5/T-6: そのまま合格"""
+    from tests.unit.test_smoke_judge import _run, analyze_log
+
     evid = _bundled_evidences()[course]
     assert sorted(evid) == ["T-1", "T-2", "T-3", "T-4", "T-5", "T-6"]
     store: dict = {}
     ctx = type("Ctx", (), {"state": store})()
     agent_module.set_operation_mode("TRAINING", tool_context=ctx)
     agent_module.set_training_course(course, tool_context=ctx)
-    for step in ["T-1", "T-2", "T-3", "T-4", "T-5", "T-6"]:
-        res = agent_module.verify_step_output(step, evid[step], tool_context=ctx)
+    st = agent_module.HitmanState(store)
+
+    def ok(step, text):
+        res = agent_module.verify_step_output(step, text, tool_context=ctx)
         assert res["w_check_status"] == "VERIFIED_APPROVED", (step, res.get("message"))
         assert not res["skills_missing"], (step, res["skills_missing"])
-    assert agent_module.HitmanState(store).snapshot()["completed"] is True
+
+    ok("T-1", evid["T-1"])
+    slug = "my_hitman" if course == "hitman_clone" else "my_agent"
+    if course == "original":
+        res = agent_module.verify_step_output("T-2", evid["T-2"], tool_context=ctx)
+        assert res["verdict"] == "FAILED" and st.current_step == "T-2"
+        st.agent_slug, st.plan_confirmed = slug, True  # サンプルと同じ企画で確定した想定
+    ok("T-2", evid["T-2"])
+    res = agent_module.verify_step_output("T-3", evid["T-3"], tool_context=ctx)
+    assert res["w_check_status"] == "BLOCKED_RETRY" and st.current_step == "T-3", res.get("message")
+    ok("T-3", "[skill:ipp-agent-smoke-test@v1]\n" + _run(analyze_log, nonce=st.t3_nonce, agent_dir=slug))
+    for step in ["T-4", "T-5", "T-6"]:
+        ok(step, evid[step])
+    assert st.snapshot()["completed"] is True
 
 
 @pytest.mark.parametrize("skill_dir", sorted(p.name for p in SKILLS_DIR.iterdir() if p.is_dir()))
@@ -135,3 +155,64 @@ def test_skill_frontmatter_is_valid_yaml(skill_dir):
     fm = re.match(r"---\n(.*?)\n---\n", text, re.S).group(1)
     data = yaml.safe_load(fm)
     assert data["name"] == skill_dir and data["description"]
+
+
+def _bundled_ng_evidences() -> dict:
+    """🧪ログ注入の異常パターン（index.html の TEST_EVIDENCES_NG）を取り出す。"""
+    html = (REPO_ROOT / "hitman" / "frontend" / "static" / "index.html").read_text(encoding="utf-8")
+    start = html.index("const TEST_EVIDENCES_NG = {")
+    body = html[start: html.index("\n};", start)]
+    seg = body[body.index("original: {"):]
+    seg = seg[: seg.index("\n  }")]
+    orig = {k: v.replace("\\\\", "\\") for k, v in re.findall(r'"(T-\d)": `([^`]*)`', seg)}
+    tail = html[html.index("TEST_EVIDENCES_NG.hitman_clone = Object.assign"):]
+    tail = tail[: tail.index("});")]
+    hc = dict(orig, **{k: v.replace("\\\\", "\\") for k, v in re.findall(r'"(T-\d)": `([^`]*)`', tail)})
+    return {"original": orig, "hitman_clone": hc}
+
+
+@pytest.mark.parametrize("course", ["original", "hitman_clone"])
+def test_log_injection_normal_and_abnormal_patterns(course):
+    """🧪ログ注入: 各ステップで『正常＝合格』『異常＝不合格（ステップは進まない）』になること。
+    T-2（コースA）/T-3 の正常と T-3 の異常は、受講生の企画・確認コードに紐づけてサーバが生成する。"""
+    ok_static = _bundled_evidences()[course]
+    ng_static = _bundled_ng_evidences()[course]
+    assert sorted(ng_static) == ["T-1", "T-2", "T-4", "T-5", "T-6"]
+    store: dict = {}
+    ctx = type("Ctx", (), {"state": store})()
+    agent_module.set_operation_mode("TRAINING", tool_context=ctx)
+    agent_module.set_training_course(course, tool_context=ctx)
+    st = agent_module.HitmanState(store)
+    if course == "original":
+        # 企画未確定なら T-2 の正常ログは生成しない（案内のみ）
+        assert agent_module.build_demo_evidence("T-2", "ok", st)["text"] is None
+        agent_module.update_project_plan("カレンダーとタスクと写真日記をまとめるツール", "confirmed",
+                                         agent_name="photo_diary_agent", tool_context=ctx)
+
+    def ok_log(step):
+        gen = agent_module.build_demo_evidence(step, "ok", st)["text"]
+        return gen or ok_static[step]
+
+    def ng_log(step):
+        gen = agent_module.build_demo_evidence(step, "ng", st)["text"]
+        return gen or ng_static[step]
+
+    for step in ["T-1", "T-2", "T-3", "T-4", "T-5", "T-6"]:
+        res = agent_module.verify_step_output(step, ng_log(step), tool_context=ctx)
+        assert res["verdict"] == "FAILED" and st.current_step == step, (step, res.get("message"))
+        res = agent_module.verify_step_output(step, ok_log(step), tool_context=ctx)
+        assert res["w_check_status"] == "VERIFIED_APPROVED", (step, res.get("message"))
+    assert st.snapshot()["completed"] is True
+    if course == "original":
+        assert "photo_diary_agent" in ok_log("T-3")
+
+
+def test_demo_evidence_endpoint_is_disabled_on_cloud_run(monkeypatch):
+    import frontend.main as main_module
+    monkeypatch.delenv("HITMAN_DEMO_EVIDENCE", raising=False)
+    monkeypatch.delenv("K_SERVICE", raising=False)
+    assert main_module._demo_evidence_enabled() is True
+    monkeypatch.setenv("K_SERVICE", "hitman")
+    assert main_module._demo_evidence_enabled() is False
+    monkeypatch.setenv("HITMAN_DEMO_EVIDENCE", "1")
+    assert main_module._demo_evidence_enabled() is True

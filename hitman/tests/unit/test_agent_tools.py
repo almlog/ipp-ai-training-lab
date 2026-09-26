@@ -440,113 +440,82 @@ def test_supervisor_step_skip_tool():
     assert "上長指示による例外スキップ承認" in res_ok["message"]
 
 
-def test_guide_training_app_creation():
-    """研修モードでのオリジナルアプリ開発またはHITMAN作成ガイダンスの検証。"""
-    # 1. アイデアなし -> HITMAN作成コース（コースB）
-    res_hitman = guide_training_app_creation("")
-    assert res_hitman["status"] == "success"
-    assert "HITMAN作成コース" in res_hitman["course"]
-    assert "Excel手順書" in res_hitman["concept"]
+def test_update_project_plan_records_consultation_without_keyword_inference():
+    """T-2 企画相談: 相談中は記録と事実だけを返す。受講生の発言のキーワードで確定・コースを勝手に判断しない。"""
+    from app.agent import update_project_plan, HitmanState
 
-    # 2. オリジナルアイデア -> カスタムアプリ開発コース（コースA）
-    res_custom = guide_training_app_creation("社内Gitリポジトリのセキュリティ脆弱性自動監査エージェント")
-    assert res_custom["status"] == "success"
-    assert "オリジナルアプリ開発コース" in res_custom["course"]
-    assert "Google ADK" in res_custom["recommended_architecture"]["framework"]
+    store: dict = {}
+    ctx = type("Ctx", (), {"state": store})()
 
-    # 3. 画像認識スキル召喚テスト（ルービックキューブ3面写真攻略）
-    res_vision = guide_training_app_creation("ルービックキューブの写真を3面分共有するだけで、完全攻略のルートを表示させるAIアプリ")
-    assert res_vision["status"] == "success"
-    # 画像認識は実在しない専用スキルではなく、Gemini のマルチモーダル入力の設計ポイントとして要件に入る
-    assert "gemini-multimodal-vision" not in res_vision["summoned_skills"]
-    assert "マルチモーダル" in res_vision["prompt_for_antigravity"]
-    assert "画像認識" in res_vision["prompt_for_antigravity"] or "写真" in res_vision["prompt_for_antigravity"]
-    assert "enable-a2ui" in res_vision["summoned_skills"]
+    # 1. アイデア未定: 参考例（データ）を返すが、定型文の読み上げはさせない
+    res = update_project_plan("", status="consulting", tool_context=ctx)
+    assert res["confirmation_status"] == "consulting" and res["is_confirmed"] is False
+    assert res["command"] == ""
+    assert len(res["idea_examples"]) >= 3
+    assert "質問" in res["next_action"]
 
-    # 4. RAGスキル召喚テスト（社内規程・マニュアル問い合わせBot）
-    res_rag = guide_training_app_creation("社内就業規則やITセキュリティマニュアルの問い合わせ回答Bot")
-    assert res_rag["status"] == "success"
-    assert "rag-engine-setup" in res_rag["summoned_skills"]
-    assert "RAG" in res_rag["prompt_for_antigravity"]
+    # 2. LLM が要約したアイデアを記録。「？」を含んでも LLM が consulting と言えば consulting、確定もしない
+    res = update_project_plan("日報を自動要約して重要トピックを抽出するAI？", status="consulting", tool_context=ctx)
+    assert res["confirmation_status"] == "consulting"
+    assert HitmanState(store).user_idea.startswith("日報を自動要約")
+    assert res["idea_examples"] == []
+    assert res["agent_name"] == "report_summary_ai"
 
-    # 5. 長期記憶スキル召喚テスト（ユーザーの好みを記憶するパーソナル推薦Bot）
-    res_memory = guide_training_app_creation("会話履歴や過去のユーザー好みを記憶して個別最適な提案を行うエージェント")
-    assert res_memory["status"] == "success"
-    assert "memory-bank-setup" in res_memory["summoned_skills"]
+    # 3. 「これで決定」等の言葉ではなく、status='confirmed' で確定する（idea 空なら直前の企画を使う）
+    res = update_project_plan("", status="confirmed", tool_context=ctx)
+    assert res["confirmation_status"] == "confirmed" and res["is_confirmed"] is True
+    assert res["command"] == "cat ipp-agent-workspace/project_brief.md"
+    assert "日報を自動要約" in res["prompt_for_antigravity"]
+    assert "[skill:pick-your-agent-project@v1]" in res["prompt_for_antigravity"]
+
+    # 4. 確定する中身が無いときは確定しない
+    empty: dict = {}
+    ctx2 = type("Ctx", (), {"state": empty})()
+    res = update_project_plan("", status="confirmed", tool_context=ctx2)
+    assert res["status"] == "error" and res["is_confirmed"] is False
 
 
-def test_guide_training_app_creation_consultation_and_confirmation_gate():
-    """ステップ T-2 のアイデア相談・壁打ちフェーズと確定ゲート制御の検証。"""
-    # 1. 相談・壁打ちの質問（「え？自分で考えるの？そうだな、こういうアプリは作れるかな？」）
-    # 受講生の戸惑いを受け止め、ゼロから考えなくてよい安心メッセージと3大定番が提示されること
-    res_consult_1 = guide_training_app_creation("え？自分で考えるの？そうだな、こういうアプリは作れるかな？")
-    assert res_consult_1["status"] == "success"
-    assert res_consult_1["confirmation_status"] == "consulting"
-    assert res_consult_1["is_confirmed"] is False
-    assert res_consult_1["command"] == ""  # ターミナルコマンドを出さない
-    assert "相談" in res_consult_1["title"] or "壁打ち" in res_consult_1["title"]
-    assert "ゼロから全部考えられなくても大丈夫" in res_consult_1["message"]
-    assert "障害ログ" in res_consult_1["message"]
-    assert "コースB" in res_consult_1["message"]
+def test_update_project_plan_skills_and_course_b():
+    from app.agent import update_project_plan
 
-    # 2. 完全な困惑（「思いつかない、何を入力すればいい？」）でも安心スキャフォールディングが返ること
-    res_hesitant = guide_training_app_creation("思いつかない、何を入力すればいい？")
-    assert res_hesitant["confirmation_status"] == "consulting"
-    assert res_hesitant["is_confirmed"] is False
-    assert res_hesitant["command"] == ""
-    assert "ゼロから全部考えられなくても大丈夫" in res_hesitant["message"]
-    assert "社内規程" in res_hesitant["message"] or "マニュアル" in res_hesitant["message"]
+    ctx = type("Ctx", (), {"state": {}})()
+    # 画像を扱う企画: 実在しない専用スキルは召喚せず、設計ポイントとして記載
+    res = update_project_plan("写真から設備メーターの値を読み取る点検アプリ", tool_context=ctx)
+    assert "gemini-multimodal-vision" not in res["summoned_skills"]
+    assert any("マルチモーダル" in p for p in res["design_points"])
+    assert "enable-a2ui" in res["summoned_skills"] and "ipp-agent-smoke-test" in res["summoned_skills"]
+    # RAG / Memory
+    assert "rag-engine-setup" in update_project_plan("社内規程マニュアルのFAQ検索Bot", tool_context=ctx)["summoned_skills"]
+    assert "memory-bank-setup" in update_project_plan("前回の好みを記憶して提案するアシスタント", tool_context=ctx)["summoned_skills"]
 
-    # 3. 特定アイデアの実現性相談（「日報自動要約AIって作れる？」）
-    res_consult_2 = guide_training_app_creation("日報自動要約AIって作れる？")
-    assert res_consult_2["confirmation_status"] == "consulting"
-    assert res_consult_2["command"] == ""
-    assert "日報自動要約AI" in res_consult_2["user_idea"]
-    assert "これで決定！" in res_consult_2["message"]
+    # コースB: 受講生が選んだときだけ course='hitman_clone'（LLM が明示）
+    res = update_project_plan("", status="consulting", course="hitman_clone", tool_context=type("C", (), {"state": {}})())
+    assert "コースB" in res["course"] and res["command"] == ""
+    res = update_project_plan("", status="confirmed", course="hitman_clone", tool_context=type("C", (), {"state": {}})())
+    assert res["is_confirmed"] is True
+    assert res["command"] == "cat ipp-agent-workspace/hitman_spec.md"
 
-    # 4. 直前の相談アイデアを踏まえた確定（「これで決定！」）
-    res_confirm = guide_training_app_creation("これで決定！")
-    assert res_confirm["confirmation_status"] == "confirmed"
-    assert res_confirm["is_confirmed"] is True
-    assert res_confirm["command"] == "cat ipp-agent-workspace/project_brief.md"
-    assert "コース確定" in res_confirm["message"]
-    assert "日報自動要約AI" in res_confirm["user_idea"] or "日報自動要約AI" in res_confirm["title"]
 
-    # 4-2. ユーザー実例: 「カレンダー＆WBSスケジュール管理」相談後に「これで決定！このアイデアで進めます。」で確定
-    res_sched_consult = guide_training_app_creation("カレンダー＆WBS形式のスケジュール管理とプライバシー保護機能を備えたAIツールを作りたい")
-    assert res_sched_consult["confirmation_status"] == "consulting"
-    assert "コースA" in res_sched_consult["course"]
-    assert "スケジュール管理" in res_sched_consult["user_idea"]
+def test_guide_training_app_creation_is_thin_wrapper():
+    """REST API 互換の旧関数は、キーワード判定をせず update_project_plan に委譲する。"""
+    from app.agent import guide_training_app_creation
 
-    res_sched_confirm = guide_training_app_creation("これで決定！このアイデアで進めます。")
-    assert res_sched_confirm["confirmation_status"] == "confirmed"
-    assert res_sched_confirm["is_confirmed"] is True
-    assert "コースA" in res_sched_confirm["course"]
-    assert "コースB" not in res_sched_confirm["course"]
-    assert "hitman_spec.md" not in res_sched_confirm["command"]
-    assert res_sched_confirm["command"] == "cat ipp-agent-workspace/project_brief.md"
-    assert "スケジュール管理" in res_sched_confirm["user_idea"] or "スケジュール管理" in res_sched_confirm["title"]
+    ctx = type("Ctx", (), {"state": {}})()
+    res = guide_training_app_creation("これで決定！", is_confirmed=False, tool_context=ctx)
+    assert res["confirmation_status"] == "consulting"  # 「決定」という言葉では確定しない
+    res = guide_training_app_creation("障害ログ解析Bot", is_confirmed=True, tool_context=ctx)
+    assert res["confirmation_status"] == "confirmed"
+    assert res["command"] == "cat ipp-agent-workspace/project_brief.md"
 
-    # 5. 明示的な is_confirmed フラグによる制御
-    res_explicit_consult = guide_training_app_creation("障害ログ解析Bot", is_confirmed=False)
-    assert res_explicit_consult["confirmation_status"] == "consulting"
-    assert res_explicit_consult["command"] == ""
 
-    res_explicit_confirm = guide_training_app_creation("障害ログ解析Bot", is_confirmed=True)
-    assert res_explicit_confirm["confirmation_status"] == "confirmed"
-    assert res_explicit_confirm["command"] == "cat ipp-agent-workspace/project_brief.md"
+def test_offer_choices_stores_trimmed_unique_choices():
+    from app.agent import offer_choices, HitmanState
 
-    # 6. コースB（HITMANクローン）の相談と確定
-    res_hitman_consult = guide_training_app_creation("HITMANクローンってどういうもの？")
-    assert res_hitman_consult["confirmation_status"] == "consulting"
-    assert res_hitman_consult["command"] == ""
-    assert "コースB" in res_hitman_consult["course"]
-    assert "ゼロから全部考えられなくても大丈夫" in res_hitman_consult["message"]
-
-    res_hitman_confirm = guide_training_app_creation("コースBで決定！")
-    assert res_hitman_confirm["confirmation_status"] == "confirmed"
-    assert res_hitman_confirm["command"] == "cat ipp-agent-workspace/hitman_spec.md"
-
+    store: dict = {}
+    ctx = type("Ctx", (), {"state": store})()
+    res = offer_choices(["ログ解析Botで進めたい", "ログ解析Botで進めたい", " ", "もう少し詳しく", "別案も見たい", "コースBにする", "5個目"], tool_context=ctx)
+    assert res["shown"] == ["ログ解析Botで進めたい", "もう少し詳しく", "別案も見たい", "コースBにする"]
+    assert HitmanState(store).snapshot()["suggestions"] == res["shown"]
 
 
 def test_set_and_get_operation_mode():

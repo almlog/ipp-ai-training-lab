@@ -69,9 +69,12 @@ def _default_script(req: LlmRequest) -> LlmResponse:
         return _call("verify_step_output", {"step_number": m.group(1), "command_output": m.group(2)})
     m = re.search(r"IDEA:(.*)", text, re.S)
     if m:
-        return _call("guide_training_app_creation", {"idea": m.group(1).strip(), "course_type": "original", "is_confirmed": False})
+        return _call("update_project_plan", {"idea_summary": m.group(1).strip(), "status": "consulting"})
     if "CONFIRM" in text:
-        return _call("guide_training_app_creation", {"idea": "これで決定！", "course_type": "original", "is_confirmed": True})
+        return _call("update_project_plan", {"idea_summary": "", "status": "confirmed"})
+    m = re.search(r"CHOICES:(.*)", text, re.S)
+    if m:
+        return _call("offer_choices", {"choices": [c.strip() for c in m.group(1).split("|") if c.strip()]})
     # ツールを呼ばない雑談応答（紛らわしい文言のみ）
     return LlmResponse(content=types.Content(role="model", parts=[types.Part(text=TRICKY_TEXT)]))
 
@@ -137,13 +140,32 @@ def _chat(client: TestClient, uid: str, message: str, **extra: Any) -> dict:
 
 
 T1_LOG = "[skill:ipp-skill-check@v1]\nPS C:\\work> Get-ChildItem .agents\\skills -Name\nenable-a2ui\nipp-skill-check\npick-your-agent-project"
-T2_LOG = "# Project Brief\n## エージェント名: LogBot\n## 解決課題: 障害ログ解析\n## ツール: analyze_log"
-def _smoke_log() -> str:
+T2_LOG = "# Project Brief\n## エージェント名: log_analyzer_bot\n## 解決課題: 障害ログ解析\n## ツール: analyze_log"
+IDEA_MSG = "IDEA:障害ログを解析して原因を教えてくれるAIって作れる？"
+
+
+def _smoke_log(nonce: str = "", agent_dir: str = "") -> str:
     from tests.unit.test_smoke_judge import _run, analyze_log
-    return _run(analyze_log)
+    return _run(analyze_log, nonce=nonce, agent_dir=agent_dir)
 
 
-T3_LOG = _smoke_log()  # T-3 は実動作のスモークテスト出力で合格する
+def _t3_log(client: TestClient, uid: str) -> str:
+    """T-3 はその受講生に発行された確認コード付き・企画どおりのフォルダで実行したスモーク出力でのみ合格する。"""
+    st = client.get("/api/session/state", params={"user_id": uid}).json()["state"]
+    assert st["t3_nonce"], st
+    return _smoke_log(st["t3_nonce"], st["agent_slug"])
+
+
+def _confirm_plan(client: TestClient, uid: str) -> dict:
+    _chat(client, uid, IDEA_MSG)
+    return _chat(client, uid, "CONFIRM")["state"]
+
+
+def _pass_until_t3(client: TestClient, uid: str) -> None:
+    _chat(client, uid, f"LOG[T-1]:{T1_LOG}")
+    _confirm_plan(client, uid)
+    _chat(client, uid, f"LOG[T-1]:{T2_LOG}")
+
 T4_LOG = "============ test session starts ============\ncollected 5 items\n============ 5 passed in 0.21s ============"
 T5_LOG = "Deploying container to Cloud Run service [my-ai-agent]...\nService URL: https://my-ai-agent-abc.a.run.app"
 T6_LOG = "To https://github.com/student/my-agent.git\n * [new branch] main -> main"
@@ -164,8 +186,12 @@ def test_happy_path_advances_exactly_one_step_per_approved_log(client):
     uid = "u-happy"
     _start_training(client, uid)
     expected = ["T-2", "T-3", "T-4", "T-5", "T-6", "T-6"]
-    logs = [T1_LOG, T2_LOG, T3_LOG, T4_LOG, T5_LOG, T6_LOG]
+    logs = [T1_LOG, T2_LOG, None, T4_LOG, T5_LOG, T6_LOG]
     for i, (log, nxt) in enumerate(zip(logs, expected, strict=True), start=1):
+        if i == 2:
+            _confirm_plan(client, uid)
+        if log is None:
+            log = _t3_log(client, uid)
         # LLMは常に誤って T-1 を渡す（旧実装では巻き戻り・誤判定の原因）
         data = _chat(client, uid, f"LOG[T-1]:{log}")
         st = data["state"]
@@ -191,8 +217,7 @@ def test_llm_passing_future_step_cannot_skip(client):
 def test_self_assertion_keeps_current_step(client):
     uid = "u-assert"
     _start_training(client, uid)
-    for log in (T1_LOG, T2_LOG):
-        _chat(client, uid, f"LOG[T-1]:{log}")
+    _pass_until_t3(client, uid)
     data = _chat(client, uid, "LOG[T-1]:だいじょうぶでした。次に進もう！")
     st = data["state"]
     assert st["current_step"] == "T-3"
@@ -216,7 +241,7 @@ def test_idea_consultation_does_not_move_step_and_is_per_user(client):
     _start_training(client, a)
     _start_training(client, b)
     _chat(client, a, f"LOG[T-1]:{T1_LOG}")
-    data_a = _chat(client, a, "IDEA:障害ログを解析して原因を教えてくれるAIって作れる？")
+    data_a = _chat(client, a, IDEA_MSG)
     assert data_a["state"]["current_step"] == "T-2"
     assert "障害ログ" in data_a["state"]["user_idea"]
 
@@ -254,8 +279,8 @@ def test_reselecting_same_course_keeps_progress(client):
     """『選択中（折りたたむ）』ボタン相当の同一コース再選択で進捗が消えない。"""
     uid = "u-reselect"
     _start_training(client, uid)
-    for log in (T1_LOG, T2_LOG, T3_LOG):
-        _chat(client, uid, f"LOG[T-1]:{log}")
+    _pass_until_t3(client, uid)
+    _chat(client, uid, f"LOG[T-1]:{_t3_log(client, uid)}")
     st = client.post("/api/training/course", json={"user_id": uid, "course": "original"}).json()["state"]
     assert st["current_step"] == "T-4"
     assert set(st["results"]) == {"T-1", "T-2", "T-3"}
@@ -332,8 +357,52 @@ def test_session_sync_restores_on_page_load(client):
 def test_toggling_mode_resumes_at_first_incomplete_step(client):
     uid = "u-toggle"
     _start_training(client, uid)
-    for log in (T1_LOG, T2_LOG):
-        _chat(client, uid, f"LOG[T-1]:{log}")
+    _pass_until_t3(client, uid)
     client.post("/api/mode", json={"user_id": uid, "mode": "NORMAL"})
     st = client.post("/api/mode", json={"user_id": uid, "mode": "TRAINING"}).json()["state"]
     assert st["current_step"] == "T-3"
+
+
+def test_offer_choices_are_returned_for_the_turn_and_reset_next_turn(client):
+    """LLM が offer_choices で出した返答候補がそのターンの state に載り、次のターンには持ち越されない。"""
+    uid = "u-choices"
+    _start_training(client, uid)
+    data = _chat(client, uid, "CHOICES:ログ解析Botで進めたい|もう少し詳しく聞きたい|別のアイデアも見たい")
+    assert data["state"]["suggestions"] == ["ログ解析Botで進めたい", "もう少し詳しく聞きたい", "別のアイデアも見たい"]
+    data2 = _chat(client, uid, "ありがとう")
+    assert data2["state"]["suggestions"] == []
+
+
+def test_t2_requires_confirmed_plan_and_matching_brief(client):
+    """企画が未確定のまま、または確定した企画と別物の企画書を貼っても T-2 は合格しない（実機で発生した誤合格）。"""
+    uid = "u-t2-bind"
+    _start_training(client, uid)
+    _chat(client, uid, f"LOG[T-1]:{T1_LOG}")
+    data = _chat(client, uid, f"LOG[T-1]:{T2_LOG}")
+    assert data["state"]["current_step"] == "T-2"
+    assert data["state"]["verdict_this_turn"]["verdict"] == "FAILED"
+
+    _chat(client, uid, "IDEA:カレンダーとタスクと写真日記をまとめるツール")
+    st = _chat(client, uid, "CONFIRM")["state"]
+    assert st["plan_confirmed"] is True and st["agent_slug"] != "log_analyzer_bot"
+    data = _chat(client, uid, f"LOG[T-1]:{T2_LOG}")  # 別企画（ログ解析Bot）の企画書
+    assert data["state"]["current_step"] == "T-2"
+    assert data["state"]["verdict_this_turn"]["w_check_status"] == "BLOCKED_RETRY"
+
+    brief = T2_LOG.replace("log_analyzer_bot", st["agent_slug"])
+    data = _chat(client, uid, f"LOG[T-1]:{brief}")
+    assert data["state"]["current_step"] == "T-3"
+    assert data["state"]["t3_nonce"].startswith("T3-")
+    sop = client.get("/api/sop", params={"user_id": uid, "mode": "TRAINING"}).json()["sop"]
+    assert f"--nonce {data['state']['t3_nonce']}" in sop["T-3"]["command"]
+    assert f"ipp-agent-workspace/{st['agent_slug']}" in sop["T-3"]["command"]
+
+
+def test_changing_idea_after_confirm_requires_reconfirmation(client):
+    uid = "u-reconfirm"
+    _start_training(client, uid)
+    _chat(client, uid, f"LOG[T-1]:{T1_LOG}")
+    st = _confirm_plan(client, uid)
+    assert st["plan_confirmed"] is True
+    st = _chat(client, uid, "IDEA:社内の日報を要約してくれるAI")["state"]
+    assert st["plan_confirmed"] is False
