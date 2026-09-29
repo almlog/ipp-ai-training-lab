@@ -618,6 +618,44 @@
     filter: brightness(1.1);
   }
 
+  /* 次にやること（プロンプト中心）カード */
+  .step-prompt-card {
+    border: 1px solid #bfdbfe;
+    border-left: 4px solid var(--accent);
+    background: #f8fbff;
+    border-radius: 8px;
+    padding: 0.8rem 0.9rem;
+    font-size: 0.86rem;
+    line-height: 1.55;
+    scroll-margin-top: 8px;
+  }
+  .step-prompt-card .spc-head { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; margin-bottom: 0.2rem; }
+  .step-prompt-card .spc-tag { background: var(--accent); color: #fff; font-weight: 700; font-size: 0.72rem; border-radius: 4px; padding: 1px 6px; }
+  .step-prompt-card .spc-title { font-weight: 700; color: var(--text-main); }
+  .step-prompt-card .spc-verdict { font-size: 0.78rem; color: var(--success); font-weight: 600; margin-bottom: 0.4rem; }
+  .step-prompt-card .spc-section { margin-top: 0.6rem; }
+  .step-prompt-card .spc-label { font-weight: 700; color: var(--primary); font-size: 0.8rem; margin-bottom: 0.25rem; }
+  .step-prompt-card .spc-copy {
+    display: inline-flex; align-items: center; gap: 0.35rem;
+    background: var(--accent); color: #fff; border: none; border-radius: 6px;
+    padding: 0.45rem 0.9rem; font-size: 0.85rem; font-weight: 700; cursor: pointer;
+  }
+  .step-prompt-card .spc-copy:hover { background: var(--primary-hover); }
+  .step-prompt-card .spc-prompt {
+    margin: 0.4rem 0 0; max-height: 220px; overflow: auto; white-space: pre-wrap; word-break: break-word;
+    background: #fff; border: 1px solid var(--border); border-radius: 6px; padding: 0.5rem 0.6rem;
+    font-size: 0.76rem; color: #334155;
+  }
+  .step-prompt-card .spc-pending { color: var(--text-muted); background: #fff; border: 1px dashed var(--border); border-radius: 6px; padding: 0.5rem 0.6rem; }
+  .step-prompt-card details { margin-top: 0.5rem; font-size: 0.76rem; color: var(--text-muted); }
+  .step-prompt-card details code { display: block; margin-top: 0.3rem; white-space: pre-wrap; word-break: break-all; background: var(--cmd-bg); color: var(--cmd-text); padding: 0.4rem 0.5rem; border-radius: 4px; }
+  /* 応答待ちの進捗表示 */
+  .wait-indicator { color: var(--text-muted); font-size: 0.84rem; }
+  .wait-indicator .wait-bar { position: relative; height: 4px; background: #e2e8f0; border-radius: 2px; overflow: hidden; margin-top: 0.4rem; width: 220px; max-width: 100%; }
+  .wait-indicator .wait-bar::after { content: ""; position: absolute; left: -40%; width: 40%; height: 100%; background: var(--accent); animation: wait-slide 1.2s ease-in-out infinite; }
+  @keyframes wait-slide { from { left: -40%; } to { left: 100%; } }
+  @media (prefers-reduced-motion: reduce) { .wait-indicator .wait-bar::after { animation: none; left: 0; width: 100%; opacity: 0.4; } }
+
   .btn-copy-agy {
     display: inline-flex;
     align-items: center;
@@ -3533,7 +3571,7 @@ async function switchTrainingCourse(course) {
     showToast(`✓ 【${data.course_name || course}】に切り替えました`);
     const stepNow = appState.currentStep;
     const doneNote = (appState.sopResults["T-1"] && appState.sopResults["T-1"].verdict === "SUCCESS") ? "ステップ T-1 は合格済みです。" : "";
-    sendMessage(`【受講コース選択: ${data.course_name || course}】\n研修コースを${data.course_name || course}に確定しました。${doneNote}現在のステップ『${stepNow}』の作業手順とAntiGravity投入用プロンプトを提示してください。`);
+    sendMessage(`【受講コース選択: ${data.course_name || course}】\n研修コースを${data.course_name || course}に確定しました。${doneNote}現在のステップ『${stepNow}』で何をするかを短く案内してください（AntiGravity 用プロンプトは画面の『次にやること』カードに表示されます）。`);
   } catch(e) {
     alert("コース切替エラー: " + e.message);
   }
@@ -5045,7 +5083,9 @@ function renderFlowChart() {
           <span class="step-num-tag">${step.id}</span>
           <span class="step-title-text">${step.title}</span>
         </div>
-        <div class="step-cmd-preview">${resolveStepVariables(step.cmd).substring(0, 45)}...</div>
+        ${appState.mode === "TRAINING"
+          ? `<div class="step-cmd-preview" style="font-family:inherit;">${escapeHtml(resolveStepVariables(step.check || "").substring(0, 48))}${(step.check || "").length > 48 ? "…" : ""}</div>`
+          : `<div class="step-cmd-preview">${resolveStepVariables(step.cmd).substring(0, 45)}...</div>`}
         <div style="margin-top:0.35rem;display:flex;gap:0.35rem;flex-wrap:wrap;">
           ${step.agy_prompt ? `<button type="button" class="btn-copy-agy" onclick="event.stopPropagation(); copyAgyPrompt('${step.id}')" title="AntiGravity投入用プロンプトをクリップボードにコピー"><span class="material-symbols-outlined" style="font-size:14px;vertical-align:middle;">content_copy</span><span>AGYプロンプト</span></button>` : ""}
           ${appState.mode === "TRAINING" && appState.trainerDebugMode !== false ? `<button type="button" class="btn-step-test-log" onclick="event.stopPropagation(); injectStepDummyLog('${step.id}', 'ok')" title="正常パターン（合格する想定のログ）を入力欄に注入"><span>🧪 正常</span></button><button type="button" class="btn-step-test-log btn-step-test-log-ng" onclick="event.stopPropagation(); injectStepDummyLog('${step.id}', 'ng')" title="異常パターン（不合格になる想定のログ）を入力欄に注入"><span>🧪 異常</span></button>` : ""}
@@ -5965,6 +6005,92 @@ function renderSuggestionChips(container, suggestions) {
   container.appendChild(row);
 }
 
+// チャット欄を、指定した要素の先頭が見える位置までスクロールする（最下部ではなく、読み始める位置へ）
+function scrollLogTo(elm, smooth = true) {
+  if (!elm) return;
+  const top = elm.getBoundingClientRect().top - log.getBoundingClientRect().top + log.scrollTop - 8;
+  const reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  log.scrollTo({ top: Math.max(0, top), behavior: smooth && !reduce ? "smooth" : "auto" });
+}
+
+// 「次にやること」カード：AntiGravity に貼るプロンプトを主役にし、コマンドは参考として畳んで表示する
+function buildStepPromptCard(stepId, verdictLine) {
+  const step = SOP_ITEMS.find(s => s.id === stepId);
+  if (!step) return null;
+  const prompt = resolveStepVariables(step.agy_prompt || "");
+  const pending = !prompt || prompt.includes("合格すると、あなたの企画書");
+  const card = el("div", "step-prompt-card");
+  card.dataset.step = stepId;
+
+  const head = el("div", "spc-head");
+  head.appendChild(el("span", "spc-tag", stepId));
+  head.appendChild(el("span", "spc-title", "次にやること：" + (step.title || "").replace(/^ステップ\s*T-\d+:\s*/, "")));
+  card.appendChild(head);
+  if (verdictLine) card.appendChild(el("div", "spc-verdict", verdictLine));
+
+  const s1 = el("div", "spc-section");
+  s1.appendChild(el("div", "spc-label", "① AntiGravity に貼る指示"));
+  if (pending) {
+    s1.appendChild(el("div", "spc-pending", prompt || "このステップの指示は、前のステップが合格すると表示されます。"));
+  } else {
+    const btn = el("button", "spc-copy");
+    btn.type = "button";
+    btn.innerHTML = `<span class="material-symbols-outlined" style="font-size:18px;">content_copy</span><span>プロンプトをコピー</span>`;
+    btn.onclick = (e) => { e.stopPropagation(); copyAgyPrompt(stepId); };
+    s1.appendChild(btn);
+    s1.appendChild(el("div", "", "AntiGravity の新しい会話に貼り付けて送信してください。"));
+    const pre = el("pre", "spc-prompt", prompt);
+    s1.appendChild(pre);
+  }
+  card.appendChild(s1);
+
+  if (step.check) {
+    const s2 = el("div", "spc-section");
+    s2.appendChild(el("div", "spc-label", "② 合格の条件"));
+    s2.appendChild(el("div", "", resolveStepVariables(step.check)));
+    card.appendChild(s2);
+  }
+  const s3 = el("div", "spc-section");
+  s3.appendChild(el("div", "spc-label", "③ HITMAN に貼るもの"));
+  s3.appendChild(el("div", "", "AntiGravity が最後に出力するコードブロック（1行目が [skill:…]）を、そのままこのチャット欄に貼り付けてください。API キーは貼らないでください。"));
+  card.appendChild(s3);
+
+  if (step.cmd) {
+    const d = el("details");
+    d.appendChild(el("summary", "", "参考：AntiGravity が実行するコマンド（手で打つ必要はありません）"));
+    d.appendChild(el("code", "", resolveStepVariables(step.cmd)));
+    card.appendChild(d);
+  }
+  if (step.cautions) {
+    const c = el("div", "spc-section");
+    c.style.fontSize = "0.76rem";
+    c.style.color = "var(--text-muted)";
+    c.textContent = "⚠ " + resolveStepVariables(step.cautions);
+    card.appendChild(c);
+  }
+  return card;
+}
+
+// ステップが新しく始まったとき（合格で進んだ・コース選択直後など）だけカードを出す。同じステップで何度も出さない
+function stepPromptCardKey(st) {
+  return `${st.course || ""}|${st.current_step || ""}|${st.agent_slug || ""}|${st.t3_nonce ? "n" : ""}`;
+}
+
+function appendStepPromptCard(st, verdictLine) {
+  const stepId = st.current_step;
+  const card = buildStepPromptCard(stepId, verdictLine);
+  if (!card) return null;
+  const m = el("div", "msg agent");
+  const b = el("div", "bubble rich");
+  b.appendChild(card);
+  m.appendChild(b);
+  log.appendChild(m);
+  appState.promptCardKey = stepPromptCardKey(st);
+  appState.chatHistory.push({ role: "prompt_card", step: stepId, verdictLine: verdictLine || "" });
+  saveState();
+  return card;
+}
+
 function renderReply(b, parts, saveHistory = true, serverState = null, stepContext = null, showChips = true) {
   const ws = document.getElementById("workspace");
   if (ws && ws.classList.contains("mobile-show-sop")) {
@@ -5986,6 +6112,7 @@ function renderReply(b, parts, saveHistory = true, serverState = null, stepConte
   const vts = vt ? vt.w_check_status : "";
   const bannerKey = useServerVerdict
     ? (vts === "SECURITY_BLOCKED" ? "security"
+      : vts === "SECRET_LEAK_BLOCKED" ? "secret"
       : vts === "COURSE_SELECTED" ? "course"
       : vts === "VERIFIED_APPROVED" ? "approved"
       : vts === "TRAINING_GUIDANCE" ? "guidance"
@@ -6005,6 +6132,14 @@ function renderReply(b, parts, saveHistory = true, serverState = null, stepConte
     banner.style.color = "#991b1b";
     banner.style.marginBottom = "0.6rem";
     banner.innerHTML = `<span class="material-symbols-outlined" style="font-size:18px;color:#dc2626;">security</span><span><strong>【AI確認者 セキュリティ遮断 🚨】</strong> 危険な破壊的コマンドまたは不正プロンプトを検知しました。安全保護規程に基づき、手順の進行を即時ロックしています。</span>`;
+    b.appendChild(banner);
+  } else if (bannerKey === "secret") {
+    const banner = el("div", "pair-check-box");
+    banner.style.background = "#fef2f2";
+    banner.style.borderColor = "#ef4444";
+    banner.style.color = "#991b1b";
+    banner.style.marginBottom = "0.6rem";
+    banner.innerHTML = `<span class="material-symbols-outlined" style="font-size:18px;color:#dc2626;">key_off</span><span><strong>【認証情報の遮断 🔒】</strong> 提出内容に API キー等が含まれていたため、判定を中止しました。キーは無効化・再発行し、.env にだけ書いてください。</span>`;
     b.appendChild(banner);
   } else if (bannerKey === "course") {
     const banner = el("div", "pair-check-box");
@@ -6080,7 +6215,12 @@ function renderReply(b, parts, saveHistory = true, serverState = null, stepConte
     renderSuggestionChips(b, serverState.suggestions);
   }
   if (!b.childNodes.length) b.textContent = "(応答がありません)";
-  log.scrollTop = log.scrollHeight;
+  if (saveHistory) {
+    // 新しい応答は、読み始める位置（応答の先頭）へスクロールする。最下部へ飛ばすと先頭の案内やプロンプトが画面外に隠れる
+    scrollLogTo(b.parentElement || b);
+  } else {
+    log.scrollTop = log.scrollHeight;
+  }
 
   renderStepContext = null;
   renderServerDriven = false;
@@ -6093,6 +6233,33 @@ function renderReply(b, parts, saveHistory = true, serverState = null, stepConte
     }
     saveState();
   }
+}
+
+// 応答待ちの表示。処理全体の進捗率はサーバから取れないため、経過秒数と「いま何をしているか」を示す
+function startWaitIndicator(b, sentText) {
+  const t = (sentText || "").toLowerCase();
+  const phases = t.includes("[skill:ipp-cloud-run-deploy")
+    ? ["デプロイ結果を確認しています", "公開URLに実際にアクセスして、AI が応答するか確かめています（最大1分ほど）"]
+    : t.includes("[skill:ipp-agent-smoke-test")
+    ? ["スモークテストの生データを再判定しています", "企画書のツールが呼ばれているか照合しています"]
+    : t.includes("[skill:pick-your-agent-project")
+    ? ["企画書の書式を確認しています", "企画書から次のステップの手順を作っています"]
+    : ["HITMANが内容を確認しています", "HITMANが返答を考えています"];
+  b.innerHTML = "";
+  const box = el("div", "wait-indicator");
+  box.setAttribute("role", "status");
+  box.setAttribute("aria-live", "polite");
+  const label = el("div", "", phases[0] + "…");
+  box.appendChild(label);
+  box.appendChild(el("div", "wait-bar"));
+  b.appendChild(box);
+  const started = Date.now();
+  const timer = setInterval(() => {
+    const sec = Math.round((Date.now() - started) / 1000);
+    const phase = phases[Math.min(phases.length - 1, Math.floor(sec / 6))];
+    label.textContent = `${phase}…（${sec}秒経過）`;
+  }, 1000);
+  return () => clearInterval(timer);
 }
 
 // 認証情報（API キー等）の平文送信を防ぐ。サーバ側（app/secret_guard.py）でも同じ判定で遮断するが、
@@ -6133,7 +6300,8 @@ async function sendMessage(text) {
   input.value = "";
   input.style.height = "44px";
   const b = bubble("agent");
-  b.innerHTML = `<span style="color:#64748b;">HITMANが手順とログを検証中…</span>`;
+  const stopWait = startWaitIndicator(b, text);
+  const prevStep = appState.currentStep;
 
   const sendBtn = document.getElementById("send-btn");
   const pasteBtn = document.getElementById("btn-trainer-paste-log");
@@ -6159,13 +6327,26 @@ async function sendMessage(text) {
       updateCostMetrics(data.metrics);
     }
     const st = data.state || null;
+    const cardDue = !!(st && st.mode === "TRAINING" && st.course_selected && stepPromptCardKey(st) !== appState.promptCardKey);
     if (st && st.mode === "TRAINING") {
       // 状態を先に確定してから描画する（旧実装は描画→推測の順で1ステップずれていた）
-      applyServerState(st);
+      applyServerState(st, { refreshSop: !cardDue });
       if (st.session_restored) showToast("↻ サーバのセッションを直前の進捗から復元しました");
+      // 新しいステップのカードは、企画書に合わせて作り直された最新の手順で出す
+      if (cardDue) await refreshTrainingSop();
     }
+    stopWait();
     renderReply(b, data.parts || [], true, st, st ? st.current_step : null);
+    if (cardDue) {
+      const vt = st.verdict_this_turn;
+      const line = (vt && vt.w_check_status === "VERIFIED_APPROVED" && prevStep && prevStep !== st.current_step)
+        ? `✓ ステップ ${prevStep} 合格。続いてステップ ${st.current_step} です。` : "";
+      const card = appendStepPromptCard(st, line);
+      // 次のステップへ進んだら、コピーすべきプロンプトの先頭が見える位置へ
+      if (card) scrollLogTo(card.closest(".msg") || card);
+    }
   } catch (e) {
+    stopWait();
     b.textContent = "通信エラーが発生しました: " + e.message;
   } finally {
     chatInFlight = false;
@@ -6351,6 +6532,15 @@ window.addEventListener("DOMContentLoaded", () => {
     appState.chatHistory.forEach((item, i) => {
       if (item.role === "user") {
         bubble("user").textContent = item.text;
+      } else if (item.role === "prompt_card") {
+        const card = buildStepPromptCard(item.step, item.verdictLine);
+        if (card) {
+          const m = el("div", "msg agent");
+          const cb = el("div", "bubble rich");
+          cb.appendChild(card);
+          m.appendChild(cb);
+          log.appendChild(m);
+        }
       } else if (item.role === "agent") {
         const b = bubble("agent");
         renderReply(b, item.parts || [], false, item.state || null, item.step || null, i === lastAgentIdx);
