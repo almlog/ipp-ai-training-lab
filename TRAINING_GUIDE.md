@@ -163,17 +163,18 @@ uv run pytest
 
 ### 【マイルストーン 9】自作ツールの Cloud Run 本番デプロイ
 
-自作したオリジナルAIツールを、受講生個人の GCP プロジェクト上の Cloud Run へデプロイします：
+自作したオリジナルAIツールを、受講生個人の GCP プロジェクト上の Cloud Run へデプロイします。
+API キーは `.env` から Secret Manager へ安全に登録し、Cloud Run には参照だけを渡します（スキル `ipp-cloud-run-deploy`）。
+**`--set-env-vars` に API キーを書く方法は使いません**（デプロイログや Cloud Run の設定画面に平文で残るため）。
 
 ```bash
-gcloud run deploy my-custom-agent \
-  --source . \
-  --region us-central1 \
-  --allow-unauthenticated \
-  --set-env-vars "GOOGLE_API_KEY=AQ.xxx,GOOGLE_CLOUD_PROJECT=ipp-ai-training-xxxx,GOOGLE_CLOUD_LOCATION=global,GOOGLE_GENAI_USE_VERTEXAI=true"
+python .agents/skills/ipp-cloud-run-deploy/scripts/deploy.py \
+  --agent-dir ipp-agent-workspace/<エージェント名> \
+  --service <サービス名> --nonce <HITMAN の確認コード> --q "<動作確認の質問>"
 ```
 
-デプロイ完了後に出力される Service URL（`https://my-custom-agent-xxxx.run.app`）をブラウザで開けば、世界中からアクセス可能な受講生独自のAIツールが完成します！
+スクリプトは、デプロイ後に `/health` と `/chat` を実際に呼んで AI が応答することまで確かめます。
+出力された Service URL（`https://<サービス名>-xxxx.run.app`）をブラウザで開けば、世界中からアクセス可能な受講生独自のAIツールが完成します！
 
 ### 【マイルストーン 10】成果物の発表と共有
 

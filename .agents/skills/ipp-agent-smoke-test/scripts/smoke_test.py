@@ -162,7 +162,8 @@ def format_report(data: dict, command: str) -> str:
 
 def _load_dotenv_files(agent_dir: str) -> None:
     """.env を読み込む（既に設定済みの環境変数は上書きしない）。python-dotenv が無ければ簡易パーサで読む。"""
-    for path in (Path(agent_dir) / ".env", Path.cwd() / ".env", Path.cwd() / "hitman" / ".env"):
+    # 受講生自身のキーだけを使う（HITMAN 本体の hitman/.env は読まない）
+    for path in (Path(agent_dir) / ".env", Path.cwd() / ".env"):
         if not path.is_file():
             continue
         for line in path.read_text(encoding="utf-8", errors="ignore").splitlines():

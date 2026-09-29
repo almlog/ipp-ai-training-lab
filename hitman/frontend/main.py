@@ -432,6 +432,24 @@ async def chat(req: Request):
     if not message:
         return JSONResponse({"parts": [], "metrics": None, "state": None})
 
+    # 認証情報（API キー等）が含まれるメッセージは Gemini に送らない・会話履歴に残さない・ログに出さない。
+    # 判定を LLM に任せると、キーがモデルへの入力とセッション履歴に残ってしまうため、ここで止める。
+    from app.secret_guard import find_secrets, leak_guidance
+    secret_kinds = find_secrets(message)
+    if secret_kinds:
+        logger.warning("Blocked a chat message containing credentials (kinds=%s, user=%s)", secret_kinds, user_id)
+        state_payload = None
+        if use_direct:
+            state_payload = await _snapshot_state(user_id)
+            state_payload["verdict_this_turn"] = None
+            state_payload["session_restored"] = False
+            state_payload["secret_blocked"] = True
+        return JSONResponse({
+            "parts": [{"kind": "text", "text": leak_guidance(secret_kinds)}],
+            "metrics": None,
+            "state": state_payload,
+        })
+
     async with _user_lock(user_id):
         state_before_seq = 0
         session_restored = False

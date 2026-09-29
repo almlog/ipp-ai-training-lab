@@ -244,11 +244,16 @@ AntiGravity は素の状態でも賢いですが、本研修のリポジトリ�
 AntiGravity は、あなたが「◯◯を作って」と指示するだけで、適切なスキルを自動でポケットから取り出して活用します。
 
 1. 🎯 **`pick-your-agent-project`（企画壁打ちスキル）**:
-   - 「何を作ればいいかわからない」というあなたに質問を投げかけ、業務課題をヒアリングして立派な設計書（`project_brief.md`）にまとめてくれます。
+   - あなたの「作りたい」を聞き取り、機能を一緒に広げ・絞り込んで、研修で作れる設計書（`project_brief.md`）にまとめてくれます。**この設計書に書いたものが、そのまま T-3 以降で作られます。**
 2. 🎴 **`enable-a2ui`（リッチカード表示スキル）**:
    - 文字だけの味気ない返事ではなく、綺麗な枠線やカード、表がついた Google 最新の A2UI (v0.8) デザインを画面に描くコードを自動生成します。
-3. 🌐 **`build-agent-frontend`（Web画面作成スキル）**:
-   - スマホや PC のブラウザからあなたのエージェントとおしゃべりできる、FastAPI とチャット画面を一瞬で組み立てます。
+3. 🏗️ **`ipp-build-app-from-brief`（設計書どおりにアプリを作るスキル）**:
+   - 設計書の機能・画面・関数ツールをすべて実装します。画面はテンプレートのチャット画面ではなく、設計書の『画面』から作ります（カレンダー、一覧表、入力フォームなども作れます）。
+   - ※ `build-agent-frontend`（汎用チャット画面）は上級者向けで、研修の T-3〜T-5 では使いません。
+3-2. 🔒 **`ipp-secure-credentials`（API キー保護スキル）**:
+   - あなたの Gemini API キーを `.env` にだけ安全に置き、コード・ログ・GitHub に漏れていないかを検査します。
+3-3. 🚀 **`ipp-cloud-run-deploy`（安全なデプロイスキル）**:
+   - API キーを Secret Manager 経由で渡して Cloud Run に公開し、公開 URL で AI が応答するところまで確かめます。
 4. 🧠 **`memory-bank-setup`（長期記憶スキル）**:
    - 会話が終わってもあなたの名前や好みを忘れない「長期記憶エンジン（Vertex AI Memory Bank）」をエージェントに搭載します。
 5. 📚 **`rag-engine-setup`（社内資料検索スキル）**:
@@ -395,19 +400,12 @@ rag-engine-setup
 1. HITMAN の Step T-2 カードで **`[📋 AGYプロンプトをコピー]`** をクリック。
 2. AntiGravity に貼り付けて送信します。
 
-**【コースA（オリジナルAI）を選んだ場合のプロンプト】**:
-```text
-【AntiGravityに貼り付けるプロンプト: Step T-2 (コースA)】
-スキル「pick-your-agent-project」を活用して、私が現場で抱える課題を解決するオリジナルAIエージェントの企画・要件定義を作成してください。
-私の課題・作りたいもの: （例: クラウドログ監視と異常検知ボット、社内申請FAQボット など）
-以下の項目を含む「ipp-agent-workspace/project_brief.md」を作成し、内容を出力してください：
-1. エージェント名と目的（解決する現場課題）
-2. 使用するモデル（gemini-3.8-flash または 3.6-flash）
-3. 必要な関数ツール（自作ツール最低1つ）
-4. A2UIカード表示仕様（カードレイアウト、表示項目）
-5. 長期記憶（Memory Bank）活用方針
-【重要制約】今回は project_brief.md の策定のみを行ってください。Pythonコードの実装やデプロイはまだ行わないでください。
-```
+**【コースA（オリジナルAI）を選んだ場合】**:
+- プロンプトを貼ると、AntiGravity が **相談相手** になります。「どんな場面で、だれが、何に困っているか」を聞かれるので、作りたいものを自由に伝えてください。
+- AntiGravity が「こういう機能もあると便利ですか？」と機能を広げる提案をしてくれます。研修時間では難しい機能（ログイン、外部サービス連携など）は、理由と代わりの案を説明したうえで『今回は作らないもの』に入れます。
+- まとまったら設計書（`ipp-agent-workspace/project_brief.md`）を見せてくれるので、内容を確認して「この内容で進めて」と伝えます。
+- AntiGravity が `brief_check.py` で書式を検査し、HITMAN 提出用のコードブロック（1行目が `[skill:pick-your-agent-project@v1]`）を出力します。
+- ⚠️ この段階では API キーは使いません。**API キーはチャットに貼らないでください。**
 
 **【コースB（HITMANクローン）を選んだ場合のプロンプト】**:
 ```text
@@ -420,8 +418,8 @@ AIペアオペレーター「HITMAN」クローンの仕様を設計します。
 【重要制約】今回は仕様書作成のみを行い、実装コードの生成はまだ待機してください。
 ```
 
-3. **HITMAN への提出**: AntiGravity が画面に書き出した `project_brief.md`（または `hitman_spec.md`）の内容（タイトルやツールの箇条書きなど）をコピーし、HITMAN に提出します。
-4. 🟢 **合格判定** を受けて、Step T-3 へ進みます。
+3. **HITMAN への提出**: コースAは `brief_check.py` が出力したコードブロックを、コースBは `hitman_spec.md` の内容を、そのままコピーして HITMAN に提出します。
+4. 🟢 **合格判定** を受けて、Step T-3 へ進みます。コースAでは、**あなたの設計書の機能・画面・関数ツールに合わせて T-3〜T-6 の手順とプロンプトが自動で作られます。**
 
 ---
 
@@ -434,23 +432,12 @@ AIペアオペレーター「HITMAN」クローンの仕様を設計します。
 1. HITMAN の Step T-3 カードで **`[📋 AGYプロンプトをコピー]`** をクリック。
 2. AntiGravity に貼り付けて送信します。
 
-```text
-【AntiGravityに貼り付けるプロンプト: Step T-3】
-project_brief.md の定義に基づき、Google ADK (Python) で自作エージェントを実装してください。
-作業ディレクトリ: ipp-agent-workspace/my_agent/
-スキル「enable-a2ui」を参照し、以下を構築してください：
-1. agent.py:
-   - Google ADK Agent (MODEL: gemini-3.8-flash / 3.6-flash)
-   - 自作関数ツール（ログ解析、API連携、計算処理など）
-   - A2UI カードコールバック (after_model_callback=a2ui_callback)
-2. a2ui_utils.py: スキル enable-a2ui から A2UI v0.8 コールバックを配置
-3. pyproject.toml / requirements.txt: 依存パッケージ定義
-ツールは入力（引数）に応じて実際に処理すること（固定値を返すダミー実装は不可）。
-実装後、スキル「ipp-agent-smoke-test」で、内容の異なる2つの質問を使ってエージェントを実際に動かし、
-出力されたコードブロックを一字一句変えずに出力してください（FAIL の場合は修正して再実行）。
-```
+コースAのプロンプトは、あなたの設計書から自動で作られます（機能・画面・関数ツールの一覧入り）。主な流れ：
+1. **API キーの設定**: AntiGravity が `.env` ファイルを用意します。案内に従い、**エディタで `.env` を開いて自分のキーを貼り付けて保存**します（チャットには貼らない）。
+2. **実装**: スキル `ipp-build-app-from-brief` で、設計書どおりの画面（`static/`）・AI（`agent.py`）・データ（`store.py`）・サーバ（`main.py`）を作ります。
+3. **動作確認**: 設計書の Q1・Q2 を使ったスモークテストで、エージェントを実際に動かします。
 
-3. **見守る**: AntiGravity が `ipp-agent-workspace/my_agent/agent.py` などのファイルを自動生成し、最後にスモークテスト（動作確認）でエージェントを実際に動かします。
+3. **見守る**: AntiGravity が `ipp-agent-workspace/<エージェント名>/` にファイルを自動生成し、最後にスモークテスト（動作確認）でエージェントを実際に動かします。
 4. **HITMAN への提出**: スモークテストが出力したコードブロック（1行目が `[skill:ipp-agent-smoke-test@v1]`、最後が `SMOKE_DIGEST`）を、**そのまま全部**コピーして HITMAN に貼り付けます。
 5. 🚦 **HITMAN の判定**:
    - 🟢 **合格**: 自作ツールが実際に呼ばれ、質問によって応答と結果が変わることが確認できれば、Step T-4 へ進みます。
@@ -504,18 +491,15 @@ tests/test_agent.py::test_agent_response PASSED                          [100%]
 1. HITMAN の Step T-5 カードで **`[📋 AGYプロンプトをコピー]`** をクリック。
 2. AntiGravity に貼り付けて送信します。
 
-```text
-【AntiGravityに貼り付けるプロンプト: Step T-5】
-スキル「build-agent-frontend」を活用して、作成したエージェントを Google Cloud Run へデプロイしてください。
-1. frontend/ の配置: FastAPI プロキシ、チャットUI (static/index.html)、A2UI レンダラーの構築
-2. サービスアカウント権限: Cloud Run サービスアカウントに roles/aiplatform.user を付与
-3. デプロイコマンドの実行:
-   gcloud run deploy my-custom-agent --source ipp-agent-workspace/my_agent --region us-central1 --allow-unauthenticated
-4. 発行された本番公開サービスURL（https://...run.app）を出力してください。
+プロンプトの中で、AntiGravity は次のスクリプトを実行します（`gcloud run deploy` を手で打つことはしません）：
+```bash
+python .agents/skills/ipp-cloud-run-deploy/scripts/deploy.py --agent-dir ipp-agent-workspace/<エージェント名> --service <サービス名> --nonce <確認コード> --q "<設計書の Q1>"
 ```
+- あなたの `.env` の API キーを **Secret Manager に安全に登録**し、Cloud Run には参照だけを渡します（キーが画面・ログに出ることはありません）。
+- デプロイ後、公開 URL の `/health` と `/chat` を実際に呼んで、**AI が応答するところまで**確かめます。
 
 3. **見守る**: クラウドへのアップロードとコンテナの組み立てが行われます（約 2〜3 分かかります。お茶を飲んでリラックスしてお待ちください）。
-4. **HITMAN への提出**: 最後にターミナルに表示された **`Service URL: https://...run.app`** をコピーして HITMAN に貼り付けます。
+4. **HITMAN への提出**: スクリプトが出力したコードブロック（1行目が `[skill:ipp-cloud-run-deploy@v1]`、最後が `DEPLOY_DIGEST`）をそのままコピーして HITMAN に貼り付けます。HITMAN も公開 URL に実際にアクセスして確かめます。**URL が出ただけでは合格しません。**
 5. 🟢 **合格判定** を受けると、あなただけの本番 URL が承認され、最終ステップ T-6 がアンロックされます！
 
 ---

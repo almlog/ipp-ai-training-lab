@@ -1,5 +1,9 @@
 # IPP AI実践研修 開発ラボ 総合修正プラン ＆ 検証チェックリスト
 
+> [!NOTE]
+> **2026-09-30 追記（レビュー結果）**: 欠陥3（企画と成果物の落差）の根本原因は `build-agent-frontend` だけではなく、HITMAN の T-2 がキーワード表で企画を固定の Bot に置き換えていたこと（「カレンダー」→ WBS＆スケジュール管理Bot、T-3 の質問・ツールも WBS 用に固定）。
+> コースAを「受講生の企画書（project_brief.md）が唯一の設計図」となるよう再設計し、API キーを平文で扱わない仕組みを入れた。詳細は `docs/hitman-fix-history-and-roadmap.md` の「2026-09-30 再設計」を参照。
+
 - **作成日**: 2026-09-30
 - **対象**: `almlog/ipp-ai-training-lab`
 - **目的**: 2026-09-30の実機完走テストで発覚した重大欠陥・不備を根本解決し、受講生が感動・納得できる品質へと引き上げるための包括的修正計画と検証基準。
@@ -41,7 +45,8 @@ Error: Server returned non-JSON (HTTP 500). Internal Server Error
 
 ### Phase 1: デプロイ＆実稼働ヘルスチェックの信頼性担保（最優先・必須）
 1. **APIキー／クレデンシャルの自動注入**:
-   - `build-agent-frontend` の Dockerfile / デプロイコマンドにおいて、`gcloud run deploy --set-env-vars GEMINI_API_KEY=...`（または Secret Manager 参照）を自動設定するよう是正。
+   - ~~`gcloud run deploy --set-env-vars GEMINI_API_KEY=...`~~ は採用しない（キーがデプロイログ・Cloud Run の設定画面に平文で残り、そのログを HITMAN に貼るため）。
+   - **対応済み（2026-09-30）**: 新スキル `ipp-cloud-run-deploy` の `deploy.py` が、`.env` のキーを標準入力で Secret Manager に登録し、`--set-secrets` で参照だけを渡す。
 2. **T-5 デプロイ判定の実稼働ヘルスチェック義務化**:
    - `verify_step_output("T-5", ...)` の判定ロジックを改修。
    - デプロイログから抽出した Service URL に対し、バックエンドから実際に `POST /chat` リクエスト（ヘルスチェック用テストメッセージ）を送信する。
@@ -123,7 +128,7 @@ Error: Server returned non-JSON (HTTP 500). Internal Server Error
 1. **まず本ドキュメント（`docs/training-lab-comprehensive-fix-plan.md`）を通読する**。
 2. **Phase 1（APIキー注入と T-5 実稼働ヘルスチェック）から実装に着手する**。
    - `hitman/app/agent.py` の `verify_step_output`（T-5 判定部）に、実URL疎通テストを追加。
-   - `build-agent-frontend` のデプロイ指示プロンプトに `--set-env-vars GEMINI_API_KEY=...` を明記。
+   - ~~デプロイ指示プロンプトに `--set-env-vars GEMINI_API_KEY=...` を明記~~ → `ipp-cloud-run-deploy` の `deploy.py` を使う（Secret Manager 経由。対応済み）。
 3. **Phase 2（UI改善）に着手する**。
    - `hitman/frontend/static/index.html` のスクロール制御を修正。
    - カード表示をプロンプト中心に刷新。

@@ -5,6 +5,11 @@ description: Build a chat web frontend for a deployed ADK / Agent Engine agent a
 
 # Build a chat frontend
 
+> [!WARNING]
+> **IPP 研修（コースA / コースB）の T-3〜T-5 では使わない。** このスキルは Agent Engine（Agent Runtime）にデプロイ済みのエージェントに、汎用チャット画面をつなぐ上級者向けのものです。
+> コースAの画面は、受講生の企画書（`project_brief.md` の『3. 画面』）から `ipp-build-app-from-brief` スキルで作ります。このテンプレートをコピーすると、どの企画でも同じチャット画面になってしまいます。
+> Cloud Run へのデプロイは `ipp-cloud-run-deploy` スキルを使います（API キーを平文で渡さないため）。
+
 > [!NOTE]
 > **HITMAN 使用証跡**: このスキルを使って作業した回答では、HITMAN 提出用コードブロックの1行目に `[skill:build-agent-frontend@v1]` と出力すること（実際にこのスキルを使った場合のみ）。
 

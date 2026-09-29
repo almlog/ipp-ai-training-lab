@@ -14,15 +14,18 @@
 - フロント（`frontend/static/index.html`）は `/chat` などが返す `state` をそのまま表示する。LLM の応答文を正規表現やキーワードで解析して、ステップ・合否・コースを決めない。
 - localStorage の内容を読み込み時に書き換える「自己治癒」処理を追加しない。サーバの state が正で、`/api/session/sync` で同期する。
 
-## 3. 会話の理解は LLM、ツールは記録と事実の提供
-- T-2 の企画相談では、受講生の発言をツールに生のまま渡してキーワードで「確定・相談中・コース」を判定する実装にしない。LLM が要約と判断（`update_project_plan(idea_summary, status, course)`）を明示的に渡す。
+## 3. 会話の理解は LLM、ツールは記録と事実の提供。コースAの企画は受講生の企画書だけが決める
+- コースAの企画相談・機能の拡充・要件定義書（project_brief.md）の作成は Antigravity（スキル `pick-your-agent-project`）で行う。HITMAN の `update_project_plan` は企画の記録と進め方の案内だけを行う。
+- **コースAでは、キーワード表・固定の企画例・サンプルアプリで企画の中身（エージェント名・機能・画面・ツール・確認用の質問）を決めない。** 2026-09-30 の実機で「カレンダー＋ガント＋日記」の企画が、キーワード表で WBS 管理Bot に置き換えられ、別物のアプリができた。T-3〜T-6 は `state.brief`（T-2 で合格した企画書の解析結果）からだけ組み立てる（`_personalize_course_a_sop`）。
+- テンプレートで進むのはコースB（HITMANクローン）だけ。コースAの画面は企画書の『画面』から作らせる（`build-agent-frontend` のチャット画面テンプレートをコピーさせない）。
 - ツールは定型の会話文を返さない（LLM がそれを読み上げるだけになり、会話が固定化する）。返すのは記録内容・推奨スキル・次にやることなどの事実。
 - 返答候補のボタンは LLM が `offer_choices` で毎ターン作る。フロントに固定のチップを追加しない。
 
 ## 4. 合格条件は客観的な証跡で判定する
 - T-1: 新しい会話で `/ipp-skill-check` を実行した出力（`[skill:ipp-skill-check@v1]`）。
-- T-2: コースAは企画の確定（`update_project_plan(status="confirmed", agent_name=...)`）が必須で、企画書に確定したエージェント名が含まれること。別企画のサンプルで合格させない。
-- T-3: `ipp-agent-smoke-test` の出力。`SMOKE_JSON` の生データから再判定し、`SMOKE_DIGEST` で改変を検知する。T-2 合格時に発行した確認コード（`--nonce`）と企画どおりのフォルダ（`agent_dir`）が一致すること。
+- T-2: コースAは `brief_check.py` の出力（企画書の全文）を `app/project_brief.py` で解析し、書式どおり（基本情報・機能と受け入れ条件・画面・関数ツール・データ・認証情報・今回は作らないもの・Q1/Q2）なら合格。合格した内容が以降の設計図になる。`project_brief.py` はスキル側のコピーと同一に保つ。
+- T-3: `ipp-agent-smoke-test` の出力。`SMOKE_JSON` の生データから再判定し、`SMOKE_DIGEST` で改変を検知する。T-2 合格時に発行した確認コード（`--nonce`）と企画どおりのフォルダ（`agent_dir`）が一致し、呼ばれたツールが企画書の関数ツールを含むこと。
+- T-5: `ipp-cloud-run-deploy` の出力。`DEPLOY_JSON` / `DEPLOY_DIGEST`、確認コード、企画のサービス名、`/health`・`/chat` が 200 で AI の応答があることを確認し、さらに HITMAN 自身が公開URLへアクセスして確かめる（`live_deploy_check`。アクセス先は `_is_cloud_run_url` で受講生のサービスの Cloud Run URL に限定）。URL が出ただけで合格させない。
 - コマンドの失敗（`fatal: could not read`、`[rejected]`、`No such file or directory` など）を含むログは、URL やファイル名があっても合格させない。
 - 合格させるためにキーワードを追加して判定を緩めない。受講生が通れない場合は、手順・案内・スキルの側を直す。判定を変えたら「異常パターンが不合格になる」テストも追加する。
 
@@ -37,7 +40,10 @@
 - T-2（コースA）/T-3 の注入ログは受講生の企画・確認コードに紐づくため、`build_demo_evidence`（`/api/training/demo-evidence`）で生成する。Cloud Run では既定で無効（`HITMAN_DEMO_EVIDENCE=1` で有効）。受講生が合格ログを作れる経路を増やさない。
 - ツールやサンプルの成果物をダミー実装（引数を無視した固定値、LLM を通さない `/chat`、固定値だけを確認するテスト）で作らない。
 
-## 7. 環境と秘密情報
+## 7. 環境と秘密情報（受講生の API キーを平文で扱わない）
+- 受講生の Gemini API キーは、各自がエディタでアプリのフォルダの `.env` にだけ書く。プロンプト・カード・マニュアルで、キーをチャットに貼らせる・コマンドに埋め込む（`$env:GEMINI_API_KEY=...`、`export`）・`--set-env-vars` で渡す手順を案内しない。
+- Cloud Run へは `ipp-cloud-run-deploy` の `deploy.py` だけで渡す（キーは標準入力で Secret Manager に登録し、`--set-secrets` で参照だけを渡す）。
+- `/chat` と `verify_step_output` は `app/secret_guard.py` で認証情報を検知したら、Gemini に送らず・合格させず・値を表示しない。判定パターンはスキル側のコピー（`ipp-secure-credentials/scripts/secret_guard.py`）と画面（`index.html` の `SECRET_PATTERNS`）と同じに保つ。
 - 自分の環境で動いたことを、受講生の環境で動く根拠にしない。受講生の手順（クローン先・開くフォルダ・新しい会話）どおりに再現して確認する。仕様が不明なことは推測で断定せず、実機で確かめる。
 - API キーは `hitman/.env` にだけ置く。コマンド・ログ・チャット・コミットにキーの値を書かない。スクリプトは `.env` から読み込み、キーを表示しない。
 - 例外を握りつぶして「動いているように見える」フォールバックにしない。必ずログに出す。

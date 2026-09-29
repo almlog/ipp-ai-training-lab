@@ -51,6 +51,18 @@ Run everything from the **project root** (where `app/` / `project_brief.md` /
 `agents-cli-manifest.yaml` live). Ideally the participant has already done the
 "Share What You Built" step, so a `README.md` and demo GIF are in the repo.
 
+## Step 0 — IPP 研修: 認証情報の漏えい検査（必須）
+
+公開リポジトリに Gemini API キーが入ると、数分で悪用されます。プッシュの前に必ず実行し、`SECRET_SCAN: PASS` を確認してください。
+
+```bash
+python .agents/skills/ipp-secure-credentials/scripts/secret_scan.py ipp-agent-workspace/<エージェント名>
+```
+
+- `.env` は `.gitignore` で除外されていること（`env_setup.py` で設定済み）。`git status` に `.env` が出ていないことも確認する。
+- FAIL の場合はプッシュしない。キーが書かれていたファイルを直し、そのキーは無効化・再発行する（Git の履歴に一度でも入ったキーは漏えい扱い）。
+- `.env` の中身や `gh auth token` を表示しない。
+
 ## Step 1 — Prep (install gh, stage, scan). No commit, no push.
 
 ```bash

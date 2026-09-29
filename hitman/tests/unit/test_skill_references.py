@@ -114,11 +114,9 @@ def _bundled_evidences() -> dict:
 @pytest.mark.parametrize("course", ["original", "hitman_clone"])
 def test_bundled_sample_logs_follow_current_rules(course):
     """デモ用サンプルログ（🧪ログ注入）が現行の判定ルールと乖離していないこと。
-    - T-2: コースAは企画未確定なら不合格。確定した企画（サンプルと同じエージェント名）なら合格
-    - T-3: サンプルは受講生ごとの確認コードを持たないため、貼り付けだけでは合格しない（実機で起きた誤合格の防止）
-    - T-1/T-4/T-5/T-6: そのまま合格"""
-    from tests.unit.test_smoke_judge import _run, analyze_log
-
+    - T-2: コースAは書式どおりの企画書なら合格し、その企画書が以降の設計図になる
+    - T-3 / T-5: サンプルは受講生ごとの確認コードを持たないため、貼り付けだけでは合格しない（実機で起きた誤合格の防止）
+    - T-1/T-4/T-6: そのまま合格"""
     evid = _bundled_evidences()[course]
     assert sorted(evid) == ["T-1", "T-2", "T-3", "T-4", "T-5", "T-6"]
     store: dict = {}
@@ -133,17 +131,17 @@ def test_bundled_sample_logs_follow_current_rules(course):
         assert not res["skills_missing"], (step, res["skills_missing"])
 
     ok("T-1", evid["T-1"])
-    slug = "my_hitman" if course == "hitman_clone" else "my_agent"
-    if course == "original":
-        res = agent_module.verify_step_output("T-2", evid["T-2"], tool_context=ctx)
-        assert res["verdict"] == "FAILED" and st.current_step == "T-2"
-        st.agent_slug, st.plan_confirmed = slug, True  # サンプルと同じ企画で確定した想定
     ok("T-2", evid["T-2"])
+    if course == "original":
+        assert st.brief["agent_name"] == "expense_check_agent"
     res = agent_module.verify_step_output("T-3", evid["T-3"], tool_context=ctx)
     assert res["w_check_status"] == "BLOCKED_RETRY" and st.current_step == "T-3", res.get("message")
-    ok("T-3", "[skill:ipp-agent-smoke-test@v1]\n" + _run(analyze_log, nonce=st.t3_nonce, agent_dir=slug))
-    for step in ["T-4", "T-5", "T-6"]:
-        ok(step, evid[step])
+    ok("T-3", agent_module.build_demo_evidence("T-3", "ok", st)["text"])
+    ok("T-4", evid["T-4"])
+    res = agent_module.verify_step_output("T-5", evid["T-5"], tool_context=ctx)
+    assert res["verdict"] == "FAILED" and st.current_step == "T-5", res.get("message")
+    ok("T-5", agent_module.build_demo_evidence("T-5", "ok", st)["text"])
+    ok("T-6", evid["T-6"])
     assert st.snapshot()["completed"] is True
 
 
@@ -177,17 +175,12 @@ def test_log_injection_normal_and_abnormal_patterns(course):
     T-2（コースA）/T-3 の正常と T-3 の異常は、受講生の企画・確認コードに紐づけてサーバが生成する。"""
     ok_static = _bundled_evidences()[course]
     ng_static = _bundled_ng_evidences()[course]
-    assert sorted(ng_static) == ["T-1", "T-2", "T-4", "T-5", "T-6"]
+    assert sorted(ng_static) == ["T-1", "T-2", "T-4", "T-5", "T-6"]  # T-3 の異常はサーバが生成（T-5 はサーバ生成を優先）
     store: dict = {}
     ctx = type("Ctx", (), {"state": store})()
     agent_module.set_operation_mode("TRAINING", tool_context=ctx)
     agent_module.set_training_course(course, tool_context=ctx)
     st = agent_module.HitmanState(store)
-    if course == "original":
-        # 企画未確定なら T-2 の正常ログは生成しない（案内のみ）
-        assert agent_module.build_demo_evidence("T-2", "ok", st)["text"] is None
-        agent_module.update_project_plan("カレンダーとタスクと写真日記をまとめるツール", "confirmed",
-                                         agent_name="photo_diary_agent", tool_context=ctx)
 
     def ok_log(step):
         gen = agent_module.build_demo_evidence(step, "ok", st)["text"]
@@ -204,7 +197,11 @@ def test_log_injection_normal_and_abnormal_patterns(course):
         assert res["w_check_status"] == "VERIFIED_APPROVED", (step, res.get("message"))
     assert st.snapshot()["completed"] is True
     if course == "original":
-        assert "photo_diary_agent" in ok_log("T-3")
+        # デモの企画書（備品貸出アシスタント）が設計図になり、T-3 はその企画書のツールで動いた記録になる
+        assert st.brief["agent_name"] == "equipment_lending_agent"
+        assert "equipment_lending_agent" in ok_log("T-3") and "lend_item" in ok_log("T-3")
+    # T-5 の異常パターンは『/chat が 500（API キー未注入）』＝実機で起きた状態
+    assert '"status_chat":500' in ng_log("T-5")
 
 
 def test_demo_evidence_endpoint_is_disabled_on_cloud_run(monkeypatch):

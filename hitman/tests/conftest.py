@@ -17,3 +17,11 @@ def _reset_hitman_global_state():
     except Exception:
         pass
     yield
+
+
+@pytest.fixture(autouse=True)
+def _no_live_deploy_check(monkeypatch):
+    """T-5 の公開URL実地確認（HITMAN からの HTTP アクセス）はテストでは行わない。
+    実地確認そのものは test_deploy_judge.py でモックして検査する。"""
+    monkeypatch.setenv("HITMAN_LIVE_DEPLOY_CHECK", "0")
+    yield

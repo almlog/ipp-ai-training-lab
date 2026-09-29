@@ -1,6 +1,8 @@
 # Copyright (c) 2026 Shunpei Suzuki (suzuki.shunpei@ipp.local), IPP
 # Developed by Shunpei Suzuki <suzuki.shunpei@ipp.local>
 #
+import json
+
 from app.agent import (
     ACTIVE_STEP_SEQUENCE,
     analyze_sql_impact,
@@ -382,6 +384,8 @@ def test_verify_step_output_training_mode_maintains_current_step_on_assertion():
     import app.agent as agent_module
     set_operation_mode("TRAINING")
     set_training_course("original")
+    from tests.unit.brief_fixtures import set_brief
+    set_brief(agent_module.HitmanState.of(None))  # T-3 は T-2 で合格した企画書がある状態で進む
     agent_module.CURRENT_STEP = "T-3"
 
     # ユーザーが「だいじょうぶそうだったよ。次のステップに進もう！」と自己申告
@@ -440,53 +444,44 @@ def test_supervisor_step_skip_tool():
     assert "上長指示による例外スキップ承認" in res_ok["message"]
 
 
-def test_update_project_plan_records_consultation_without_keyword_inference():
-    """T-2 企画相談: 相談中は記録と事実だけを返す。受講生の発言のキーワードで確定・コースを勝手に判断しない。"""
+def test_update_project_plan_records_idea_without_deciding_the_project():
+    """T-2 企画相談: HITMAN は企画を記録して進め方を返すだけ。キーワードからエージェント名・スキル・ツールを決めない。"""
     from app.agent import update_project_plan, HitmanState
 
     store: dict = {}
     ctx = type("Ctx", (), {"state": store})()
 
-    # 1. アイデア未定: 参考例（データ）を返すが、定型文の読み上げはさせない
+    # 1. アイデア未定: 参考例（データ）と、Antigravity で相談する T-2 プロンプトを返す
     res = update_project_plan("", status="consulting", tool_context=ctx)
-    assert res["confirmation_status"] == "consulting" and res["is_confirmed"] is False
-    assert res["command"] == ""
     assert len(res["idea_examples"]) >= 3
-    assert "質問" in res["next_action"]
+    assert "pick-your-agent-project" in res["prompt_for_antigravity"]
+    assert "brief_check.py" in res["command"]
 
-    # 2. LLM が要約したアイデアを記録。「？」を含んでも LLM が consulting と言えば consulting、確定もしない
-    res = update_project_plan("日報を自動要約して重要トピックを抽出するAI？", status="consulting", tool_context=ctx)
-    assert res["confirmation_status"] == "consulting"
-    assert HitmanState(store).user_idea.startswith("日報を自動要約")
-    assert res["idea_examples"] == []
-    assert res["agent_name"] == "report_summary_ai"
+    # 2. アイデアを記録しても、キーワードからエージェント名・推奨スキル・設計ポイントを作らない
+    res = update_project_plan("カレンダーとガントチャートと日記を1つにまとめたアプリ", status="consulting", tool_context=ctx)
+    assert HitmanState(store).user_idea.startswith("カレンダー")
+    for k in ("agent_name", "agent_display_name", "design_points", "project_brief"):
+        assert k not in res, k
+    assert res["summoned_skills"] == ["pick-your-agent-project"]
+    assert "WBS＆スケジュール管理Bot" not in json.dumps(res, ensure_ascii=False)
+    # 企画の相談は Antigravity で行う（プロンプトは受講生の企画に左右されない相談用プロンプト）
+    assert "置き換えない" in res["prompt_for_antigravity"]
 
-    # 3. 「これで決定」等の言葉ではなく、status='confirmed' で確定する（idea 空なら直前の企画を使う）
-    res = update_project_plan("", status="confirmed", tool_context=ctx)
-    assert res["confirmation_status"] == "confirmed" and res["is_confirmed"] is True
-    assert res["command"] == "cat ipp-agent-workspace/project_brief.md"
-    assert "日報を自動要約" in res["prompt_for_antigravity"]
-    assert "[skill:pick-your-agent-project@v1]" in res["prompt_for_antigravity"]
-
-    # 4. 確定する中身が無いときは確定しない
-    empty: dict = {}
-    ctx2 = type("Ctx", (), {"state": empty})()
-    res = update_project_plan("", status="confirmed", tool_context=ctx2)
-    assert res["status"] == "error" and res["is_confirmed"] is False
+    # 3. 『確定』と言っても、企画書が合格するまで企画は確定しない（T-3 以降は企画書待ち）
+    res = update_project_plan("", status="confirmed", agent_name="schedule_wbs_agent", tool_context=ctx)
+    st = HitmanState(store)
+    assert st.plan_confirmed is False and st.brief == {} and st.agent_slug == ""
+    sop = agent_module_sop(st)
+    assert sop["T-3"]["command"] == "" and "企画書" in sop["T-3"]["agy_prompt"]
 
 
-def test_update_project_plan_skills_and_course_b():
+def agent_module_sop(st):
+    import app.agent as agent_module
+    return agent_module.get_training_sop("original", state=st)
+
+
+def test_update_project_plan_course_b():
     from app.agent import update_project_plan
-
-    ctx = type("Ctx", (), {"state": {}})()
-    # 画像を扱う企画: 実在しない専用スキルは召喚せず、設計ポイントとして記載
-    res = update_project_plan("写真から設備メーターの値を読み取る点検アプリ", tool_context=ctx)
-    assert "gemini-multimodal-vision" not in res["summoned_skills"]
-    assert any("マルチモーダル" in p for p in res["design_points"])
-    assert "enable-a2ui" in res["summoned_skills"] and "ipp-agent-smoke-test" in res["summoned_skills"]
-    # RAG / Memory
-    assert "rag-engine-setup" in update_project_plan("社内規程マニュアルのFAQ検索Bot", tool_context=ctx)["summoned_skills"]
-    assert "memory-bank-setup" in update_project_plan("前回の好みを記憶して提案するアシスタント", tool_context=ctx)["summoned_skills"]
 
     # コースB: 受講生が選んだときだけ course='hitman_clone'（LLM が明示）
     res = update_project_plan("", status="consulting", course="hitman_clone", tool_context=type("C", (), {"state": {}})())
@@ -498,14 +493,14 @@ def test_update_project_plan_skills_and_course_b():
 
 def test_guide_training_app_creation_is_thin_wrapper():
     """REST API 互換の旧関数は、キーワード判定をせず update_project_plan に委譲する。"""
-    from app.agent import guide_training_app_creation
+    from app.agent import guide_training_app_creation, HitmanState
 
-    ctx = type("Ctx", (), {"state": {}})()
-    res = guide_training_app_creation("これで決定！", is_confirmed=False, tool_context=ctx)
-    assert res["confirmation_status"] == "consulting"  # 「決定」という言葉では確定しない
-    res = guide_training_app_creation("障害ログ解析Bot", is_confirmed=True, tool_context=ctx)
-    assert res["confirmation_status"] == "confirmed"
-    assert res["command"] == "cat ipp-agent-workspace/project_brief.md"
+    store: dict = {}
+    ctx = type("Ctx", (), {"state": store})()
+    res = guide_training_app_creation("これで決定！障害ログ解析Bot", is_confirmed=True, tool_context=ctx)
+    assert res["brief_passed"] is False  # 『決定』という言葉でも、企画書の合格前は確定しない
+    assert HitmanState(store).plan_confirmed is False
+    assert "brief_check.py" in res["command"]
 
 
 def test_offer_choices_stores_trimmed_unique_choices():
@@ -623,8 +618,11 @@ def test_training_step_verification_t1_to_t6():
     t1_fail = verify_step_output("T-1", "環境構築完了しました！次はどうすればいいですか？")
     assert t1_fail["verdict"] == "FAILED"
 
-    # T-2: Project Brief出力 vs ログ不在
-    t2_pass = verify_step_output("T-2", "# Project Brief\n- エージェント名: AutoOpsAgent\n- 目的: 現場ログ監視と異常検知\n- ツール: log_analyzer, a2ui_card")
+    # T-2: 書式どおりの要件定義書（brief_check.py の出力）で合格。項目が足りない企画書は不合格
+    from tests.unit.brief_fixtures import t2_log, deploy_log
+    t2_incomplete = verify_step_output("T-2", "# Project Brief\n- エージェント名: AutoOpsAgent\n- 目的: 現場ログ監視と異常検知\n- ツール: log_analyzer, a2ui_card")
+    assert t2_incomplete["verdict"] == "FAILED"
+    t2_pass = verify_step_output("T-2", t2_log())
     assert t2_pass["verdict"] == "SUCCESS"
 
     t2_fail = verify_step_output("T-2", "要件定義作りました。進めていいですか？")
@@ -645,9 +643,13 @@ def test_training_step_verification_t1_to_t6():
     assert t4_fail["verdict"] == "FAILED"
     assert t4_fail["w_check_status"] == "BLOCKED_RETRY"
 
-    # T-5: Cloud Run デプロイ成功
-    t5_pass = verify_step_output("T-5", "Deploying container to Cloud Run service [my-agent]...\nService URL: https://my-agent-xyz-an.a.run.app\nDone.")
-    assert t5_pass["verdict"] == "SUCCESS"
+    # T-5: URL が出ただけでは合格しない（実機で /chat が 500 のまま合格していた）。deploy.py の動作確認付き出力で判定
+    t5_url_only = verify_step_output("T-5", "Deploying container to Cloud Run service [my-agent]...\nService URL: https://my-agent-xyz-an.a.run.app\nDone.")
+    assert t5_url_only["verdict"] == "FAILED"
+    t5_broken = verify_step_output("T-5", deploy_log("", "log-analyzer-bot", chat_status=500))
+    assert t5_broken["verdict"] == "FAILED"
+    t5_pass = verify_step_output("T-5", deploy_log("", "log-analyzer-bot"))
+    assert t5_pass["verdict"] == "SUCCESS", t5_pass["message"]
 
     # T-6: 個人GitHub公開・修了
     t6_pass = verify_step_output("T-6", "Enumerating objects: 42, done.\nTo https://github.com/suzuki-shunpei/my-agent.git\n * [new branch]      main -> main")
@@ -694,7 +696,7 @@ def test_frontend_training_course_endpoints():
     assert param_data["parameters"]["WORKSPACE_DIR"] == "C:\\custom\\agent_ws"
 
     # 5. GET /api/sop with custom parameters
-    res_custom_sop = client.get("/api/sop?mode=TRAINING&course=original&workspace=C:\\custom\\agent_ws&agent=custom_agent")
+    res_custom_sop = client.get("/api/sop?mode=TRAINING&course=hitman_clone&workspace=C:\\custom\\agent_ws&agent=custom_agent")
     assert res_custom_sop.status_code == 200
     custom_sop_data = res_custom_sop.json()
     assert "C:\\custom\\agent_ws" in custom_sop_data["sop"]["T-1"]["command"]

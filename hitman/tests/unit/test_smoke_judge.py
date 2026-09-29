@@ -23,6 +23,7 @@ from google.adk.models.llm_response import LlmResponse
 from google.genai import types
 
 import app.agent as agent_module
+from tests.unit.brief_fixtures import CALENDAR_BRIEF, set_brief
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 SCRIPT = REPO_ROOT / ".agents" / "skills" / "ipp-agent-smoke-test" / "scripts" / "smoke_test.py"
@@ -126,18 +127,35 @@ def test_smoke_output_bound_to_other_student_or_folder_is_rejected():
     st = agent_module.HitmanState(store)
     st.results = {"T-1": "SUCCESS", "T-2": "SUCCESS"}
     st.current_step = "T-3"
-    st.agent_slug = "schedule_wbs_agent"
+    set_brief(st)  # 企画書: log_analyzer_bot / 関数ツール analyze_log
     nonce = st.issue_t3_nonce()
     for out in (
         _run(analyze_log),  # 確認コードなし（サンプルの貼り付け相当）
-        _run(analyze_log, nonce="T3-000000", agent_dir="schedule_wbs_agent"),  # 他人の確認コード
-        _run(analyze_log, nonce=nonce, agent_dir="log_analyzer_bot"),  # 企画と別のフォルダ
+        _run(analyze_log, nonce="T3-000000", agent_dir="log_analyzer_bot"),  # 他人の確認コード
+        _run(analyze_log, nonce=nonce, agent_dir="calendar_journal_agent"),  # 企画と別のフォルダ
     ):
         res = agent_module.verify_step_output("T-3", out, tool_context=ctx)
         assert res["w_check_status"] == "BLOCKED_RETRY", res["message"]
         assert st.current_step == "T-3"
-    res = agent_module.verify_step_output("T-3", _run(analyze_log, nonce=nonce, agent_dir="schedule_wbs_agent"), tool_context=ctx)
+    res = agent_module.verify_step_output("T-3", _run(analyze_log, nonce=nonce, agent_dir="log_analyzer_bot"), tool_context=ctx)
     assert res["w_check_status"] == "VERIFIED_APPROVED", res["message"]
+
+
+def test_smoke_output_with_tools_not_in_brief_is_rejected():
+    """企画書の関数ツールと別のツールで動くエージェント（テンプレートや別企画への置き換え）は合格しない。"""
+    store: dict = {}
+    ctx = type("Ctx", (), {"state": store})()
+    agent_module.set_operation_mode("TRAINING", tool_context=ctx)
+    agent_module.set_training_course("original", tool_context=ctx)
+    st = agent_module.HitmanState(store)
+    st.results = {"T-1": "SUCCESS", "T-2": "SUCCESS"}
+    st.current_step = "T-3"
+    set_brief(st, CALENDAR_BRIEF)  # 企画書の関数ツール: add_event / upsert_task / summarize_week
+    nonce = st.issue_t3_nonce()
+    res = agent_module.verify_step_output("T-3", _run(analyze_log, nonce=nonce, agent_dir="calendar_journal_agent"), tool_context=ctx)
+    assert res["w_check_status"] == "BLOCKED_RETRY", res["message"]
+    assert "企画書の関数ツール" in res["message"]
+    assert st.current_step == "T-3"
 
 
 def test_truncated_output_is_broken():
@@ -163,7 +181,7 @@ def test_verify_step_t3_uses_smoke_result(tool, expected):
     st = agent_module.HitmanState(store)
     st.results = {"T-1": "SUCCESS", "T-2": "SUCCESS"}
     st.current_step = "T-3"
-    st.agent_slug = "log_analyzer_bot"
+    set_brief(st)
     nonce = st.issue_t3_nonce()
     res = agent_module.verify_step_output("T-3", _run(tool, nonce=nonce, agent_dir="log_analyzer_bot"), tool_context=ctx)
     assert res["w_check_status"] == expected

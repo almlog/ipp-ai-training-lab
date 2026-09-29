@@ -137,15 +137,16 @@ python --version
 # ② Git の確認（バージョンが表示されること）
 git --version
 
-# ③ APIキー疎通テスト（ご自身のAPIキーに置き換えて実行）
-# ※ Windows PowerShell の場合:
-$env:GEMINI_API_KEY="あなたのAPIキー"
-python -c "import urllib.request, json, os; key=os.getenv('GEMINI_API_KEY'); url=f'https://generativelanguage.googleapis.com/v1beta/models?key={key}'; print('✅ APIキー認証成功！' if urllib.request.urlopen(url).getcode()==200 else '❌ エラー')"
-
-# ※ macOS / Linux の場合:
-export GEMINI_API_KEY="あなたのAPIキー"
-python3 -c "import urllib.request, json, os; key=os.getenv('GEMINI_API_KEY'); url=f'https://generativelanguage.googleapis.com/v1beta/models?key={key}'; print('✅ APIキー認証成功！' if urllib.request.urlopen(url).getcode()==200 else '❌ エラー')"
+# ③ APIキー疎通テスト（キーはコマンドに書かず、実行後に貼り付けます。画面・履歴には残りません）
+# ※ Windows は python、macOS / Linux は python3 で実行
+python -c "import getpass,urllib.request; k=getpass.getpass('APIキーを貼り付けてEnter（表示されません）: '); r=urllib.request.Request('https://generativelanguage.googleapis.com/v1beta/models', headers={'x-goog-api-key': k}); print('✅ APIキー認証成功！' if urllib.request.urlopen(r).getcode()==200 else '❌ エラー')"
 ```
+
+> [!WARNING]
+> **API キーの扱い（研修の必須ルール）**
+> - `$env:GEMINI_API_KEY="..."` や `export GEMINI_API_KEY=...` のように、**キーをコマンドに直接書かないでください**（コマンド履歴に平文で残ります）。
+> - 研修中、キーは作成するアプリのフォルダの **`.env` ファイルにだけ** エディタで書き込みます（手順は研修の T-3 で案内されます）。
+> - **チャット（Antigravity・HITMAN）にキーを貼らないでください。** 貼ってしまった場合は、そのキーを削除して再発行してください。
 
 ### チェックリスト
 - [ ] 個人Googleアカウントでログインできる

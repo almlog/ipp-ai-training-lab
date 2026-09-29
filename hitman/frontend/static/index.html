@@ -3773,6 +3773,10 @@ const TEST_EVIDENCES = {
 PS C:\\work> Get-ChildItem .agents\\skills -Name
 build-agent-frontend
 enable-a2ui
+ipp-agent-smoke-test
+ipp-build-app-from-brief
+ipp-cloud-run-deploy
+ipp-secure-credentials
 ipp-skill-check
 memory-bank-setup
 novasmart-governance-lab
@@ -3783,14 +3787,41 @@ record-demo
 troubleshoot-lab-setup`,
 
     "T-2": `[skill:pick-your-agent-project@v1]
-# project_brief.md (自作AIエージェント要件定義)
-## 1. アプリ概要
-- アプリ名: my_agent (社内申請＆FAQアシスタント)
-- 目的: 社内申請手続きの問い合わせに24時間自律回答する。
-## 2. アーキテクチャ
-- フレームワーク: Google ADK (Agent Development Kit 1.5.0) + Python
-- UIコンポーネント: A2UI v0.8 リッチカード表示
-- ツール: consult_policy_faq, request_human_approval`,
+$ python .agents/skills/pick-your-agent-project/scripts/brief_check.py ipp-agent-workspace/project_brief.md
+BRIEF_CHECK: PASS  agent: expense_check_agent  features: 2  screens: 2  tools: 2
+# 経費精算チェッカー: Project Brief
+
+## 1. 基本情報
+- エージェント名: expense_check_agent
+- 表示名: 経費精算チェッカー
+- 利用者: 経理担当
+- 解決する課題: 経費申請の規程違反チェックを目視で行っていて時間がかかる
+
+## 2. 機能一覧
+- F1: 申請の登録と一覧 ／ 受け入れ条件: フォームで日付・金額・用途を入れると一覧に表示される
+- F2: 規程チェック ／ 受け入れ条件: AI に申請のチェックを頼むと、上限超過や用途不備を指摘する
+
+## 3. 画面
+- S1: 申請一覧 ／ 要素: 登録フォーム、一覧表 ／ 使う機能: F1
+- S2: AI チェック ／ 要素: チャット欄、指摘カード ／ 使う機能: F2
+
+## 4. 関数ツール
+- add_expense(date: str, amount: int, purpose: str) -> dict ／ 役割: 申請を登録する ／ 使う機能: F1
+- check_expense(expense_id: str) -> dict ／ 役割: 規程の上限・用途と照合する ／ 使う機能: F2
+
+## 5. データと保存先
+- 経費申請 ／ 保存先: メモリ
+
+## 6. 認証情報
+- GEMINI_API_KEY: ローカルは .env から読み込む。本番は Secret Manager から渡す。キーの値はどこにも書かない。
+
+## 7. 今回は作らないもの
+- 承認ワークフローとメール通知
+
+## 8. 動作確認
+- Q1: 10月1日のタクシー代12000円の申請をチェックして
+- Q2: 懇親会費3000円を登録して
+`,
 
     "T-3": `[skill:ipp-agent-smoke-test@v1]
 $ python .agents/skills/ipp-agent-smoke-test/scripts/smoke_test.py --agent-dir ipp-agent-workspace/my_agent --q1 "No space left on device のエラーが出ました" --q2 "DB connection timeout が発生しました"
@@ -3822,13 +3853,15 @@ tests/test_agent.py::test_schema_validity PASSED                         [100%]
 
 ============================== 5 passed in 1.42s ==============================`,
 
-    "T-5": `[skill:build-agent-frontend@v1]
-【ステップ T-5: Cloud Run 本番デプロイ 完了ログ】
-$ gcloud run deploy my-agent --source ipp-agent-workspace/my_agent --region asia-northeast1 --allow-unauthenticated
-Building Container... DONE
-Creating Revision... DONE
-Service [my-agent] has been deployed and is serving 100 percent of traffic.
-Service URL: https://my-agent-1070367799384.asia-northeast1.run.app`,
+    "T-5": `[skill:ipp-cloud-run-deploy@v1]
+$ python .agents/skills/ipp-cloud-run-deploy/scripts/deploy.py --agent-dir ipp-agent-workspace/my_agent --service my-agent --nonce T3-SAMPLE
+service: my-agent  region: asia-northeast1  nonce: T3-SAMPLE
+secret: my-agent-gemini-api-key（Secret Manager 参照。値は表示しません）
+Service URL: https://my-agent-1070367799384.asia-northeast1.run.app
+check health_http: OK
+check chat_http: OK
+check chat_reply: OK
+DEPLOY_RESULT: PASS`,
 
     "T-6": `[skill:publish-to-github@v1]
 【ステップ T-6: 個人GitHub公開＆修了証発行 完了ログ】
@@ -3845,6 +3878,10 @@ To https://github.com/shunpei-suzuki/my-ai-agent.git
 PS C:\\work> Get-ChildItem .agents\\skills -Name
 build-agent-frontend
 enable-a2ui
+ipp-agent-smoke-test
+ipp-build-app-from-brief
+ipp-cloud-run-deploy
+ipp-secure-credentials
 ipp-skill-check
 memory-bank-setup
 novasmart-governance-lab
@@ -3896,13 +3933,15 @@ tests/test_hitman.py::test_agent_response PASSED                       [100%]
 
 ============================== 6 passed in 1.58s ==============================`,
 
-    "T-5": `[skill:build-agent-frontend@v1]
-【ステップ T-5: Cloud Run 本番デプロイ 完了ログ】
-$ gcloud run deploy my-hitman --source ipp-agent-workspace/my_hitman --region asia-northeast1 --allow-unauthenticated
-Building Container... DONE
-Creating Revision... DONE
-Service [my-hitman] has been deployed and is serving 100 percent of traffic.
-Service URL: https://my-hitman-1070367799384.asia-northeast1.run.app`,
+    "T-5": `[skill:ipp-cloud-run-deploy@v1]
+$ python .agents/skills/ipp-cloud-run-deploy/scripts/deploy.py --agent-dir ipp-agent-workspace/my_hitman --service my-hitman --nonce T3-SAMPLE
+service: my-hitman  region: asia-northeast1  nonce: T3-SAMPLE
+secret: my-hitman-gemini-api-key（Secret Manager 参照。値は表示しません）
+Service URL: https://my-hitman-1070367799384.asia-northeast1.run.app
+check health_http: OK
+check chat_http: OK
+check chat_reply: OK
+DEPLOY_RESULT: PASS`,
 
     "T-6": `[skill:publish-to-github@v1]
 【ステップ T-6: 個人GitHub公開＆修了証発行 完了ログ】
@@ -3951,7 +3990,7 @@ Content-Type: application/json
 };
 
 // 🧪ログ注入の「異常パターン」: 各ステップで不合格（差し戻し）になるべきログ。判定ルールのデモ・回帰確認用。
-// T-2（コースA）/ T-3 の正常パターンは受講生の企画・確認コードに紐づくため、サーバ（/api/training/demo-evidence）で生成する。
+// T-2（コースA）/ T-3 / T-5 のログは受講生の企画・確認コードに紐づくため、サーバ（/api/training/demo-evidence）で生成する。
 const TEST_EVIDENCES_NG = {
   original: {
     "T-1": `PS C:\\work> git clone https://github.com/almlog/ipp-ai-training-lab.git
@@ -3989,7 +4028,7 @@ cat : パス 'C:\\work\\ipp-agent-workspace\\hitman_spec.md' が存在しない�
 async function getEvidenceLog(stepId, course, pattern) {
   const table = pattern === "ng" ? TEST_EVIDENCES_NG : TEST_EVIDENCES;
   const staticLog = ((table[course] || table.original) || {})[stepId] || "";
-  const needsSession = appState.mode === "TRAINING" && (stepId === "T-3" || (stepId === "T-2" && pattern === "ok" && course !== "hitman_clone"));
+  const needsSession = appState.mode === "TRAINING" && (stepId === "T-3" || stepId === "T-5" || (stepId === "T-2" && pattern === "ok" && course !== "hitman_clone"));
   if (!needsSession) return { text: staticLog, note: "" };
   try {
     const res = await fetch("/api/training/demo-evidence", {
@@ -6056,8 +6095,27 @@ function renderReply(b, parts, saveHistory = true, serverState = null, stepConte
   }
 }
 
+// 認証情報（API キー等）の平文送信を防ぐ。サーバ側（app/secret_guard.py）でも同じ判定で遮断するが、
+// 画面の履歴（localStorage）に残さないよう、送信前にここでも止める。
+const SECRET_PATTERNS = [
+  /AIza[0-9A-Za-z_\-]{35}/,
+  /AQ\.[0-9A-Za-z_\-]{30,}/,
+  /ya29\.[0-9A-Za-z_\-]{20,}/,
+  /(?<![A-Za-z0-9_])(?:gh[pousr]_[0-9A-Za-z]{30,}|github_pat_[0-9A-Za-z_]{30,})/,
+  /-----BEGIN (?:RSA |EC |OPENSSH |)PRIVATE KEY-----/,
+  /"private_key"\s*:\s*"-----BEGIN/,
+  /(?<![A-Za-z0-9_])(?:GEMINI_API_KEY|GOOGLE_API_KEY|API_KEY|SECRET_KEY|ACCESS_TOKEN)[ \t]*[=:][ \t]*["']?(?=[0-9A-Za-z_\-]*[0-9])(?=[0-9A-Za-z_\-]*[A-Z])(?=[0-9A-Za-z_\-]*[a-z])[0-9A-Za-z_\-]{20,}(?![0-9A-Za-z_\-]*:(?:latest|\d+))/,
+];
+function containsSecret(text) {
+  return SECRET_PATTERNS.some((re) => re.test(text || ""));
+}
+
 async function sendMessage(text) {
   if (!text) return;
+  if (containsSecret(text)) {
+    showToast("🔒 API キーなどの認証情報が含まれているため送信しませんでした。キーは漏えいしたものとして無効化・再発行し、新しいキーは各自の .env にだけ書いてください。");
+    return;
+  }
   if (chatInFlight) {
     showToast("⏳ HITMANが応答中です。応答を待ってから送信してください。");
     return;
