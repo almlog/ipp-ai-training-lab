@@ -11,6 +11,7 @@ __pycache__/
 *.py[cod]
 .pytest_cache/
 *.log
+logs/
 
 # macOS noise
 .DS_Store

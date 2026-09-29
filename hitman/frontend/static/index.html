@@ -4936,7 +4936,7 @@ function exportReportMarkdown() {
   }
 
   const fileName = isTraining
-    ? `AltX_AI_Training_Final_Report_${appState.trainingCourse || 'course_a'}_${new Date().toISOString().slice(0,10)}.md`
+    ? `IPP_AI_Training_Final_Report_${appState.trainingCourse || 'course_a'}_${new Date().toISOString().slice(0,10)}.md`
     : `Release_Final_Report_${new Date().toISOString().slice(0,10)}.md`;
 
   const blob = new Blob([md], { type: "text/markdown;charset=utf-8;" });
@@ -5227,7 +5227,7 @@ function exportSopMarkdown() {
   });
 
   const fileName = isTraining
-    ? `AltX_AI_Training_Report_${appState.trainingCourse || 'course_a'}_${new Date().toISOString().slice(0,10)}.md`
+    ? `IPP_AI_Training_Report_${appState.trainingCourse || 'course_a'}_${new Date().toISOString().slice(0,10)}.md`
     : `SOP_Execution_Report_${new Date().toISOString().slice(0,10)}.md`;
 
   const blob = new Blob([md], { type: "text/markdown;charset=utf-8;" });

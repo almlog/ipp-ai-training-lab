@@ -1009,9 +1009,175 @@ def derive_agent_slug_and_name(idea: str) -> tuple[str, str, str]:
     return "custom_agent", raw[:20] + ("..." if len(raw) > 20 else ""), "custom-agent"
 
 
+def _derive_agent_q_examples(idea: str, slug: str) -> tuple[str, str, str]:
+    """受講生の企画アイデアとエージェントslugから、(q1, q2, tool_desc) を導出する。
+    q1, q2: スモークテストで実際に投げる、内容がはっきり異なる2つの質問例。
+    tool_desc: 自作関数の役割・入力・出力の説明。
+    """
+    lower = (idea or slug or "").lower()
+    if any(k in lower for k in ("ログ", "log", "障害", "エラー")):
+        return (
+            '2026-09-29 10:00:00 [ERROR] ConnectionRefusedError: port 5432 connection refused の原因と解決コマンドを教えて',
+            '2026-09-29 10:01:00 [INFO] Health check passed successfully のログを解析して',
+            'ログテキストを受け取り、エラー原因の特定と復旧コマンドを返す関数ツール（例: parse_and_diagnose_log）'
+        )
+    if any(k in lower for k in ("マニュアル", "規程", "faq", "就業規則")):
+        return (
+            '慶弔休暇は何日付与されますか？申請期限も教えてください',
+            'リモートワーク時の通信手当の上限額と支給条件を教えてください',
+            '社内規程・FAQナレッジを検索し、根拠条文と回答を返す関数ツール（例: search_internal_faq）'
+        )
+    if any(k in lower for k in ("日報", "要約", "報告", "レポート")):
+        return (
+            '本日の業務: A機能のDB設計完了。課題: 特になし。明日の予定: API実装開始',
+            '本日の業務: 障害対応で丸一日調査。課題: 本番DBのメモリ使用率が95%超えで枯渇寸前。至急対応要',
+            '業務日報テキストを受け取り、進捗・課題・ネクストアクションを構造化要約する関数ツール（例: summarize_daily_report）'
+        )
+    if any(k in lower for k in ("ガント", "wbs", "カレンダー", "スケジュール", "予定")):
+        return (
+            'プロジェクトXの今週の予定と未完了タスク一覧を教えて',
+            'タスク『認証基盤実装』の進捗遅延に伴うWBSガントチャートを再生成して',
+            'タスク一覧やスケジュールから進捗状況やガントチャートデータを生成する関数ツール（例: get_schedule_and_wbs）'
+        )
+    if any(k in lower for k in ("シフト", "勤怠")):
+        return (
+            '来週月曜日の早番と遅番のシフト担当者を教えて',
+            '今月の残業時間が40時間を超えているメンバーをリストアップして',
+            'シフト・勤怠データを取得・集計し、過重労働アラートや配置を返す関数ツール（例: check_shift_attendance）'
+        )
+    if "議事録" in lower:
+        return (
+            '会議の文字起こし: 田中「納期は来月末で合意しましょう」鈴木「承知しました。担当は私が引き取ります」',
+            '会議の文字起こし: 全体雑談と近況報告のみ。特に決定事項や宿題タスクはなし。',
+            '会議テキストから決定事項とToDoタスク・担当者を抽出する関数ツール（例: extract_minutes_and_todos）'
+        )
+    if any(k in lower for k in ("申請", "承認", "ワークフロー")):
+        return (
+            'PC購入申請: 金額8万円、用途: 開発用サブディスプレイおよび周辺機器',
+            '有給休暇申請: 10月15日〜16日、私用のため',
+            '申請内容をチェックし、承認ルート・必要書類を判定する関数ツール（例: validate_approval_request）'
+        )
+    clean_idea = (idea or slug or "オリジナル業務支援AI")[:30]
+    return (
+        f'『{clean_idea}』のメイン機能について、正常な入力データを与えて実行して',
+        f'『{clean_idea}』について、別の条件や例外的な入力データを与えて実行して',
+        f'企画『{clean_idea}』の中核業務を処理する自作関数ツール（入力に応じて処理結果を返すこと）'
+    )
+
+
+def _personalize_course_a_sop(base_sop: dict, idea: str, agent_name: str, short_name: str, service_name: str, nonce_text: str, ws: str) -> None:
+    """コースAの確定企画に合わせて、T-3〜T-6の作業目的・コマンド・AntiGravity投入プロンプトをパーソナライズする（案A）。"""
+    q1, q2, tool_desc = _derive_agent_q_examples(idea, agent_name)
+    disp = short_name or idea or agent_name
+
+    # T-3 パーソナライズ
+    base_sop["T-3"]["title"] = f"ステップ T-3: エージェントコア＆A2UI実装（{disp}）"
+    base_sop["T-3"]["objective"] = f"企画『{idea or disp}』に基づき、ADK Agent（{agent_name}）、自作関数ツール、A2UIカード生成を実装し、スモークテストで動作確認する。"
+    base_sop["T-3"]["command"] = (
+        f'python .agents/skills/ipp-agent-smoke-test/scripts/smoke_test.py '
+        f'--agent-dir {ws}/{agent_name} --q1 "{q1}" --q2 "{q2}" --nonce {nonce_text}'
+    )
+    base_sop["T-3"]["expected_check"] = f"スモークテストで、企画『{disp}』の自作ツールが実際に呼ばれ、入力に応じて応答と結果が変わること（SMOKE_RESULT: PASS）"
+    base_sop["T-3"]["agy_prompt"] = (
+        f"【AntiGravity投入用プロンプト: Step T-3（『{disp}』実装＆スモークテスト）】\n"
+        f"企画名: 『{idea or disp}』\n"
+        f"エージェントモジュール名: {agent_name}\n"
+        f"あなたはIPPのAI実践研修専属メンターです。\n"
+        f"受講生に以下を伝えてください：\n"
+        f"「お疲れ様です！ステップ T-3（エージェントコア＆A2UI実装）に入ります。確定した要件定義に基づき、Google ADKエージェント『{disp}』本体、自作関数ツール、およびA2UIリッチカード表示を自律実装します。」\n\n"
+        f"【自律実行タスク】\n"
+        f"1. スキル「enable-a2ui」を参照する。\n"
+        f"2. ディレクトリ「{ws}/{agent_name}/」配下に以下を自律実装する：\n"
+        f"   - agent.py: ADK Agent本体（root_agent）、自作関数ツール、A2UIカード生成コールバック（after_model_callback）\n"
+        f"   - a2ui_utils.py: A2UIカード用サーフェス定義\n"
+        f"   - pyproject.toml または requirements.txt: 依存ライブラリ\n"
+        f"3. 必要な自作関数ツールの仕様:\n"
+        f"   - {tool_desc}\n"
+        f"   - エージェントの instruction には、どの場面でどのツールを使うかを明記し、ツールは引数（入力）に応じて実際に処理すること（固定値を返すダミー実装は不可）\n"
+        f"4. 動作確認（スモークテスト）: スキル「ipp-agent-smoke-test」を使い、以下の2つの質問でエージェントを実際に動かす：\n"
+        f"   python .agents/skills/ipp-agent-smoke-test/scripts/smoke_test.py --agent-dir {ws}/{agent_name} --q1 \"{q1}\" --q2 \"{q2}\" --nonce {nonce_text}\n"
+        f"   結果が FAIL の場合は、出力を書き換えずに原因を修正して再実行し、PASS になるまで繰り返すこと。\n\n"
+        f"【重要: HITMAN提出用生ログ出力規程】\n"
+        f"スクリプトが出力したコードブロック（1行目が [skill:ipp-agent-smoke-test@v1]、最後の行が SMOKE_DIGEST）を、一字一句変えずに回答の最末尾に出力してください。\n"
+        f"要約・抜粋・書き換えは禁止です（HITMAN は生データから再判定し、改変を検知します）。\n"
+        f"出力後、受講生へ「上記コードブロックをそのままコピーして、HITMANのチャット欄に貼り付けてください。HITMANがエージェントの実動作を客観検証し、ステップ T-4へ進みます！」と案内して待機してください。"
+    )
+
+    # T-4 パーソナライズ
+    base_sop["T-4"]["title"] = f"ステップ T-4: ローカルテスト＆自律Wチェック（{disp}）"
+    base_sop["T-4"]["objective"] = f"『{disp}』の自作関数ツールやA2UIカード生成を検証するPytest単体テストを実行し、客観検証する。"
+    base_sop["T-4"]["command"] = f"pytest {ws}/{agent_name}/tests/ -v"
+    base_sop["T-4"]["expected_check"] = "テストが全件実行され、全テストが passed（エラー0件）で終了すること"
+    base_sop["T-4"]["agy_prompt"] = (
+        f"【AntiGravity投入用プロンプト: Step T-4（『{disp}』ローカルテスト＆動作検証）】\n"
+        f"あなたはIPPのAI実践研修専属メンターです。\n"
+        f"受講生に以下を伝えてください：\n"
+        f"「お疲れ様です！ステップ T-4（ローカルテスト＆自律Wチェック）です。実装したエージェント『{disp}』の関数ツールやA2UIカード生成が正常に動作するか、自動テストを実行して客観検証します。」\n\n"
+        f"【自律実行タスク】\n"
+        f"1. 「{ws}/{agent_name}/tests/test_agent.py」を作成し、以下の単体テストを実装する：\n"
+        f"   - ツールが入力引数に応じて異なる正しい結果を返すことの検証\n"
+        f"   - A2UIカード生成コールバックが正常に動作することの検証\n"
+        f"2. ターミナルで `pytest {ws}/{agent_name}/tests/ -v` を実行し、全件 PASSED となることを確認する。\n\n"
+        f"【重要: HITMAN提出用生ログ出力規程】\n"
+        f"提出用コードブロックの1行目には、この作業で実際に使用したスキルの証跡行（例: [skill:enable-a2ui@v1]）をそのまま列挙してください（使っていないスキルの証跡は書かないこと）。\n"
+        f"「テスト合格しました」等の言葉だけで済ませず、必ず pytest の標準出力（test session starts から passed in ... までの生ログ）を、以下の通り```bashのコードブロック形式で回答の最末尾に逐語出力してください：\n\n"
+        f"```bash\n"
+        f"$ pytest {ws}/{agent_name}/tests/ -v\n"
+        f"(pytest の実行結果ログ全文を出力)\n"
+        f"```\n\n"
+        f"出力後、受講生へ「上記コードブロック内のテストログをコピーして、HITMANのチャット欄に貼り付けてください。HITMANが客観Wチェック承認を行い、ステップ T-5へ進みます！」と案内して待機してください。"
+    )
+
+    # T-5 パーソナライズ
+    base_sop["T-5"]["title"] = f"ステップ T-5: Cloud Run 本番デプロイ（{disp}）"
+    base_sop["T-5"]["objective"] = f"『{disp}』を Google Cloud Run へコンテナデプロイし、本番Webサービスとして公開する。"
+    base_sop["T-5"]["command"] = f"gcloud run deploy {service_name} --source {ws}/{agent_name} --region asia-northeast1 --allow-unauthenticated"
+    base_sop["T-5"]["expected_check"] = f"Cloud Run へのデプロイが成功し、Service URL（https://{service_name}-...run.app）が出力されること"
+    base_sop["T-5"]["agy_prompt"] = (
+        f"【AntiGravity投入用プロンプト: Step T-5（『{disp}』Cloud Run本番デプロイ）】\n"
+        f"あなたはIPPのAI実践研修専属メンターです。\n"
+        f"受講生に以下を伝えてください：\n"
+        f"「お疲れ様です！ステップ T-5（Cloud Run 本番デプロイ）です。作成したAIエージェント『{disp}』を Google Cloud Run へコンテナデプロイし、本番Webサービスとして公開します。」\n\n"
+        f"【自律実行タスク】\n"
+        f"1. スキル「build-agent-frontend」を参照し、Dockerfile / FastAPIプロキシフロントエンドを準備する。\n"
+        f"2. サービス名「{service_name}」として Cloud Run へのデプロイを実行（またはコンテナビルド検証を行いService URLを発行）する。\n"
+        f"3. 発行された本番サービスURL（https://...run.app）を出力する。\n\n"
+        f"【重要: HITMAN提出用生ログ出力規程】\n"
+        f"提出用コードブロックの1行目には、この作業で実際に使用したスキルの証跡行（例: [skill:enable-a2ui@v1]）をそのまま列挙してください（使っていないスキルの証跡は書かないこと）。\n"
+        f"必ずデプロイコマンドの標準出力（Building Container... から Service URL: https://...run.app まで）を、以下の通り```bashのコードブロック形式で回答の最末尾に逐語出力してください：\n\n"
+        f"```bash\n"
+        f"$ gcloud run deploy {service_name} ...\n"
+        f"(デプロイログおよび発行された Service URL を全文出力)\n"
+        f"```\n\n"
+        f"出力後、受講生へ「上記コードブロック内のデプロイログをコピーして、HITMANのチャット欄に貼り付けてください。HITMANが本番健全性を検証し、最終ステップ T-6へ進みます！」と案内して待機してください。"
+    )
+
+    # T-6 パーソナライズ
+    base_sop["T-6"]["title"] = f"ステップ T-6: 個人GitHub公開＆修了証発行（{disp}）"
+    base_sop["T-6"]["objective"] = f"完成した自作AIエージェント『{disp}』のソースコードを受講生自身の個人GitHubリポジトリへ公開し、研修修了報告書を発行する。"
+    base_sop["T-6"]["agy_prompt"] = (
+        f"【AntiGravity投入用プロンプト: Step T-6（『{disp}』個人GitHub公開＆修了認定）】\n"
+        f"あなたはIPPのAI実践研修専属メンターです。\n"
+        f"受講生に以下を伝えてください：\n"
+        f"「お疲れ様です！最終ステップ T-6（個人GitHub公開＆修了認定）です。完成した成果物『{disp}』をあなたの個人GitHubリポジトリ（{service_name}）へ公開し、研修修了の客観証拠とします。」\n\n"
+        f"【自律実行タスク】\n"
+        f"1. スキル「publish-to-github」を活用し、gh CLIのデバイス認証フローを用いて安全に個人GitHubへ公開する。\n"
+        f"2. リポジトリURL（https://github.com/...）を出力する。\n\n"
+        f"【重要: HITMAN提出用生ログ出力規程】\n"
+        f"提出用コードブロックの1行目には、この作業で実際に使用したスキルの証跡行（例: [skill:enable-a2ui@v1]）をそのまま列挙してください（使っていないスキルの証跡は書かないこと）。\n"
+        f"必ず GitHub 認証・プッシュの実行結果（gh auth status や git push の標準出力、リポジトリURL）を、以下の通り```bashのコードブロック形式で回答の最末尾に逐語出力してください：\n\n"
+        f"```bash\n"
+        f"$ git push origin main\n"
+        f"(GitHub公開ログおよびリポジトリURLを全文出力)\n"
+        f"```\n\n"
+        f"出力後、受講生へ「上記コードブロック内の公開ログをコピーして、HITMANのチャット欄に貼り付けてください。HITMANが修了認定を行い、最終評価レポートを発行します！」と案内して待機してください。"
+    )
+
+
 def get_training_sop(course_type: str = None, params: dict = None, state: "HitmanState" = None) -> dict:
     """研修モードの指定コース用SOPを取得し、動的パラメータ（WORKSPACE_DIR, AGENT_NAME, PYTHON_ENV等）を展開して返却する。
-    コースAのT-2は、セッションで確定した企画（t2_override）があればその内容で上書きする。"""
+    コースAのT-2は、セッションで確定した企画（t2_override）があればその内容で上書きする。
+    また、企画が確定していればT-3〜T-6の作業目的・コマンド・AntiGravity投入プロンプトも動的にパーソナライズする（案A）。"""
     state = state or HitmanState.of(None)
     is_hitman = _normalize_course(course_type or state.course) == "hitman_clone"
     base_sop = copy.deepcopy(TRAINING_SOP_HITMAN_CLONE if is_hitman else TRAINING_SOP_ORIGINAL)
@@ -1043,18 +1209,24 @@ def get_training_sop(course_type: str = None, params: dict = None, state: "Hitma
             short_name = ""
     py_env = p.get("PYTHON_ENV", "uv (自動管理)")
     nonce_text = state.t3_nonce or "<T-2合格後にHITMANが発行する確認コード>"
-    for field in ("command", "agy_prompt"):
-        val = base_sop["T-3"].get(field)
-        if isinstance(val, str):
-            base_sop["T-3"][field] = val.replace('--q2 "<質問2>"', f'--q2 "<質問2>" --nonce {nonce_text}')
-    if short_name:
-        for sid in ("T-3", "T-4", "T-5", "T-6"):
-            if isinstance(base_sop[sid].get("title"), str) and short_name not in base_sop[sid]["title"]:
-                base_sop[sid]["title"] += f"（{short_name}）"
-        for field in ("command", "expected_check", "agy_prompt"):
-            val = base_sop["T-5"].get(field)
+
+    # 案A: コースAで企画アイデアまたはエージェント名が存在する場合はT-3〜T-6を動的パーソナライズ
+    if not is_hitman and (state.user_idea or (state.agent_slug and state.agent_slug != "my_agent")):
+        _personalize_course_a_sop(base_sop, state.user_idea, agent_name, short_name, service_name, nonce_text, ws)
+    else:
+        # デフォルトまたはコースB
+        for field in ("command", "agy_prompt"):
+            val = base_sop["T-3"].get(field)
             if isinstance(val, str):
-                base_sop["T-5"][field] = val.replace("my-ai-agent", service_name)
+                base_sop["T-3"][field] = val.replace('--q2 "<質問2>"', f'--q2 "<質問2>" --nonce {nonce_text}')
+        if short_name:
+            for sid in ("T-3", "T-4", "T-5", "T-6"):
+                if isinstance(base_sop[sid].get("title"), str) and short_name not in base_sop[sid]["title"]:
+                    base_sop[sid]["title"] += f"（{short_name}）"
+            for field in ("command", "expected_check", "agy_prompt"):
+                val = base_sop["T-5"].get(field)
+                if isinstance(val, str):
+                    base_sop["T-5"][field] = val.replace("my-ai-agent", service_name)
 
     for step_id, step in base_sop.items():
         for field in ["command", "expected_check", "cautions", "agy_prompt", "title", "objective"]:
@@ -1572,7 +1744,7 @@ def is_pure_assertion_without_log(raw: str) -> bool:
         "http/1.", "http/2", "curl -", "200 ok", "content-type",
         "bash", "root@", "user@", "$ ", "# ", "0 error", "job for",
         "pytest", "passed", "test session starts", "collected ", "failed", "passed in",
-        "git clone", "github.com", "altx-", "run.app", "service url", "deploying container",
+        "git clone", "github.com", "ipp-", "run.app", "service url", "deploying container",
         "python", ".py", "brief", "hitman", "[skill:", "get-childitem",
     ]
     has_terminal_sig = any(sig in clean_lower for sig in terminal_signatures)
@@ -3075,11 +3247,12 @@ def generate_final_report(
             {"item": "T-6: 個人GitHub公開＆成果保全", "before": "未公開", "after": "個人GitHubリポジトリへコード公開・納品完了", "verdict": "承認済 ✓"},
         ]
 
+        slug = state.agent_slug or "my_agent"
         training_deliverables = [
             {"name": "要件定義・アーキテクチャ仕様書", "path": "project_brief.md" if not is_hitman else "hitman_spec.md", "status": "承認・保全済 ✓"},
-            {"name": "ADK AIエージェント本体", "path": "my_agent/agent.py" if not is_hitman else "my_hitman/agent.py", "status": "実装済 ✓"},
-            {"name": "A2UIリッチカード生成モジュール", "path": "my_agent/a2ui_utils.py" if not is_hitman else "my_hitman/a2ui_utils.py", "status": "実装済 ✓"},
-            {"name": "自律Wチェック単体テストコード", "path": "tests/test_agent.py", "status": "全件合格 ✓"},
+            {"name": "ADK AIエージェント本体", "path": f"{slug}/agent.py" if not is_hitman else "my_hitman/agent.py", "status": "実装済 ✓"},
+            {"name": "A2UIリッチカード生成モジュール", "path": f"{slug}/a2ui_utils.py" if not is_hitman else "my_hitman/a2ui_utils.py", "status": "実装済 ✓"},
+            {"name": "自律Wチェック単体テストコード", "path": f"{slug}/tests/test_agent.py" if not is_hitman else "my_hitman/tests/test_agent.py", "status": "全件合格 ✓"},
             {"name": "Cloud Run デプロイ設定 (Dockerfile)", "path": "Dockerfile", "status": "本番稼働 ✓"},
             {"name": "個人GitHub公開リポジトリ", "path": "https://github.com/...", "status": "公開完了 ✓"},
         ]

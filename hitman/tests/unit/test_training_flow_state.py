@@ -406,3 +406,41 @@ def test_changing_idea_after_confirm_requires_reconfirmation(client):
     assert st["plan_confirmed"] is True
     st = _chat(client, uid, "IDEA:社内の日報を要約してくれるAI")["state"]
     assert st["plan_confirmed"] is False
+
+
+def test_proposal_a_personalization_across_steps(client):
+    """【案A検証】企画確定後に T-3〜T-6 の各ステップが受講生のアイデアに合わせてパーソナライズされること。"""
+    uid = "u-proposal-a"
+    _start_training(client, uid)
+    _chat(client, uid, f"LOG[T-1]:{T1_LOG}")
+    _chat(client, uid, "IDEA:エラーログ解析と復旧コマンド即答Bot")
+    st = _chat(client, uid, "CONFIRM")["state"]
+    assert st["plan_confirmed"] is True
+
+    brief = T2_LOG.replace("log_analyzer_bot", st["agent_slug"])
+    _chat(client, uid, f"LOG[T-1]:{brief}")  # T-2 合格して T-3 へ進行
+
+    sop = client.get("/api/sop", params={"user_id": uid, "mode": "TRAINING"}).json()["sop"]
+
+    # T-3 パーソナライズ検証
+    t3 = sop["T-3"]
+    assert "log_analyzer_bot" in t3["command"]
+    assert "--nonce" in t3["command"]
+    assert "--q1" in t3["command"] and "--q2" in t3["command"]
+    assert "ログ" in t3["agy_prompt"]
+    assert "log_analyzer_bot" in t3["agy_prompt"]
+
+    # T-4 パーソナライズ検証
+    t4 = sop["T-4"]
+    assert "pytest ipp-agent-workspace/log_analyzer_bot/tests/ -v" == t4["command"]
+    assert "log_analyzer_bot" in t4["agy_prompt"] or "ログ" in t4["agy_prompt"]
+
+    # T-5 パーソナライズ検証
+    t5 = sop["T-5"]
+    assert "log-analyzer-bot" in t5["command"]
+    assert "log-analyzer-bot" in t5["agy_prompt"]
+
+    # T-6 パーソナライズ検証
+    t6 = sop["T-6"]
+    assert "log-analyzer-bot" in t6["agy_prompt"] or "ログ" in t6["agy_prompt"]
+

@@ -1,3 +1,6 @@
+.gcloudignore
+.git/
+.gitignore
 .venv/
 __pycache__/
 *.pyc
@@ -6,8 +9,6 @@ __pycache__/
 .pytest_cache/
 .coverage
 htmlcov/
-.git/
-.gitignore
 .env
 .google-agents-cli/
 *.log
