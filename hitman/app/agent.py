@@ -2954,23 +2954,46 @@ def update_project_plan(idea_summary: str = "", status: str = "consulting", cour
     ws = "ipp-agent-workspace"
     skills_text = "\n".join(f"  - {sk}" for sk in skills)
     points_text = "\n".join(points)
+    brief_draft = (
+        f"# project_brief.md (自作AIエージェント要件定義)\n\n"
+        f"## 1. アプリ概要\n"
+        f"- **エージェント名**: `{slug}`\n"
+        f"- **表示名**: {short_name}\n"
+        f"- **解決する課題**: {idea}\n\n"
+        f"## 2. アーキテクチャ構成\n"
+        f"- **フレームワーク**: Google ADK (Agent Development Kit) + Python\n"
+        f"- **使用モデル**: gemini-3.8-flash（フォールバック: gemini-3.6-flash）\n"
+        f"- **UI**: A2UI (Agent-to-UI) v0.8 リッチカード表示 + FastAPI チャットフロントエンド\n"
+        f"- **作業ディレクトリ**: `{ws}`\n"
+        f"- **使用スキル**:\n{skills_text}\n\n"
+        f"## 3. 設計ポイント＆機能要件\n{points_text}\n\n"
+        f"## 4. 自作関数ツール要件\n"
+        f"- 企画に合わせた専用ツールを最低1つ実装（入力引数に応じて動的に処理し、固定値のダミーは返さない）\n\n"
+        f"## 5. A2UIカード表示仕様\n"
+        f"- 応答の末尾にカード/テーブル形式で結果を可視化（ボタン・フォームは配置せず表示専用とする）\n\n"
+        f"## 6. 動作確認方針（T-3 スモークテスト）\n"
+        f"- 内容の異なる2つの質問を送り、入力に応じてツールが呼ばれ結果が動的に変化することを検証\n"
+    )
     prompt_for_agy = (
-        f"【AntiGravity投入用プロンプト: Step T-2（企画『{idea}』要件定義）】\n"
+        f"【AntiGravity投入用プロンプト: Step T-2（企画『{idea}』要件定義ファイル生成）】\n"
         f"受講生オリジナル企画: 『{idea}』\n"
-        f"あなたはIPPのAI実践研修専属メンターです。\n\n"
-        f"【使用するスキル（ワークスペース直下の .agents/skills/）】\n{skills_text}\n\n"
+        f"あなたはIPPのAI実践研修専属メンターです。\n"
+        f"受講生がHITMAN画面で壁打ち・確定した以下の要件定義書の内容で、ワークスペースにファイルを保存し、提出用ログを出力してください。\n\n"
+        f"【使用するスキル（ワークスペース直下の .agents/skills/）】\n"
+        f"{skills_text}\n\n"
         f"【自律実行タスク】\n"
-        f"スキル「pick-your-agent-project」を使い、企画『{idea}』の要件定義書「{ws}/project_brief.md」を作成してください。\n"
-        f"以下を必ず盛り込むこと：\n"
-        f"1. エージェント名（{slug}）と解決する現場課題\n"
-        f"2. モデル選定（gemini-3.8-flash 優先、フォールバック: 3.6-flash）\n"
-        f"3. 設計ポイント:\n{points_text}\n"
-        f"4. 必要な関数ツール（ツール名、引数、返り値。入力に応じて実際に処理すること）\n"
-        f"5. A2UIカード表示仕様（表示専用。ボタン・フォームは使わない）\n"
-        f"6. 動作確認の方法（T-3 のスモークテストで使う、内容の異なる2つの質問）\n\n"
-        f"作成後、ターミナルで `cat {ws}/project_brief.md` を実行し、その出力をコードブロックで出力してください。\n"
-        f"提出用コードブロックの1行目には、実際に使用したスキルの証跡行（例: [skill:pick-your-agent-project@v1]）を列挙してください。\n"
-        f"最後に受講生へ「このコードブロックを HITMAN に貼り付けてください」と案内してください。"
+        f"スキル「pick-your-agent-project」を活用し、以下の要件定義書を「{ws}/project_brief.md」として作成・保存してください。\n"
+        f"（※ 受講生への再ヒアリング・質問は行わず、以下の確定内容をそのまま正確に保存してください）\n\n"
+        f"```markdown\n"
+        f"{brief_draft}\n"
+        f"```\n\n"
+        f"作成後、ターミナルで `cat {ws}/project_brief.md` を実行し、その出力を以下の通りコードブロック形式で逐語出力してください。\n"
+        f"提出用コードブロックの1行目には、実際に使用したスキルの証跡行 [skill:pick-your-agent-project@v1] を必ず記載してください：\n\n"
+        f"```markdown\n"
+        f"[skill:pick-your-agent-project@v1]\n"
+        f"{brief_draft}\n"
+        f"```\n\n"
+        f"出力後、受講生へ「上記コードブロック内のログをコピーして、HITMANのチャット欄に貼り付けてください。HITMANが客観Wチェックを行い、合格承認後にステップ T-3へ進みます！」と案内して待機してください。"
     )
     state.course_selected = True
     state.t2_override = {
@@ -2984,8 +3007,9 @@ def update_project_plan(idea_summary: str = "", status: str = "consulting", cour
         "is_confirmed": True,
         "title": state.t2_override["title"],
         "command": state.t2_override["command"],
+        "project_brief": brief_draft,
         "prompt_for_antigravity": prompt_for_agy,
-        "next_action": "受講生に AntiGravity 用プロンプトを渡し、project_brief.md の cat 出力（スキル証跡付き）を HITMAN に提出してもらう。",
+        "next_action": "HITMANの回答本文に、作成した要件定義書（project_brief）の内容と、AntiGravity投入用プロンプト（```text コードブロック）を全文逐語出力して受講生へ渡す。",
     })
     return base
 
@@ -3421,7 +3445,9 @@ a2ui_instruction = schema_manager.generate_system_prompt(
         "`update_project_plan` が返す idea_examples は参考情報であり、そのまま列挙しない。アイデアが決まらない受講生には、選択肢の1つとしてコースB（HITMANクローン）も紹介してよい。"
         "2. 企画の内容が出た・変わったときは、受講生の発言をそのまま渡さず、要点を1文に要約して `update_project_plan(idea_summary=要約, status='consulting')` を呼ぶ。"
         "返ってきた推奨スキル・設計ポイント・エージェント名を、受講生の企画に即して説明する。"
-        "3. 受講生が『この企画で進める』と明確に合意したときだけ、`update_project_plan(idea_summary=要約, status='confirmed', agent_name=英小文字スネークケースの名前（例: photo_diary_agent）)` を呼び、返ってきた AntiGravity 用プロンプトと提出コマンドを案内する。"
+        "3. 受講生が『この企画で進める』と明確に合意したときだけ、`update_project_plan(idea_summary=要約, status='confirmed', agent_name=英小文字スネークケースの名前（例: photo_diary_agent）)` を呼ぶ。"
+        "【超重要: 確定時の要件定義書・プロンプト出力規程】受講生に再質問や二度手間のインタビューを絶対に発生させないため、HITMAN側で確定した要件定義書（project_brief）の内容を回答本文で確認した上で、ツールの返り値 `prompt_for_antigravity` の全文を【必ず ```text のコードブロック形式で回答本文の末尾に全文逐語出力】してください（要約・省略・未出力は重大インシデント違反として厳禁）。"
+        "受講生には『上記コードブロック内のプロンプトをそのまま AntiGravity にコピー＆ペーストしてください。AntiGravity が要件定義書ファイルを自動作成し、提出用ログを出力します』と案内してください。"
         "確定後は、ツールが返した agent_name をフォルダ名・エージェント名として一貫して使う（自分で別の名前を作らない）。"
         "T-2 の要件定義書にはこのエージェント名が必要で、別の企画のサンプルを貼っても合格しない。T-2 合格後に T-3 用の確認コード（T3-xxxxxx）が発行されるので、T-3 ではカードのコマンド（--nonce 付き）をそのまま使うよう案内する。"
         "迷い・質問・『〜は作れる？』は合意ではない。コースBは受講生が自分で選んだときだけ course='hitman_clone' にする（勝手にすり替えない）。"
