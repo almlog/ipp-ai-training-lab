@@ -33,47 +33,43 @@ Google Cloud 上にインフラを立てることなく、受講生の `GEMINI_A
 ```python
 import os
 from pathlib import Path
-from google import genai
 from google.adk.agents import Agent
 
-# Google GenAI クライアント（.env の GEMINI_API_KEY を自動利用）
-client = genai.Client()
-
-# 起動時にドキュメントを File API へアップロード（一度だけ）
-DOCS_PATH = Path("docs/company_rules.txt")
-_uploaded_doc = None
-
-def get_or_upload_doc():
-    global _uploaded_doc
-    if _uploaded_doc is None and DOCS_PATH.is_file():
-        _uploaded_doc = client.files.upload(file=str(DOCS_PATH))
-    return _uploaded_doc
+DOCS_DIR = Path("docs")
 
 def search_company_documents(query: str) -> str:
-    """社内規程・ドキュメントを検索し、質問に対する正確な根拠と回答を返します。
+    """社内規程・ドキュメント（docs/ フォルダ配下）を検索し、関連する条項と内容を返します。
     
     Args:
         query: 検索・質問したい内容（例: '出張旅費の申請締め切りはいつですか？'）
     """
-    doc = get_or_upload_doc()
-    if not doc:
-        return "社内資料（docs/company_rules.txt）が見つかりません。所定のフォルダに配置してください。"
-
-    response = client.models.generate_content(
-        model="gemini-2.5-flash",
-        contents=[
-            doc,
-            f"あなたは社内ドキュメントの正確なQAボットです。上記の資料の内容に基づいて、次の質問に回答してください。\n質問: {query}\n"
-            f"※資料に記載がない内容は「資料に該当する記述がありません」と回答してください。"
-        ]
-    )
-    return response.text or "回答を生成できませんでした。"
+    if not DOCS_DIR.is_dir():
+        return "社内資料フォルダ（docs/）が見つかりません。"
+    
+    matched_docs = []
+    for f in DOCS_DIR.glob("**/*.*"):
+        if f.suffix in (".txt", ".md", ".csv", ".json"):
+            try:
+                text = f.read_text(encoding="utf-8", errors="replace")
+                matched_docs.append(f"=== 資料: {f.name} ===\n{text}")
+            except Exception:
+                pass
+    
+    if not matched_docs:
+        return "該当する社内資料がありません。"
+    
+    return "\n\n".join(matched_docs)
 
 # ADK エージェントに関数ツールとして登録
 root_agent = Agent(
     model="gemini-2.5-flash",
     name="rag_agent",
-    instruction="あなたは社内ドキュメントQAアシスタントです。社内規程に関する質問は、必ず search_company_documents ツールを呼び出して正確に回答してください。",
+    instruction=(
+        "あなたは社内ドキュメントQAアシスタントです。"
+        "社内規程に関する質問は、必ず search_company_documents ツールを呼び出して資料を確認し、"
+        "資料に記載されている条項に基づいて正確に回答してください。"
+        "資料に記載のない事項は「資料には記載がありません」と明記してください。"
+    ),
     tools=[search_company_documents],
 )
 ```

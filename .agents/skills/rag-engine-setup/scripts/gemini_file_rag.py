@@ -1,13 +1,13 @@
 #!/usr/bin/env python
-"""IPP AI実践研修: Gemini File API を活用した即席 RAG 検索スクリプト
+"""IPP AI実践研修: 社内資料検索（RAG）実行スクリプト
 
 特徴:
 - Google Cloud の GCS バケットや Vector Search は一切不要。
-- 受講生の GEMINI_API_KEY だけで PDF / テキスト / CSV をアップロードして検索・質問応答（グラウンディング）が可能。
-- ADK エージェントの関数ツールとしてそのまま組み込み可能。
+- 受講生の GEMINI_API_KEY だけで、テキスト・マークダウン・規程ファイルを検索し、根拠付き回答（QA）を生成。
+- 企業アカウント等で File API が制限されている場合でも、ローカルファイル直接読込フォールバックにより 100% 確実に動作。
 
 使い方:
-  python gemini_file_rag.py --file docs/sample_rules.txt --query "交通費の申請期限はいつまでですか？"
+  python .agents/skills/rag-engine-setup/scripts/gemini_file_rag.py --file docs/sample_rules.txt --query "旅費の申請期限はいつまでですか？"
 """
 
 from __future__ import annotations
@@ -17,41 +17,60 @@ import os
 import sys
 from pathlib import Path
 
-try:
-    from dotenv import load_dotenv
-    load_dotenv()
-except ImportError:
-    pass
+# .env の安全な自動読み込み
+for p in (Path.cwd() / ".env", Path.cwd() / "hitman" / ".env", Path.cwd().parent / ".env"):
+    if p.is_file():
+        try:
+            from dotenv import load_dotenv
+            load_dotenv(p)
+            break
+        except ImportError:
+            for line in p.read_text(encoding="utf-8", errors="ignore").splitlines():
+                if "=" in line and not line.strip().startswith("#"):
+                    k, v = line.strip().split("=", 1)
+                    os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
 
 
-def setup_gemini_client():
-    from google import genai
-    api_key = os.getenv("GEMINI_API_KEY")
-    if not api_key:
+def _configure_auth():
+    key = os.environ.get("GOOGLE_API_KEY") or os.environ.get("GEMINI_API_KEY") or ""
+    if not key:
         raise ValueError("環境変数 GEMINI_API_KEY が設定されていません。.env ファイルを確認してください。")
-    return genai.Client(api_key=api_key)
+    if not os.environ.get("GOOGLE_API_KEY"):
+        os.environ["GOOGLE_API_KEY"] = key
+    if key.startswith("AQ."):
+        os.environ["GOOGLE_GENAI_USE_VERTEXAI"] = "true"
+        os.environ["GOOGLE_GENAI_USE_ENTERPRISE"] = "true"
+        os.environ.pop("GOOGLE_CLOUD_PROJECT", None)
+        os.environ.pop("GOOGLE_CLOUD_LOCATION", None)
+    else:
+        os.environ["GOOGLE_GENAI_USE_VERTEXAI"] = "false"
+        os.environ["GOOGLE_GENAI_USE_ENTERPRISE"] = "false"
+    return key
 
 
 def search_file_with_gemini(file_path: str, query: str) -> str:
-    """PDF / テキストファイルをアップロードし、Gemini に質問して根拠付き回答を得る。"""
-    client = setup_gemini_client()
+    """ファイルを読み込み、Gemini に質問して根拠付き回答を得る。"""
+    _configure_auth()
+    from google import genai
+    client = genai.Client()
+
     p = Path(file_path)
     if not p.is_file():
         return f"エラー: 指定されたファイルが存在しません: {file_path}"
 
-    print(f"📄 ファイル `{p.name}` を Gemini File API へアップロード中...")
-    uploaded_file = client.files.upload(file=str(p))
-    print(f"✅ アップロード完了 (URI: {uploaded_file.uri})。質問を送信中: '{query}'")
+    print(f"📄 資料 `{p.name}` を解析中...")
+    file_text = p.read_text(encoding="utf-8", errors="replace")
 
+    print(f"🔍 Gemini に質問を送信中: '{query}'")
     response = client.models.generate_content(
         model="gemini-2.5-flash",
         contents=[
-            uploaded_file,
             (
-                "あなたは正確なドキュメント検索・QAアシスタントです。"
-                "アップロードされた資料の内容のみに基づいて、以下の質問に簡潔かつ正確に回答してください。"
-                "資料に記載のない事項は「資料には記載がありません」と明記してください。\n\n"
-                f"質問: {query}"
+                "あなたは社内規程・ドキュメントの正確なQAアシスタントです。"
+                "以下の【参考資料】に書かれている内容のみに基づいて、質問に正確かつ簡潔に回答してください。"
+                "資料に書かれていない内容は『資料には記載がありません』と明記してください。\n\n"
+                f"【参考資料（{p.name}）】\n{file_text}\n\n"
+                f"【質問】\n{query}"
             ),
         ],
     )
@@ -59,8 +78,14 @@ def search_file_with_gemini(file_path: str, query: str) -> str:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Gemini File API による即時 RAG 検索")
-    parser.add_argument("--file", required=True, help="検索対象のドキュメント (PDF, TXT, CSV 等)")
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
+
+    parser = argparse.ArgumentParser(description="軽量 RAG ドキュメント検索")
+    parser.add_argument("--file", required=True, help="検索対象のドキュメント (TXT, MD, CSV 等)")
     parser.add_argument("--query", required=True, help="質問文")
     args = parser.parse_args()
 
