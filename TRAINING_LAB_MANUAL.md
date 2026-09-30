@@ -231,33 +231,31 @@ HITMAN Cockpit は、受講生それぞれの PC ドライブ構成や会社セ�
 
 ## 6. AntiGravity の秘密道具（Skills と MCP）を理解しよう
 
-AntiGravity は素の状態でも賢いですが、本研修のリポジトリを読み込むと、**8つの「Skills（専門技能）」** と **2つの「MCP（直通電話）」** という強力な秘密道具を手に入れます。
+AntiGravity は素の状態でも賢いですが、本研修の環境セットアップ（T-1）を実行すると、**8つの「Skills（専門技能）」** と **2つの「MCP（直通ツール）」** という強力な秘密道具を手に入れます。
 
 > [!IMPORTANT]
-> **スキルが使えるようになる条件（実機で確認済み）**
-> - AntiGravity がスキルとして読み込むのは、**開いているワークスペースの直下にある `.agents/skills/`** だけです。クローンしたリポジトリの中（下の階層）にあるスキルは読み込まれません。
-> - スキルは **会話を始めたとき** に読み込まれます。同じ会話の途中でスキルを置いても、その会話では使えません。
->
-> そのため Step T-1 では、クローン後にスキルをワークスペース直下へコピーし、**新しい会話** で `/ipp-skill-check` を実行して、読み込まれたことを HITMAN で確認します。
+> **スキルと MCP が使えるようになる仕組み（自動セットアップ）**
+> - AntiGravity がスキルとして読み込むのは、**開いているワークスペースの直下にある `.agents/skills/`** です。また MCP はユーザー設定（`~/.gemini/antigravity/mcp/`）から読み込まれます。
+> - Step T-1 の自動同期スクリプト（`setup_lab_environment.py`）を実行することで、**全 Skills および 2 つの MCP が自動配置** されます。
+> - スキルと MCP は **会話を始めたとき** に AntiGravity に読み込まれます。そのため、セットアップ後は **新しい会話** で `/ipp-skill-check` を実行して、読み込まれたことを HITMAN で確認します。
 
 ### 🎒 8 つの Skills（専門技能パック）
-AntiGravity は、あなたが「◯◯を作って」と指示するだけで、適切なスキルを自動でポケットから取り出して活用します。
+AntiGravity は、受講生がプロンプトで「◯◯を作って」「◯◯スキルを使って」と指示するだけで、適切なスキルを自動でポケットから取り出して活用します。
 
 1. 🎯 **`pick-your-agent-project`（企画壁打ちスキル）**:
    - あなたの「作りたい」を聞き取り、機能を一緒に広げ・絞り込んで、研修で作れる設計書（`project_brief.md`）にまとめてくれます。**この設計書に書いたものが、そのまま T-3 以降で作られます。**
 2. 🎴 **`enable-a2ui`（リッチカード表示スキル）**:
    - 文字だけの味気ない返事ではなく、綺麗な枠線やカード、表がついた Google 最新の A2UI (v0.8) デザインを画面に描くコードを自動生成します。
 3. 🏗️ **`ipp-build-app-from-brief`（設計書どおりにアプリを作るスキル）**:
-   - 設計書の機能・画面・関数ツールをすべて実装します。画面はテンプレートのチャット画面ではなく、設計書の『画面』から作ります（カレンダー、一覧表、入力フォームなども作れます）。
-   - ※ `build-agent-frontend`（汎用チャット画面）は上級者向けで、研修の T-3〜T-5 では使いません。
+   - 設計書の機能・画面・関数ツールをすべて実装します。画面はテンプレートのチャット画面ではなく、Google 標準のリッチ UI（Google Fonts, Material Symbols, Tailwind CSS）で高品質に作成します。
 3-2. 🔒 **`ipp-secure-credentials`（API キー保護スキル）**:
    - あなたの Gemini API キーを `.env` にだけ安全に置き、コード・ログ・GitHub に漏れていないかを検査します。
 3-3. 🚀 **`ipp-cloud-run-deploy`（安全なデプロイスキル）**:
-   - API キーを Secret Manager 経由で渡して Cloud Run に公開し、公開 URL で AI が応答するところまで確かめます。
+   - API キーを Secret Manager 経由で渡して Cloud Run に公開し、公開 URL で AI が応答するところまで確かめます。修了後は安全停止（クリーンアップ）も行います。
 4. 🧠 **`memory-bank-setup`（長期記憶スキル）**:
-   - 会話が終わってもあなたの名前や好みを忘れない「長期記憶エンジン（Vertex AI Memory Bank）」をエージェントに搭載します。
+   - 会話が終わっても名前や好みを忘れない長期記憶をエージェントに搭載します。**受講生の `GEMINI_API_KEY` だけで動く「ローカル SQLite 永続化ツール（パターン A）」** と、Google Cloud の「Vertex AI Memory Bank（パターン B）」の双方が利用可能です。
 5. 📚 **`rag-engine-setup`（社内資料検索スキル）**:
-   - 社内マニュアルや PDF を読み込ませて、「この規程どうなってる？」と聞いたら正確に答えてくれる RAG 機能を組み込みます。
+   - 社内マニュアルや PDF を読み込ませて根拠付きで回答する RAG 機能を組み込みます。**追加インフラ不要で `GEMINI_API_KEY` だけで動く「Gemini File API（パターン A）」** と、Google Cloud の「Vertex AI RAG Engine（パターン B）」の双方が利用可能です。
 6. 🚀 **`publish-to-github`（世界公開スキル）**:
    - 難しいコマンドを打たなくても、画面の指示に従うだけであなたの個人 GitHub に安全にコードを保存・公開してくれます。
 7. 🩺 **`troubleshoot-lab-setup`（自動お医者さんスキル）**:
@@ -265,11 +263,13 @@ AntiGravity は、あなたが「◯◯を作って」と指示するだけで�
 8. 🛡️ **`novasmart-governance-lab`（セキュリティ防護スキル）**:
    - 悪いプロンプト攻撃（インジェクション）を防ぐセキュリティフィルター（Model Armor）や監査ログの仕組みを体験できます。
 
-### ☎️ 2 つの MCP（直通ホットライン）
+### ☎️ 2 つの MCP（直通ツール）
+リポジトリのセットアップにより、以下の MCP ツール定義が受講生の AntiGravity 環境（`~/.gemini/antigravity/mcp/`）に自動インストールされます。
+
 1. 📖 **Developer Knowledge MCP**:
-   - Google の最新公式マニュアルと直通しており、AI が「知ったかぶり（ウソ）」をするのを防ぎます。
+   - Google の公式ドキュメント（Developer Knowledge API）と直通しており、最新の Google Cloud / Gemini 仕様を正確に検索・回答します。
 2. 🗄️ **Firebase MCP**:
-   - データを保存するデータベース（Cloud Firestore）と直通しており、データの読み書きを簡単にしてくれます。
+   - データベース（Cloud Firestore）や Firebase Hosting と直通しており、データの読み書きやデプロイを簡単にしてくれます。
 
 ---
 
@@ -374,8 +374,8 @@ HITMAN Cockpit は、受講生が **`[⚙️ 研修環境設定]`** ボタンか
 2. 作業フォルダ作成とクローン（ワークスペースのルートで実行）:
    mkdir ipp-agent-workspace
    git clone https://github.com/almlog/ipp-ai-training-lab.git ipp-agent-workspace/ipp-ai-training-lab
-3. 研修スキルをワークスペース直下へコピー（Windows/Mac/Linux共通）:
-   python -c "import shutil; shutil.copytree(r'ipp-agent-workspace/ipp-ai-training-lab/.agents', '.agents', dirs_exist_ok=True)"
+3. 研修スキルおよび MCP を自動同期（Windows/Mac/Linux共通）:
+   python ipp-agent-workspace/ipp-ai-training-lab/.agents/scripts/setup_lab_environment.py
 4. python --version と .agents/skills の一覧を表示
 5. 受講生へ「新しい会話を開いて /ipp-skill-check を実行してください」と案内して終了
 ```

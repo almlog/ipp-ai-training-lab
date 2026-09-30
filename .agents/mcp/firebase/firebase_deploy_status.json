@@ -1,0 +1,1 @@
+{"name":"firebase_deploy_status","description":"Check the status of a background deployment job using its Job ID.","parameters":{"properties":{"jobId":{"description":"The Job ID returned by the deploy tool","type":"string"}},"required":["jobId"],"type":"object"}}

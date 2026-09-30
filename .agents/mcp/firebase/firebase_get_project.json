@@ -1,0 +1,1 @@
+{"name":"firebase_get_project","description":"Use this to retrieve information about the currently active Firebase Project.","parameters":{"type":"object"}}

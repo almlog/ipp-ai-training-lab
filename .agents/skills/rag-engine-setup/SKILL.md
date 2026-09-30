@@ -1,29 +1,96 @@
 ---
 name: rag-engine-setup
 description: >
-  Set up a Vertex AI RAG Engine corpus (Agent Platform) in serverless mode and
-  wire it into an ADK agent. Use when the user wants to "create a RAG corpus",
-  "build a RAG store", "ground my agent on documents", "add retrieval to my
-  agent", or hits Spanner/allowlist errors creating a corpus. Covers GCS upload,
-  serverless-mode switch, the LLM parser (custom parsing prompt), import,
-  standalone retrieval testing, and exposing retrieval as a plain function tool
-  (required so it can coexist with A2UI / other function tools on Gemini 2.5).
+  Ground an ADK agent on documents (PDF, TXT, CSV, Markdown) using either
+  (A) Gemini File API (recommended for lab environments, requires only GEMINI_API_KEY),
+  or (B) Vertex AI RAG Engine in serverless mode (requires Google Cloud GCS & Vector Search).
+  Use when the user wants to "create a RAG corpus", "ground my agent on documents",
+  "search internal manuals", "add retrieval to my agent", or asks how to do document QA.
 ---
 
-# Vertex AI RAG Engine — serverless corpus + ADK integration
+# RAG & ドキュメントグラウンディング統合ガイド（Gemini File API / Vertex AI）
 
 > [!NOTE]
 > **HITMAN 使用証跡**: このスキルを使って作業した回答では、HITMAN 提出用コードブロックの1行目に `[skill:rag-engine-setup@v1]` と出力すること（実際にこのスキルを使った場合のみ）。
 
-A RAG Engine **corpus** is a managed index: you point it at documents in Cloud
-Storage (or Drive), it chunks + embeds them, and stores the vectors in a managed
-vector database. An agent then queries the corpus at runtime through a
-**retrieval tool** and grounds its answers on the returned passages.
+受講生の環境と要件に合わせて、**2つの RAG パターン** を選択できます：
 
-This skill builds a corpus in **serverless mode** — the cheapest, no-allowlist,
-fully-managed option — and shows how the agent consumes it.
+1. **【パターン A: 推奨】Gemini File API / ローカル検索による即席 RAG**  
+   - **前提条件**: `GEMINI_API_KEY` のみ（Google Cloud の事前インフラ構築は一切不要）。
+   - **特徴**: PDF やテキストファイルを直接 Gemini にアップロードして検索・質問応答。数行の Python 関数ツールとして即座に実装可能。
+2. **【パターン B: エンタープライズ】Vertex AI RAG Engine（GCS ＋ Vector Search）**  
+   - **前提条件**: Google Cloud プロジェクト、Cloud Storage バケット、Vertex AI API 有効化。
+   - **特徴**: 大規模ドキュメント群のベクトル埋め込みとインデックス永続化。
 
-## Mental model (how it works end to end)
+---
+
+## 🚀 パターン A: Gemini File API による即席 RAG（APIキーのみで動作）
+
+Google Cloud 上にインフラを立てることなく、受講生の `GEMINI_API_KEY` だけで社内マニュアルや規程（PDF / TXT）を AI に読ませて根拠付き回答を生成する最もシンプルな方法です。
+
+### 1. ドキュメント検索ツール（agent.py 内に実装）
+
+```python
+import os
+from pathlib import Path
+from google import genai
+from google.adk.agents import Agent
+
+# Google GenAI クライアント（.env の GEMINI_API_KEY を自動利用）
+client = genai.Client()
+
+# 起動時にドキュメントを File API へアップロード（一度だけ）
+DOCS_PATH = Path("docs/company_rules.txt")
+_uploaded_doc = None
+
+def get_or_upload_doc():
+    global _uploaded_doc
+    if _uploaded_doc is None and DOCS_PATH.is_file():
+        _uploaded_doc = client.files.upload(file=str(DOCS_PATH))
+    return _uploaded_doc
+
+def search_company_documents(query: str) -> str:
+    """社内規程・ドキュメントを検索し、質問に対する正確な根拠と回答を返します。
+    
+    Args:
+        query: 検索・質問したい内容（例: '出張旅費の申請締め切りはいつですか？'）
+    """
+    doc = get_or_upload_doc()
+    if not doc:
+        return "社内資料（docs/company_rules.txt）が見つかりません。所定のフォルダに配置してください。"
+
+    response = client.models.generate_content(
+        model="gemini-2.5-flash",
+        contents=[
+            doc,
+            f"あなたは社内ドキュメントの正確なQAボットです。上記の資料の内容に基づいて、次の質問に回答してください。\n質問: {query}\n"
+            f"※資料に記載がない内容は「資料に該当する記述がありません」と回答してください。"
+        ]
+    )
+    return response.text or "回答を生成できませんでした。"
+
+# ADK エージェントに関数ツールとして登録
+root_agent = Agent(
+    model="gemini-2.5-flash",
+    name="rag_agent",
+    instruction="あなたは社内ドキュメントQAアシスタントです。社内規程に関する質問は、必ず search_company_documents ツールを呼び出して正確に回答してください。",
+    tools=[search_company_documents],
+)
+```
+
+### 2. 即時動作確認スクリプト
+
+同梱のスクリプトで、手元のファイルが正しく Gemini から検索できるか即座に確認できます：
+
+```bash
+python .agents/skills/rag-engine-setup/scripts/gemini_file_rag.py --file docs/sample_rules.txt --query "旅費精算のルールを教えて"
+```
+
+---
+
+## 🏛️ パターン B: Vertex AI RAG Engine（GCS ＋ Vector Search）
+
+大規模な組織ドキュメントや、Google Cloud のマネージド Vector Search を用いたエンタープライズ RAG 構成です。
 
 ```
 Ingest (once):   docs in GCS ──▶ LLM parser ──▶ chunk ──▶ embed ──▶ managed Vector Search

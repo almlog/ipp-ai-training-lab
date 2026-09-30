@@ -359,4 +359,38 @@ flowchart LR
 - 統合テスト（`tests/integration/`）: **4 passed**
 - リグレッションなし、全件合格を確認済み。
 
+---
+
+## 9. MCP 同梱・自動同期＆RAG・長期記憶の API キー対応（2026-09-30）
+
+### 1. 解決した課題と背景
+1. **MCP が受講生環境にインストールされない問題**:
+   - マニュアルには「2つの MCP（Developer Knowledge, Firebase）が手に入る」と記載されていたが、MCP 定義はリポジトリ外（ローカル PC 固有）にあったため、受講生がクローンしても認識されなかった。
+2. **RAG および長期記憶が Gemini API キー環境で動作しない問題**:
+   - `rag-engine-setup`（Vertex AI RAG Engine）および `memory-bank-setup`（Vertex AI Memory Bank）は Google Cloud の課金インフラ（GCS, Vector Search, Reasoning Engine）を前提としており、受講生が API キー環境で呼び出しても動作しなかった。
+
+### 2. 実装したアーキテクチャ
+
+#### ① MCP のリポジトリ同梱＆自動セットアップスクリプト
+- **同梱ファイル**: `.agents/mcp/firebase/` 配下に全 19 の MCP ツールスキーマ（Developer Knowledge 検索/QA、Firebase ツール群）をコミット。
+- **自動同期スクリプト**: [`.agents/scripts/setup_lab_environment.py`](file:///.agents/scripts/setup_lab_environment.py)
+  - ワークスペース直下の `.agents/skills` への同期。
+  - 受講生ホームディレクトリ（`~/.gemini/antigravity/mcp/`）への MCP 自動インストール。
+- **HITMAN T-1 コマンドの更新**:
+  - `T1_COMMAND` を `python ipp-agent-workspace/ipp-ai-training-lab/.agents/scripts/setup_lab_environment.py` に更新し、環境構築時に Skills と MCP を一括で自動配備。
+
+#### ② Gemini File API による即席 RAG（`rag-engine-setup`）
+- **パターン A（推奨・APIキーのみで動作）の新設**:
+  - Google GenAI SDK（`client.files.upload`）を活用し、受講生の `GEMINI_API_KEY` のみで PDF やテキスト規程を直接 Gemini に読ませて根拠付き QA を行う実装パターンを追加。
+  - 実動テストスクリプト: [`.agents/skills/rag-engine-setup/scripts/gemini_file_rag.py`](file:///.agents/skills/rag-engine-setup/scripts/gemini_file_rag.py)
+- **パターン B（エンタープライズ）**:
+  - 従来の Vertex AI RAG Engine（GCS + Vector Search）のガイドラインも併記として維持。
+
+#### ③ ローカル SQLite による長期記憶（`memory-bank-setup`）
+- **パターン A（推奨・APIキーのみで動作）の新設**:
+  - Reasoning Engine インスタンス不要で、`remember_user_fact` および `recall_user_facts` の関数ツールにより SQLite / JSON にユーザーの好みや情報をセッション横断で永続化するパターンを追加。
+  - 実動テストスクリプト: [`.agents/skills/memory-bank-setup/scripts/local_memory_tool.py`](file:///.agents/skills/memory-bank-setup/scripts/local_memory_tool.py)
+- **パターン B（エンタープライズ）**:
+  - 従来の Vertex AI Memory Bank（Reasoning Engine）のガイドラインも併記として維持。
+
 

@@ -233,24 +233,24 @@ SKILL_CHECK_MARKER = "[skill:ipp-skill-check@v1]"
 T1_COMMAND = (
     "mkdir ipp-agent-workspace ; "
     "git clone https://github.com/almlog/ipp-ai-training-lab.git ipp-agent-workspace/ipp-ai-training-lab ; "
-    "python -c \"import shutil; shutil.copytree(r'ipp-agent-workspace/ipp-ai-training-lab/.agents', '.agents', dirs_exist_ok=True)\""
+    "python ipp-agent-workspace/ipp-ai-training-lab/.agents/scripts/setup_lab_environment.py"
 )
 
 
 def _t1_step(course_greeting: str) -> dict:
     return {
         "step_id": "T-1",
-        "title": "ステップ T-1: 開発環境構築とスキル同期",
-        "objective": "専用フォルダに講師リポジトリをクローンし、研修スキルをワークスペース直下へ配置して、Antigravity に読み込まれたことを確認する。",
+        "title": "ステップ T-1: 開発環境構築とスキル・MCP同期",
+        "objective": "専用フォルダに講師リポジトリをクローンし、研修スキル群および MCP（Developer Knowledge, Firebase）をセットアップして、Antigravity に読み込まれたことを確認する。",
         "command": T1_COMMAND,
         "expected_check": f"新しい会話で /ipp-skill-check が起動し、証跡行 {SKILL_CHECK_MARKER} と .agents/skills のスキル一覧が出力されること",
         "cautions": (
             "AntiGravity のモデル設定で「gemini-3.8-flash」を選択してください（エラーや未提供時は「gemini-3.6-flash」）。"
-            "スキルは『ワークスペース直下の .agents/skills/』に置いたものだけが、『新しい会話』から有効になります。"
+            "スキルおよび MCP は『新しい会話』から有効になります。"
             "クローン後は必ず新しい会話を開き、/ipp-skill-check の結果を HITMAN に提出してください。"
         ),
         "agy_prompt": (
-            "【AntiGravity投入用プロンプト: Step T-1（環境構築・スキル同期）】\n"
+            "【AntiGravity投入用プロンプト: Step T-1（環境構築・スキル＆MCP同期）】\n"
             "あなたはIPPのAI実践研修専属メンターです。\n"
             f"まず受講生に以下の通り挨拶してください：\n「{course_greeting}」\n\n"
             "【自律実行タスク】（すべて、いま開いているワークスペースのルートフォルダで実行すること）\n"
@@ -258,16 +258,15 @@ def _t1_step(course_greeting: str) -> dict:
             "2. 作業フォルダ作成とリポジトリのクローン:\n"
             "   mkdir ipp-agent-workspace\n"
             "   git clone https://github.com/almlog/ipp-ai-training-lab.git ipp-agent-workspace/ipp-ai-training-lab\n"
-            "3. 研修スキルをワークスペース直下へ配置（重要）:\n"
-            "   Antigravity は、ワークスペースのルート直下にある .agents/skills/ だけをスキルとして読み込みます。"
-            "クローンしたリポジトリの中（下の階層）にあるスキルは読み込まれないため、次のコマンドでルート直下へコピーしてください（Windows/Mac/Linux共通）：\n"
-            "   python -c \"import shutil; shutil.copytree(r'ipp-agent-workspace/ipp-ai-training-lab/.agents', '.agents', dirs_exist_ok=True)\"\n"
+            "3. 研修スキルおよび MCP の自動同期（重要）:\n"
+            "   次のコマンドを実行して、研修スキル（.agents/skills）をワークスペース直下へ配置し、さらに Developer Knowledge MCP および Firebase MCP を AntiGravity の設定領域へ自動同期してください：\n"
+            "   python ipp-agent-workspace/ipp-ai-training-lab/.agents/scripts/setup_lab_environment.py\n"
             "4. 配置の確認: python --version を実行し、続けて .agents/skills の一覧を表示する"
             "（Windows: Get-ChildItem .agents\\skills -Name ／ Mac・Linux: ls .agents/skills）。\n\n"
-            "【重要: スキルは新しい会話から有効になります】\n"
-            "スキルは会話の開始時に読み込まれるため、この会話の中ではまだ使えません。"
+            "【重要: スキルと MCP は新しい会話から有効になります】\n"
+            "スキルと MCP は会話の開始時に読み込まれるため、この会話の中ではまだ使えません。"
             "作業が終わったら、受講生へ次の通り案内してこの会話を終えてください：\n"
-            "「準備ができました！スキルは新しい会話から有効になります。Antigravity で新しい会話を開き、"
+            "「準備ができました！スキルと MCP は新しい会話から有効になります。Antigravity で新しい会話を開き、"
             "チャット欄に /ipp-skill-check と入力して送信してください。表示されたコードブロックを HITMAN のチャット欄に貼り付けると、"
             "スキルの読み込みが確認されてステップ T-2 へ進みます。」\n"
             "※ この会話では HITMAN 提出用のログは出力しないこと（提出するのは新しい会話での /ipp-skill-check の結果です）。"

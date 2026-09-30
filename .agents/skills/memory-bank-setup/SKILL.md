@@ -1,32 +1,118 @@
 ---
 name: memory-bank-setup
 description: >
-  Add cross-session long-term memory to an ADK agent using Agent Platform's
-  Vertex AI Memory Bank, and wire it into the agent. Use when the user wants to
-  "add memory", "add a Memory Bank", "remember facts/preferences across
-  sessions", "make my agent remember me between conversations", or asks why
-  memories aren't persisting / aren't showing in the Cloud Console. Covers the
-  agent-side wiring (PreloadMemoryTool + a memory-generation callback), creating
-  the managed Memory Bank instance, pointing the runtime's memory service at it
-  (local ADK Web and deployed Agent Runtime), verifying in the Console, and the
-  gotcha that `agents-cli deploy` does NOT configure a memory service on its own.
+  Add durable cross-session long-term memory to an ADK agent using either
+  (A) Local durable SQLite storage (recommended for lab environments, requires only GEMINI_API_KEY),
+  or (B) Vertex AI Memory Bank on Agent Platform (requires Google Cloud Reasoning Engine).
+  Use when the user wants to "add memory", "remember user facts/preferences",
+  "remember across conversations", or make an agent personalize its replies over time.
 ---
 
-# Vertex AI Memory Bank — cross-session memory + ADK integration
+# 長期記憶（Memory）統合ガイド（ローカル SQLite / Vertex AI）
 
 > [!NOTE]
 > **HITMAN 使用証跡**: このスキルを使って作業した回答では、HITMAN 提出用コードブロックの1行目に `[skill:memory-bank-setup@v1]` と出力すること（実際にこのスキルを使った場合のみ）。
 
-**Sessions** remember one conversation. **Memory Bank** remembers facts and
-preferences *across* conversations (e.g. "the user is gluten-free", "call me
-Dr. Vance", "always answer in metric"). Every turn, Memory Bank reads the
-conversation, extracts durable snippets, and stores them keyed by `user_id` so
-future sessions can recall them.
+受講生の環境と要件に合わせて、**2つの長期記憶パターン** を選択できます：
 
-This skill adds Memory Bank to an ADK agent (including an `agents-cli`-scaffolded
-project) and wires it end to end.
+1. **【パターン A: 推奨】ローカル SQLite による長期記憶ツール**  
+   - **前提条件**: `GEMINI_API_KEY` のみ（Google Cloud の有料インフラ構築は一切不要）。
+   - **特徴**: `remember_user_fact` と `recall_user_facts` の2つの関数ツールにより、ユーザーの好みや指示をローカル DB に保存・復元。コンテナ内やローカル PC で確実に永続化。
+2. **【パターン B: エンタープライズ】Vertex AI Memory Bank（Agent Platform）**  
+   - **前提条件**: Google Cloud プロジェクト、Reasoning Engine インスタンス作成（`agentengine://...`）。
+   - **特徴**: クラウドマネージドなセッション横断記憶抽出エンジン。
 
-## Mental model (how it works end to end)
+---
+
+## 🚀 パターン A: ローカル SQLite による長期記憶（APIキーのみで動作）
+
+Google Cloud 上に Reasoning Engine を立ち上げることなく、受講生の `GEMINI_API_KEY` だけで「会話が終わってもユーザーの名前や好みを覚えているエージェント」を実装する最も確実な方法です。
+
+### 1. 記憶ツールの実装（agent.py 内）
+
+```python
+import sqlite3
+from pathlib import Path
+from google.adk.agents import Agent
+
+DB_PATH = Path("user_memory.db")
+
+def _init_db():
+    conn = sqlite3.connect(str(DB_PATH))
+    with conn:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS memories (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+    return conn
+
+def remember_user_fact(key: str, value: str) -> str:
+    """ユーザーに関する重要な情報、設定、好み（キーと値）を長期記憶DBに保存します。
+    
+    Args:
+        key: 記憶の分類または項目名（例: 'user_role', 'preferred_format', 'hobby'）
+        value: 記憶する具体的な内容（例: '経理部マネージャー', '表形式で簡潔に出力', 'サッカー'）
+    """
+    conn = _init_db()
+    with conn:
+        conn.execute("""
+            INSERT INTO memories (key, value, updated_at)
+            VALUES (?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT(key) DO UPDATE SET
+                value = excluded.value,
+                updated_at = CURRENT_TIMESTAMP
+        """, (key.strip(), value.strip()))
+    return f"【記憶完了】項目 `{key}` を `{value}` として保存しました。"
+
+def recall_user_facts(query: str = "") -> str:
+    """これまでに保存されたユーザーの長期記憶（設定・好み・属性）を検索・取得します。
+    
+    Args:
+        query: 検索キーワード（省略時はすべての記憶を一覧表示）
+    """
+    conn = _init_db()
+    cursor = conn.cursor()
+    if query:
+        cursor.execute("SELECT key, value FROM memories WHERE key LIKE ? OR value LIKE ?", (f"%{query}%", f"%{query}%"))
+    else:
+        cursor.execute("SELECT key, value FROM memories ORDER BY updated_at DESC")
+    rows = cursor.fetchall()
+    if not rows:
+        return "保存された長期記憶はありません。"
+    
+    items = [f"- {k}: {v}" for k, v in rows]
+    return "【保存されている長期記憶】\n" + "\n".join(items)
+
+# ADK エージェントに関数ツールとして登録
+root_agent = Agent(
+    model="gemini-2.5-flash",
+    name="memory_agent",
+    instruction=(
+        "あなたはパーソナルAIアシスタントです。"
+        "ユーザーが名前、所属、好み、指示を伝えた場合は、必ず remember_user_fact ツールを使って保存してください。"
+        "また、ユーザーへの回答時には必要に応じて recall_user_facts を呼び出し、過去に保存された好みに沿って回答してください。"
+    ),
+    tools=[remember_user_fact, recall_user_facts],
+)
+```
+
+### 2. 即時動作確認スクリプト
+
+同梱のスクリプトで、記憶の保存と呼び出しをターミナルからテストできます：
+
+```bash
+python .agents/skills/memory-bank-setup/scripts/local_memory_tool.py --remember "user_name" "山田太郎"
+python .agents/skills/memory-bank-setup/scripts/local_memory_tool.py --recall
+```
+
+---
+
+## 🏛️ パターン B: Vertex AI Memory Bank（Reasoning Engine）
+
+Google Cloud Agent Platform のフルマネージド長期記憶エンジンです。
 
 ```
 Write (per turn):  session events ─▶ after_agent_callback ─▶ add_session_to_memory()

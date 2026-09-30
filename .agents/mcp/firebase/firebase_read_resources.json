@@ -1,0 +1,1 @@
+{"name":"firebase_read_resources","description":"Use this to read the contents of `firebase://` resources or list available resources","parameters":{"properties":{"uris":{"description":"list of resource uris to read. each must start with `firebase://` prefix. omit to list all available resources","items":{"type":"string"},"type":"array"}},"type":"object"}}

@@ -1,0 +1,1 @@
+{"name":"firebase_create_project","description":"Use this to create a new Firebase Project.","parameters":{"properties":{"display_name":{"description":"The user-friendly display name for the project.","type":"string"},"project_id":{"description":"The project ID to create or use.","type":"string"}},"required":["project_id"],"type":"object"}}

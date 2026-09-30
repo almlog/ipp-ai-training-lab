@@ -1,0 +1,1 @@
+{"name":"firebase_logout","description":"Use this to sign the user out of the Firebase CLI and Firebase MCP server.","parameters":{"properties":{"email":{"description":"The email of the account to log out. If not provided, all accounts will be logged out.","type":"string"}},"type":"object"}}

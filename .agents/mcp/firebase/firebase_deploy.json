@@ -1,0 +1,1 @@
+{"name":"firebase_deploy","description":"Deploy resources to your Firebase project, based on the contents of firebase.json.","parameters":{"properties":{"only":{"description":"Comma-separated list of services to deploy. Valid targets are: database, storage, firestore, functions, hosting, remoteconfig, extensions, dataconnect, apphosting, auth.","type":"string"}},"type":"object"}}

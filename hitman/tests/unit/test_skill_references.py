@@ -91,7 +91,7 @@ def test_t1_copies_skills_to_workspace_root():
     """Antigravity はワークスペース直下の .agents/skills しか読まない。T-1 はそこへコピーさせること。"""
     for course in ("original", "hitman_clone"):
         t1 = agent_module.get_training_sop(course)["T-1"]
-        assert "copytree" in t1["command"] and "'.agents'" in t1["command"]
+        assert ("copytree" in t1["command"] or "setup_lab_environment.py" in t1["command"])
         assert "/ipp-skill-check" in t1["agy_prompt"]
         assert "新しい会話" in t1["agy_prompt"]
 
