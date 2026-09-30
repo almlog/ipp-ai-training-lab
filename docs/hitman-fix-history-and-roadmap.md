@@ -94,6 +94,29 @@
   - `git push` が rejected で失敗しても T-6 合格
   - `cat` がファイルなしで失敗しても T-2（コースB）合格
 
+### PR #5: 企画書駆動化（Brief-driven）・厳格なAPIキー保護・実稼働デプロイ検証
+
+**理由**: 「カレンダー」と言っただけで固定の「WBSスケジュールBot」にすり替わるキーワード判定の撤廃、平文APIキー漏洩の根絶、およびデプロイしたCloud RunがHTTP 500で動かない不具合の解消。
+
+- **企画書駆動**: `project_brief.md` から機能・画面・ツールをパースし、T-3〜T-6 の手順を完全動的生成（キーワード辞書の廃止）
+- **UI自作スキル**: `ipp-build-app-from-brief` により、企画書の画面定義（S1, S2等）に基づいたFastAPI Webアプリを構築
+- **APIキー保護**: `ipp-secure-credentials` / `ipp-cloud-run-deploy` により、キーを標準入力から Secret Manager に登録し `--set-secrets` でCloud Runへ安全バインド。平文環境変数・ログ・Gitコミットを完全排除
+- **実稼働ヘルスチェック**: T-5 の合格条件に `live_deploy_check` を義務化。Cloud Run の `/health` および `/chat` を実際に叩いて HTTP 200 かつ AI 正常応答を確認（500/404 は即不合格）
+- **UI/UX改善**: 「作業手順カード」の最上部（プロンプトコピーボタン）へのオートスクロール、処理待ち時間のストップウォッチ表示
+
+### PR #6: 演習環境の安全停止（クリーンアップ）セーフティ実装
+
+**理由**: 演習終了後に受講生の Google Cloud 上に Cloud Run サービスや Secret Manager のシークレットが残り続け、不要な課金発生や認証情報漏洩のリスクとなるのを防止するため。
+
+- **クリーンアップスクリプト**: `.agents/skills/ipp-cloud-run-deploy/scripts/cleanup.py` を新設
+  - 対象の Cloud Run サービスを削除し、外部アクセスとインスタンス待機を完全停止（FinOps）
+  - Secret Manager のシークレット（`<サービス名>-gemini-api-key`）を削除し、クラウド上の API キーを完全消去（セキュリティ）
+- **HITMAN修了プロンプト連携**:
+  - T-6 合格時に、受講生専用のクリーンアッププロンプト（`python .../cleanup.py --service <サービス名>`）をチャット画面に自動発行
+  - 最終評価レポート（画面モーダルおよびエクスポート用Markdown）に「演習環境の安全停止＆クリーンアップ手順（FinOps & セキュリティ保全）」セクションおよびコピーボタンを追加
+- **SKILL 自律実行**:
+  - 受講生が「環境を片付けて」「Cloud Run を削除して」「課金を止めて」「クリーンアップして」と AntiGravity に頼んだ際、または HITMAN からのプロンプトを貼られた際に自律発動するよう `SKILL.md` に組み込み
+
 ### 現在の合格条件（まとめ）
 
 | ステップ | 合格に必要なもの |
@@ -102,8 +125,8 @@
 | T-2 | コースA: 企画の確定＋確定したエージェント名を含む企画書。コースB: `hitman_spec.md` の内容 |
 | T-3 | その受講生の確認コード付きで、企画どおりのフォルダで実行したスモークテストの PASS |
 | T-4 | pytest が失敗なしで通った出力 |
-| T-5 | Cloud Run のデプロイ成功（Service URL） |
-| T-6 | GitHub への push 成功（rejected などの失敗がない） |
+| T-5 | Cloud Run のデプロイ成功（Secret Manager 経由）＋ `/health` および `/chat` の実稼働検証 PASS |
+| T-6 | 機密情報スキャン PASS ＋ GitHub への push 成功（修了後にクリーンアッププロンプト発行） |
 
 コマンド自体の失敗（`fatal: could not read`、`[rejected]`、`No such file or directory` など）が含まれるログは、URL やファイル名が含まれていても合格させません。
 

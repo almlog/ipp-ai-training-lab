@@ -4884,6 +4884,30 @@ function renderFinalReportView() {
         ${evidenceItems}
       </ul>
     </div>
+
+    ${isTraining ? `
+    <div>
+      <h4 style="margin:0.8rem 0 0.4rem;color:#1e3a8a;display:flex;align-items:center;gap:0.4rem;">
+        <span class="material-symbols-outlined" style="font-size:18px;color:#dc2626;">shield</span> 演習環境の安全停止＆クリーンアップ（FinOps ＆ セキュリティ保全）
+      </h4>
+      <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:6px;padding:0.7rem 0.9rem;font-size:0.8rem;color:#991b1b;">
+        <div style="font-weight:700;margin-bottom:0.3rem;">⚠️ 研修修了後のリソース削除のお願い</div>
+        <p style="margin:0 0 0.5rem;line-height:1.5;">
+          研修終了後の不要な課金発生を防止し、クラウド上に API キーを残さないため、AntiGravity に以下のコマンドを投入してデプロイ先リソースを破棄してください。
+        </p>
+        <div style="display:flex;align-items:center;gap:0.5rem;background:#ffffff;border:1px solid #fca5a5;border-radius:4px;padding:0.4rem 0.6rem;font-family:monospace;font-size:0.75rem;color:#1e293b;">
+          <span style="flex:1;overflow-x:auto;white-space:nowrap;" id="report-cleanup-cmd">python .agents/skills/ipp-cloud-run-deploy/scripts/cleanup.py --service ${(appState.params && appState.params.AGENT_NAME) || appState.agent_slug || (appState.trainingCourse === 'hitman_clone' ? 'my_hitman' : 'my_agent')}</span>
+          <button style="border:none;background:#fee2e2;color:#991b1b;padding:3px 8px;border-radius:4px;cursor:pointer;font-weight:700;display:flex;align-items:center;gap:3px;" onclick="const t = document.getElementById('report-cleanup-cmd').innerText; if(navigator.clipboard){navigator.clipboard.writeText(t).then(()=>showToast('クリーンアップコマンドをコピーしました！'));}">
+            <span class="material-symbols-outlined" style="font-size:14px;">content_copy</span>コピー
+          </button>
+        </div>
+        <div style="margin-top:0.5rem;font-size:0.75rem;color:#7f1d1d;display:flex;gap:1.2rem;">
+          <span>✓ Cloud Run インスタンス停止・削除</span>
+          <span>✓ Secret Manager APIキー破棄</span>
+        </div>
+      </div>
+    </div>
+    ` : ''}
   `;
 
   const reportCont = document.getElementById("report-container");
@@ -4993,7 +5017,17 @@ function exportReportMarkdown() {
     md += `- [${isT3 ? 'x' : ' '}] T-3: Google ADK AIエージェント ＋ A2UIリッチカード表示 (\`agent.py\`, \`a2ui_utils.py\`)\n`;
     md += `- [${isT4 ? 'x' : ' '}] T-4: pytest 単体テスト ＆ 客観Wチェック客観検証証跡\n`;
     md += `- [${isT5 ? 'x' : ' '}] T-5: Dockerコンテナ化 ＆ Google Cloud Run 本番デプロイ\n`;
-    md += `- [${isT6 ? 'x' : ' '}] T-6: 個人GitHubリポジトリへのコード公開 ＆ 修了証発行\n`;
+    md += `- [${isT6 ? 'x' : ' '}] T-6: 個人GitHubリポジトリへのコード公開 ＆ 修了証発行\n\n`;
+
+    const cleanSvc = (appState.params && appState.params.AGENT_NAME) || appState.agent_slug || (appState.trainingCourse === 'hitman_clone' ? 'my_hitman' : 'my_agent');
+    const cleanupCmd = `python .agents/skills/ipp-cloud-run-deploy/scripts/cleanup.py --service ${cleanSvc}`;
+    md += `## 4. 演習環境の安全停止＆クリーンアップ手順（FinOps & セキュリティ）\n\n`;
+    md += `研修終了後の不要な課金発生（FinOps）およびクラウド上での機密情報保持（セキュリティ）を防ぐため、以下のコマンドで Cloud Run サービスおよび Secret Manager を破棄してください：\n\n`;
+    md += `\`\`\`bash\n`;
+    md += `${cleanupCmd}\n`;
+    md += `\`\`\`\n\n`;
+    md += `- [ ] Cloud Run サービス破棄完了（外部アクセス停止・インスタンス待機課金ゼロ）\n`;
+    md += `- [ ] Secret Manager シークレット破棄完了（APIキー消去）\n`;
   } else {
     md += `## 2. 作業前後の状態比較 (Before vs After)\n\n`;
     md += `| 確認項目 | 作業前 (Before) | 作業後 (After) | 要件合致判定 |\n`;

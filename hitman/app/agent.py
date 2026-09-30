@@ -349,7 +349,7 @@ TRAINING_SOP_ORIGINAL = {
         "objective": "完成したアプリのソースコードを、認証情報が含まれていないことを確認したうえで個人GitHubへ公開する。",
         "command": "",
         "expected_check": "受講生の個人GitHubリポジトリURLが出力され、公開が確認できること",
-        "cautions": "T-2 の企画書が合格すると、内容が確定します。",
+        "cautions": "T-2 の企画書が合格すると、内容が確定します。修了後は必ずクリーンアップコマンドでクラウド環境を安全停止してください。",
         "agy_prompt": COURSE_A_PENDING_PROMPT,
     },
 }
@@ -471,7 +471,7 @@ TRAINING_SOP_HITMAN_CLONE = {
         "objective": "完成したHITMANクローンを受講生自身の個人GitHubへ公開し、研修修了報告書を発行する。",
         "command": "gh repo view --web || git remote -v",
         "expected_check": "受講生の個人GitHubリポジトリURLが出力され、公開が確認できること",
-        "cautions": "スキル「publish-to-github」を活用し、gh CLIのデバイス認証フローを用いて安全に自身のGitHubへプッシュしてください。",
+        "cautions": "スキル「publish-to-github」を活用し、gh CLIのデバイス認証フローを用いて安全に自身のGitHubへプッシュしてください。修了後は安全停止コマンドで Cloud Run と Secret Manager を削除してください。",
         "agy_prompt": (
             "【AntiGravity投入用プロンプト: Step T-6 (HITMANクローン)】\n"
             "あなたはIPPのAI実践研修専属メンターです。\n"
@@ -1126,7 +1126,7 @@ def _personalize_course_a_sop(base_sop: dict, brief: dict, nonce_text: str, ws: 
     t6["title"] = f"ステップ T-6: 『{disp}』の個人GitHub公開＆修了証発行"
     t6["objective"] = f"『{disp}』のソースコードを、認証情報が含まれていないことを確認したうえで受講生の個人GitHub（{service}）へ公開する。"
     t6["command"] = f"python .agents/skills/ipp-secure-credentials/scripts/secret_scan.py {agent_dir}"
-    t6["cautions"] = "SECRET_SCAN: PASS でなければプッシュしないこと。.env がコミット対象に入っていないことを git status で確認してください。"
+    t6["cautions"] = "SECRET_SCAN: PASS でなければプッシュしないこと。.env がコミット対象に入っていないことを git status で確認してください。修了後は安全停止コマンドで Cloud Run と Secret Manager を破棄してください。"
     t6["agy_prompt"] = (
         f"【AntiGravity投入用プロンプト: Step T-6（『{disp}』個人GitHub公開＆修了認定）】\n"
         "あなたはIPPのAI実践研修専属メンターです。\n"
@@ -2783,6 +2783,9 @@ def _verify_step_output_impl(step_number: int | str, command_output: str, state:
             has_t6_sig = any(k in output_lower for k in ("github.com", "remote: create a pull request"))
             if not has_t6_sig:
                 return _make_no_log_response("T-6", "個人GitHubリポジトリURL（https://github.com/...）またはプッシュログが確認できません。", state=state)
+            clean_svc = (state.brief.get("agent_slug") if state.brief else None) or state.params.get("AGENT_NAME") or "my_hitman"
+            cleanup_cmd = f"python .agents/skills/ipp-cloud-run-deploy/scripts/cleanup.py --service {clean_svc}"
+
             return {
                 "verdict": "SUCCESS",
                 "w_check_status": "VERIFIED_APPROVED",
@@ -2791,8 +2794,17 @@ def _verify_step_output_impl(step_number: int | str, command_output: str, state:
                 "message": (
                     "🎉【全研修工程 修了認定・Wチェック承認】🎉\n"
                     "受講生ご自身の個人GitHubへのリポジトリ公開を確認しました！おめでとうございます！\n"
-                    "現場課題の企画・ADKエージェント実装・客観Wチェック自動化・Cloud Runデプロイ・オープンソース公開までの一連のサイクルを完全にマスターしました。\n"
-                    "画面右上の『最終評価レポート』ボタンをクリックし、研修修了証・総合評価報告書を発行・保全してください！"
+                    "現場課題の企画・ADKエージェント実装・客観Wチェック自動化・Cloud Runデプロイ・オープンソース公開までの一連のサイクルを完全にマスターしました。\n\n"
+                    "画面右上の『最終評価レポート』ボタンをクリックし、研修修了証・総合評価報告書を発行・保全してください！\n\n"
+                    "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                    "🛡️【重要: 演習環境の安全停止＆クリーンアップ（課金防止・認証情報消去）】\n"
+                    "研修終了後の不要な課金発生を防ぎ、クラウド上に API キーを残さないため、以下のプロンプトを AntiGravity に投入してリソースを完全に破棄してください：\n\n"
+                    "```text\n"
+                    "【AntiGravity投入用: 演習環境クリーンアッププロンプト】\n"
+                    "研修が修了しました。課金防止とAPIキー保護のため、デプロイした Cloud Run サービスと Secret Manager のシークレットを削除してください。\n\n"
+                    f"{cleanup_cmd}\n\n"
+                    "上記を実行し、CLEANUP_RESULT: SUCCESS となったことを報告してください。\n"
+                    "```"
                 ),
             }
 
