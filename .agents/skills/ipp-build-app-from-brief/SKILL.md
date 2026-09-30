@@ -49,9 +49,20 @@ ipp-agent-workspace/<エージェント名>/
    - `POST /chat` → 入力 `{"message": "...", "user_id": "..."}`、出力 `{"reply": "<AIの応答テキスト>"}`。必ず root_agent を実行して応答する（LLM を通さない固定文は不可）。利用者ごとにセッションを使い回す。
    - 画面が使うデータ API（例: `GET /api/events`, `POST /api/events`）。
    - `static/` を配信する（`/` で画面が開く）。
-7. **static/index.html（画面）。** 企画書の『3. 画面』の S1, S2 … をすべて作る。要素（入力欄・ボタン・カレンダー・グラフ・一覧・AI チャット欄など）は企画書のとおり。外部 CDN のライブラリ（例: カレンダー・グラフ用）を使ってよい。
-8. **動かして確かめる。** `uvicorn main:app --port 8080`（`<エージェント名>` フォルダで）でローカル起動し、企画書の各機能の受け入れ条件を1つずつ確認して、結果を受講生に報告する。
-9. **スモークテスト。** HITMAN の T-3 カードのコマンド（企画書の Q1・Q2 と確認コード入り）をそのまま実行する。FAIL なら出力を書き換えずに原因を直して再実行する。
+7. **static/index.html（画面）。** 企画書の『3. 画面』の S1, S2 … をすべて作る。
+   - **Google標準リッチUIの必須要件**:
+     - 素のダサい・使えない HTML（ブラウザ標準スタイルのみ）は禁止。
+     - Google Fonts（Noto Sans JP 等）と Material Symbols (`material-symbols-outlined`) を導入する。
+     - Tailwind CSS（`<script src="https://cdn.tailwindcss.com"></script>`）を導入し、カード型レイアウト（`bg-white rounded-xl shadow-md p-6 border`）で美しく整理する。
+     - レスポンシブ用メタタグ `<meta name="viewport" content="width=device-width, initial-scale=1.0">` を必ず設定する。
+     - 外部 CDN ライブラリ（FullCalendar、Chart.js 等）を自由に活用してよい。
+8. **UI 品質監査（ui_audit.py）。** 画面を作成後、以下のコマンドで Google 標準リッチ UI の基準（80点以上）をクリアしているか検査する：
+   ```bash
+   python .agents/skills/ipp-build-app-from-brief/scripts/ui_audit.py --agent-dir ipp-agent-workspace/<エージェント名>
+   ```
+   FAIL の場合は出力されたアドバイスに従って HTML/CSS を修正し、`UI_AUDIT_RESULT: PASS` になるまで直す。
+9. **動かして確かめる。** `uvicorn main:app --port 8080`（`<エージェント名>` フォルダで）でローカル起動し、企画書の各機能の受け入れ条件を1つずつ確認して、結果を受講生に報告する。
+10. **スモークテスト。** HITMAN の T-3 カードのコマンド（企画書の Q1・Q2 と確認コード入り）をそのまま実行する。FAIL なら出力を書き換えずに原因を直して再実行する。
 
 ## Dockerfile の例
 

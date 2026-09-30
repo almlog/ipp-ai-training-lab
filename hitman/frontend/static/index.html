@@ -315,6 +315,30 @@
     color: #ffffff;
     box-shadow: 0 1px 3px rgba(37, 99, 235, 0.3);
   }
+  .level-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 0.45rem 0.3rem;
+    border-radius: 6px;
+    border: 1px solid #cbd5e1;
+    background: #ffffff;
+    color: #334155;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    text-align: center;
+  }
+  .level-btn:hover {
+    background: #f1f5f9;
+    border-color: #94a3b8;
+  }
+  .level-btn.active {
+    background: #2563eb;
+    border-color: #1d4ed8;
+    color: #ffffff;
+    box-shadow: 0 1px 3px rgba(37, 99, 235, 0.3);
+  }
 
   /* Slide 10 Rich Course Showcase Cards */
   .course-showcase-box {
@@ -2777,6 +2801,7 @@ let appState = {
   endTime: null,
   mode: "NORMAL", // "NORMAL", "TRAINING", "SPECIAL_PAIR"
   trainingCourse: "original", // "original" or "hitman_clone"
+  trainingLevel: "standard", // "standard" (6 steps), "advance" (8 steps), "professional" (10 steps)
   courseCardCollapsed: false,
   trainingCourseSelected: false,
   supervisorName: "",
@@ -3577,12 +3602,47 @@ async function switchTrainingCourse(course) {
   }
 }
 
+async function switchTrainingLevel(level) {
+  if (appState.trainingLevel === level) {
+    return;
+  }
+  try {
+    showToast("🎯 開発レベルを切り替え中…");
+    const res = await fetch("/api/training/level", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ level: level, user_id: getSessionUserId() })
+    });
+    const data = await res.json();
+    if (data.sop) {
+      if (data.parameters) appState.parameters = data.parameters;
+      if (data.approval) appState.approval = data.approval;
+      if (data.branch_rules) appState.branchRules = data.branch_rules;
+      updateSopItemsFromDb(data.sop, data.sequence);
+    }
+    if (data.state) {
+      applyServerState(data.state, { refreshSop: false });
+    } else {
+      appState.trainingLevel = data.level || level;
+    }
+    renderFlowChart();
+    renderSopTable();
+    renderApprovalAndParameters();
+    updateCourseSelectionUI();
+    saveState();
+    showToast(`✓ 開発レベルを【${data.level_name || level}】（全${data.sequence ? data.sequence.length : 6}歩）に切り替えました`);
+  } catch(e) {
+    alert("レベル切替エラー: " + e.message);
+  }
+}
+
 // --- Server State Sync (Single Source of Truth) ---
 // 研修モードの現在ステップ・合否・コースは、サーバ（ADKセッション）が返す state のみで更新する。
 // LLMの応答文を正規表現で解析してステップを推測する処理は研修モードでは使用しない。
 function applyServerState(st, opts = {}) {
   if (!st || typeof st !== "object") return;
   const prevCourse = appState.trainingCourse;
+  const prevLevel = appState.trainingLevel;
   const prevIdea = appState.courseAIdea || "";
   const prevBind = appState.serverState ? `${appState.serverState.agent_slug || ""}|${appState.serverState.t3_nonce || ""}` : "";
   appState.serverState = st;
@@ -3590,11 +3650,16 @@ function applyServerState(st, opts = {}) {
 
   appState.mode = "TRAINING";
   appState.trainingCourse = st.course || "original";
+  appState.trainingLevel = st.level || "standard";
   appState.trainingCourseSelected = !!st.course_selected || appState.trainingCourseSelected;
   appState.courseAIdea = st.user_idea || "";
   appState.currentStep = st.current_step || "T-1";
   appState.escalationActive = false;
   appState.escalationReason = "";
+
+  if (Array.isArray(st.sequence) && st.sequence.length > 0) {
+    STEP_SEQUENCE = st.sequence;
+  }
 
   const now = new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
   const results = st.results || {};
@@ -3620,10 +3685,11 @@ function applyServerState(st, opts = {}) {
 
   // 企画の確定（エージェント名）や T-3 確認コードの発行でもカードのコマンドが変わるため再取得する
   const bindKey = `${st.agent_slug || ""}|${st.t3_nonce || ""}`;
-  const needSop = opts.refreshSop !== false && (prevCourse !== appState.trainingCourse || prevIdea !== appState.courseAIdea || prevBind !== bindKey);
+  const needSop = opts.refreshSop !== false && (prevCourse !== appState.trainingCourse || prevLevel !== appState.trainingLevel || prevIdea !== appState.courseAIdea || prevBind !== bindKey);
   if (needSop) refreshTrainingSop();
 
   updateModeUI();
+  updateCourseSelectionUI();
   renderFlowChart();
   renderSopTable();
   saveState();
@@ -3640,6 +3706,7 @@ function clientStateForRestore() {
   return {
     mode: "TRAINING",
     course: appState.trainingCourse || "original",
+    level: appState.trainingLevel || "standard",
     course_selected: !!appState.trainingCourseSelected,
     results: results,
     user_idea: appState.courseAIdea || ""
@@ -4116,9 +4183,40 @@ function toggleCourseCardCollapse() {
   saveState();
 }
 
+function getLevelSelectorHtml() {
+  const curLevel = appState.trainingLevel || "standard";
+  return `
+    <div class="level-selector-box" style="margin-top:0.6rem;padding:0.55rem 0.65rem;background:#f8fafc;border:1px solid #cbd5e1;border-radius:8px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.4rem;flex-wrap:wrap;gap:0.2rem;">
+        <div style="display:flex;align-items:center;gap:0.3rem;">
+          <span class="material-symbols-outlined" style="font-size:16px;color:#2563eb;">tune</span>
+          <strong style="font-size:0.78rem;color:#1e293b;">開発レベル選択（ステップ数のカスタマイズ）</strong>
+        </div>
+        <span style="font-size:0.68rem;color:#64748b;">受講生のペースに合わせて選択</span>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(3, 1fr);gap:0.35rem;">
+        <button type="button" class="level-btn ${curLevel === 'standard' ? 'active' : ''}" onclick="switchTrainingLevel('standard')" title="最短で標準アプリを完成させる6ステップ">
+          <div style="font-weight:700;font-size:0.75rem;">Lv.1 標準</div>
+          <div style="font-size:0.66rem;opacity:0.85;">全6歩 (最短)</div>
+        </button>
+        <button type="button" class="level-btn ${curLevel === 'advance' ? 'active' : ''}" onclick="switchTrainingLevel('advance')" title="Google標準リッチUI品質監査とテストを独立分離した8ステップ">
+          <div style="font-weight:700;font-size:0.75rem;">Lv.2 発展</div>
+          <div style="font-size:0.66rem;opacity:0.85;">全8歩 (UI分離)</div>
+        </button>
+        <button type="button" class="level-btn ${curLevel === 'professional' ? 'active' : ''}" onclick="switchTrainingLevel('professional')" title="エンタープライズ仕様の全10ステップ（UI・データ・E2E・セキュリティ）">
+          <div style="font-weight:700;font-size:0.75rem;">Lv.3 完全</div>
+          <div style="font-size:0.66rem;opacity:0.85;">全10歩 (プロ)</div>
+        </button>
+      </div>
+    </div>
+  `;
+}
+
 function getCourseCardsHtml(isChat = false) {
   const isB = appState.trainingCourse === "hitman_clone";
   const isCollapsed = appState.courseCardCollapsed === true;
+  const levelNames = { "standard": "Lv.1 標準(6歩)", "advance": "Lv.2 発展(8歩)", "professional": "Lv.3 完全(10歩)" };
+  const curLevelDisp = levelNames[appState.trainingLevel] || "Lv.1 標準(6歩)";
 
   if (isCollapsed) {
     if (isChat) {
@@ -4130,6 +4228,7 @@ function getCourseCardsHtml(isChat = false) {
               <div style="font-size:0.84rem;font-weight:800;color:#0f172a;display:flex;align-items:center;gap:0.4rem;flex-wrap:wrap;">
                 <span>受講コース確定: ${isB ? '🛡️ コースB: HITMANクローン構築' : '🚀 コースA: オリジナルAIツール開発'}</span>
                 <span style="font-size:0.68rem;background:#dcfce7;color:#15803d;padding:0.1rem 0.45rem;border-radius:4px;font-weight:700;">✓ 選択中</span>
+                ${!isB ? `<span style="font-size:0.68rem;background:#dbeafe;color:#1d4ed8;padding:0.1rem 0.45rem;border-radius:4px;font-weight:700;">${curLevelDisp}</span>` : ''}
               </div>
               <div style="font-size:0.72rem;color:#64748b;">${isB ? '王道お手本コースで100%成功・安全運行へ進みます。' : '自由創作コースで現場の独自AI開発へ進みます。'}</div>
             </div>
@@ -4151,13 +4250,14 @@ function getCourseCardsHtml(isChat = false) {
               <span class="course-collapsed-tag">${isB ? '王道お手本' : '自由創作'}</span>
               <span class="course-collapsed-name">${isB ? '【コースB】HITMANクローン構築' : '【コースA】オリジナルAIツール開発'}</span>
               <span class="course-badge-status">✓ 選択中</span>
+              ${!isB ? `<span class="course-badge-status" style="background:#dbeafe;color:#1d4ed8;border:1px solid #93c5fd;">${curLevelDisp}</span>` : ''}
             </div>
             <div class="course-collapsed-subtext">${isB ? 'Excel解析・客観Wチェック・A2UIカード判定の本格AIオペレーター' : '現場の運用課題・自作社内ボットをAIと自律開発'}</div>
           </div>
         </div>
         <button type="button" class="btn-toggle-course-card" onclick="toggleCourseCardCollapse()" title="受講コースの変更または詳細を表示">
           <span class="material-symbols-outlined" style="font-size:14px;">unfold_more</span>
-          <span>コース切替 / 詳細</span>
+          <span>コース切替 / レベル変更</span>
         </button>
       </div>
     `;
@@ -4198,8 +4298,9 @@ function getCourseCardsHtml(isChat = false) {
               <li>社内申請・総務手続きFAQボット (RAG連携)</li>
               <li>日報からタスク自動抽出ツール</li>
             </ul>
+            ${getLevelSelectorHtml()}
           </div>
-          <button type="button" class="btn-course-action course-a ${!isB ? 'is-selected' : ''}" onclick="switchTrainingCourse('original')">
+          <button type="button" class="btn-course-action course-a ${!isB ? 'is-selected' : ''}" style="margin-top:0.6rem;" onclick="switchTrainingCourse('original')">
             ${!isB ? '✓ コースA 選択中（確定・折りたたむ）' : '🚀 コースAを選択して進む'}
           </button>
         </div>

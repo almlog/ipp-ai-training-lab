@@ -211,7 +211,15 @@ SOP_DATABASE = {
 # ==============================================================================
 # 研修モード（TRAINING）専用 手順書データベース（受講生別 2大コース）
 # ==============================================================================
-TRAINING_STEP_SEQUENCE = ["T-1", "T-2", "T-3", "T-4", "T-5", "T-6"]
+TRAINING_LEVEL_STANDARD = "standard"          # Lv.1: 6ステップ (標準最短)
+TRAINING_LEVEL_ADVANCE = "advance"            # Lv.2: 8ステップ (UI/テスト分離)
+TRAINING_LEVEL_PROFESSIONAL = "professional"  # Lv.3: 10ステップ (エンタープライズ完全版)
+
+SEQUENCE_STANDARD = ["T-1", "T-2", "T-3", "T-4", "T-5", "T-6"]
+SEQUENCE_ADVANCE = ["T-1", "T-2", "T-3", "T-4", "T-5", "T-6", "T-7", "T-8"]
+SEQUENCE_PROFESSIONAL = ["T-1", "T-2", "T-3", "T-4", "T-5", "T-6", "T-7", "T-8", "T-9", "T-10"]
+
+TRAINING_STEP_SEQUENCE = SEQUENCE_STANDARD  # 後方互換用デフォルト
 
 
 # ------------------------------------------------------------------------------
@@ -575,11 +583,12 @@ K_AGENT_SLUG = "training:agent_slug"        # 確定した企画のエージェ�
 K_PLAN_CONFIRMED = "training:plan_confirmed"  # T-2 の企画が受講生の合意で確定しているか
 K_T3_NONCE = "training:t3_nonce"            # T-3 スモークテスト用の受講生ごとの確認コード
 K_BRIEF = "training:brief"                  # コースA: T-2 で合格した要件定義書の解析結果（T-3〜T-6 の唯一の設計図）
+K_LEVEL = "training:level"                  # コースA: 開発レベル（standard: 6歩 / advance: 8歩 / professional: 10歩）
 
 STATE_KEYS = (
     K_MODE, K_CURRENT_STEP, K_LAST_VERDICT, K_VERDICT_SEQ, K_COURSE, K_PARAMS,
     K_USER_IDEA, K_RESULTS, K_T2_OVERRIDE, K_COURSE_SELECTED, "hitman:suggestions",
-    K_AGENT_SLUG, K_PLAN_CONFIRMED, K_T3_NONCE, K_BRIEF,
+    K_AGENT_SLUG, K_PLAN_CONFIRMED, K_T3_NONCE, K_BRIEF, K_LEVEL,
 )
 
 # ToolContext なし呼び出し用のフォールバック格納先（グローバル変数に載らない項目）
@@ -757,19 +766,42 @@ class HitmanState:
             "skills_missing": result.get("skills_missing", []),
         }
 
+    @property
+    def level(self) -> str:
+        return self._get(K_LEVEL, TRAINING_LEVEL_STANDARD)
+
+    @level.setter
+    def level(self, v: str) -> None:
+        self._s[K_LEVEL] = v
+
+    @property
+    def step_sequence(self) -> list[str]:
+        if self.mode != MODE_TRAINING:
+            return list(ACTIVE_STEP_SEQUENCE)
+        if _normalize_course(self.course) == "hitman_clone":
+            return list(SEQUENCE_STANDARD)
+        lvl = self.level
+        if lvl == TRAINING_LEVEL_ADVANCE:
+            return list(SEQUENCE_ADVANCE)
+        elif lvl == TRAINING_LEVEL_PROFESSIONAL:
+            return list(SEQUENCE_PROFESSIONAL)
+        return list(SEQUENCE_STANDARD)
+
     def snapshot(self) -> dict:
         """フロントエンドへ返す公開ステート。"""
+        seq = self.step_sequence
         return {
             "mode": self.mode,
             "current_step": self.current_step,
             "course": self.course,
             "course_selected": self.course_selected,
+            "level": self.level,
             "results": self.results,
             "user_idea": self.user_idea,
             "last_verdict": self.last_verdict or None,
             "verdict_seq": self.verdict_seq,
-            "sequence": list(TRAINING_STEP_SEQUENCE) if self.mode == MODE_TRAINING else list(ACTIVE_STEP_SEQUENCE),
-            "completed": self.mode == MODE_TRAINING and self.results.get(TRAINING_STEP_SEQUENCE[-1]) == "SUCCESS",
+            "sequence": seq,
+            "completed": self.mode == MODE_TRAINING and self.results.get(seq[-1]) == "SUCCESS",
             "suggestions": list(self._get("hitman:suggestions", [])),
             "agent_slug": self.agent_slug,
             "plan_confirmed": self.plan_confirmed,
@@ -867,7 +899,7 @@ def select_training_course(state: HitmanState, course_type: str) -> dict:
         state.brief = {}
         state._s[K_T3_NONCE] = ""
         state.current_step = "T-2" if t1_done else "T-1"
-    elif state.current_step not in TRAINING_STEP_SEQUENCE:
+    elif state.current_step not in state.step_sequence:
         state.current_step = "T-1"
     return {
         "course": new_course,
@@ -884,22 +916,23 @@ def apply_training_verdict(state: HitmanState, result: dict) -> None:
     案内文や LLM の言い回しではステップは一切動かない。
     """
     step_id = result.get("step_id")
-    if step_id not in TRAINING_STEP_SEQUENCE:
+    seq = state.step_sequence
+    if step_id not in seq:
         return
     if result.get("w_check_status") != "VERIFIED_APPROVED" or result.get("verdict") != "SUCCESS":
         return
     cur = state.current_step
-    if cur in TRAINING_STEP_SEQUENCE and step_id != cur:
+    if cur in seq and step_id != cur:
         # 現在ステップ以外への合格は反映しない（スキップ・巻き戻し防止）
         return
     results = state.results
     results[step_id] = "SUCCESS"
     state.results = results
-    idx = TRAINING_STEP_SEQUENCE.index(step_id)
+    idx = seq.index(step_id)
     if step_id == "T-2":
         state.issue_t3_nonce()  # T-3 のスモークテストで使う、この受講生専用の確認コード
-    if idx + 1 < len(TRAINING_STEP_SEQUENCE):
-        state.current_step = TRAINING_STEP_SEQUENCE[idx + 1]
+    if idx + 1 < len(seq):
+        state.current_step = seq[idx + 1]
     else:
         state.current_step = step_id
 
@@ -974,8 +1007,42 @@ def set_training_course(course_type: str, tool_context: Any = None) -> dict:
         "course_name": sel["course_name"],
         "changed": sel["changed"],
         "current_step": sel["current_step"],
-        "step_sequence": list(TRAINING_STEP_SEQUENCE),
+        "step_sequence": list(state.step_sequence),
         "sop": get_training_sop(sel["course"], state=state),
+    }
+
+
+def _normalize_level(raw: str | None) -> str:
+    s = (raw or "").strip().lower()
+    if s in ("advance", "2", "8", "lv2", "lv.2", "adv"):
+        return TRAINING_LEVEL_ADVANCE
+    if s in ("professional", "pro", "3", "10", "lv3", "lv.3"):
+        return TRAINING_LEVEL_PROFESSIONAL
+    return TRAINING_LEVEL_STANDARD
+
+
+def set_training_level(level: str, tool_context: Any = None) -> dict:
+    """コースA専用: 受講生が希望する開発レベル（'standard': 6歩, 'advance': 8歩, 'professional': 10歩）を設定する。
+
+    受講生の持ち時間・習熟度に合わせてステップ規模を動的に伸縮させる。
+    """
+    state = HitmanState.of(tool_context)
+    normalized = _normalize_level(level)
+    old = state.level
+    changed = normalized != old
+    state.level = normalized
+
+    seq = state.step_sequence
+    if state.current_step not in seq:
+        state.current_step = seq[0]
+
+    return {
+        "status": "success",
+        "level": normalized,
+        "changed": changed,
+        "step_sequence": list(seq),
+        "current_step": state.current_step,
+        "sop": get_training_sop(state.course, state=state),
     }
 
 
@@ -1012,11 +1079,10 @@ def _brief_lines(items: list, fmt) -> str:
     return "\n".join(fmt(x) for x in items) or "   （なし）"
 
 
-def _personalize_course_a_sop(base_sop: dict, brief: dict, nonce_text: str, ws: str) -> None:
-    """コースA: T-2 で合格した要件定義書（brief）から T-3〜T-6 の手順・プロンプトを組み立てる。
+def _personalize_course_a_sop(base_sop: dict, brief: dict, nonce_text: str, ws: str, level: str = TRAINING_LEVEL_STANDARD) -> None:
+    """コースA: T-2 で合格した要件定義書（brief）と開発レベル（6/8/10歩）から手順・プロンプトを動的生成する。
 
-    企画の内容はすべて受講生の企画書から取る。キーワード表・固定の企画例・サンプルアプリで置き換えない
-    （旧実装は『カレンダー』等の語から WBS 管理Bot に固定され、企画と別物のアプリができていた）。
+    受講生の企画書と選択レベル（standard: 6歩, advance: 8歩, professional: 10歩）を反映する。
     """
     from app.project_brief import service_name_for
 
@@ -1039,109 +1105,275 @@ def _personalize_course_a_sop(base_sop: dict, brief: dict, nonce_text: str, ws: 
         f"python .agents/skills/ipp-cloud-run-deploy/scripts/deploy.py --agent-dir {agent_dir} "
         f"--service {service} --nonce {nonce_text} --q \"{q1}\""
     )
+    ui_audit_cmd = f"python .agents/skills/ipp-build-app-from-brief/scripts/ui_audit.py --agent-dir {agent_dir}"
+    cleanup_cmd = f"python .agents/skills/ipp-cloud-run-deploy/scripts/cleanup.py --service {service}"
 
-    t3 = base_sop["T-3"]
-    t3["title"] = f"ステップ T-3: 『{disp}』の実装＆動作確認"
-    t3["objective"] = f"企画書どおりに『{disp}』の機能・画面・関数ツール（{tool_names}）を実装し、エージェントを実際に動かして確認する。"
-    t3["command"] = smoke_cmd
-    t3["expected_check"] = f"スモークテストで、企画書の関数ツール（{tool_names}）が実際に呼ばれ、入力に応じて応答と結果が変わること（SMOKE_RESULT: PASS）"
-    t3["cautions"] = "API キーは .env にだけ書き、チャットには貼らないこと。企画書にない別のアプリ（汎用チャット画面など）に置き換えさせないこと。"
-    t3["agy_prompt"] = (
-        f"【AntiGravity投入用プロンプト: Step T-3（『{disp}』の実装＆動作確認）】\n"
-        "あなたはIPPのAI実践研修専属メンターです。スキル「ipp-build-app-from-brief」の手順に従い、"
-        f"受講生と合意した要件定義書 {ws}/project_brief.md のとおりに実装してください。\n"
-        "受講生に以下を伝えてください：\n"
-        f"「お疲れ様です！ステップ T-3 です。あなたの企画書どおりに『{disp}』の画面・AI・関数ツールを実装します。途中で API キーの設定をお願いします。」\n\n"
-        "【作るもの（企画書より。すべて作ること）】\n"
-        f"■ 機能\n{features}\n"
-        f"■ 画面（static/ に自作の HTML で作る。ボタン・入力フォーム等も企画書どおりに作る）\n{screens}\n"
-        f"■ 関数ツール（この名前・引数で実装し、引数に応じて実際に処理する。固定値のダミーは不可）\n{tools}\n"
-        f"■ データと保存先\n{data}\n"
-        f"■ 今回は作らないもの\n{out_of_scope}\n\n"
-        "【自律実行タスク】\n"
-        f"1. 認証情報の準備: `python .agents/skills/ipp-secure-credentials/scripts/env_setup.py --agent-dir {agent_dir}` を実行する。"
-        f"GEMINI_API_KEY: 未設定 なら、受講生にエディタで {agent_dir}/.env を開いてキーを書き込んでもらい、--check で『設定済み』になるまで待つ。\n"
-        f"2. スキル「ipp-build-app-from-brief」のフォルダ構成で {agent_dir}/ に実装する（credentials.py のコピー、store.py、agent.py の root_agent、"
-        "main.py の GET /health・POST /chat・データAPI・画面配信、static/ の画面、requirements.txt、Dockerfile）。\n"
-        "3. 汎用のチャット画面テンプレート（build-agent-frontend）やサンプル（log_analyzer_bot、my_hitman）をコピーしない。画面は上の『画面』から作る。\n"
-        "4. 作れない・時間内に終わらない機能が出たら、黙って省略せず受講生に説明し、合意のうえで企画書の『今回は作らないもの』へ移す。\n"
-        f"5. ローカルで起動し（{agent_dir} で `uvicorn main:app --port 8080`）、各機能の受け入れ条件を確認して受講生に報告する。\n"
-        "6. 動作確認（スモークテスト）: スキル「ipp-agent-smoke-test」を使い、企画書の Q1・Q2 でエージェントを実際に動かす：\n"
-        f"   {smoke_cmd}\n"
-        "   結果が FAIL の場合は、出力を書き換えずに原因を修正して再実行し、PASS になるまで繰り返すこと。\n\n"
-        + CREDENTIAL_RULES + "\n"
-        "【重要: HITMAN提出用生ログ出力規程】\n"
-        "スクリプトが出力したコードブロック（1行目が [skill:ipp-agent-smoke-test@v1]、最後の行が SMOKE_DIGEST）を、一字一句変えずに回答の最末尾に出力してください。"
-        "要約・抜粋・書き換えは禁止です（HITMAN は生データから再判定し、改変を検知します）。\n"
-        "出力後、受講生へ「上記コードブロックをそのままコピーして、HITMANのチャット欄に貼り付けてください。HITMANがエージェントの実動作を客観検証し、ステップ T-4へ進みます！」と案内して待機してください。"
-    )
+    if level == TRAINING_LEVEL_ADVANCE:
+        # ======================================================================
+        # Lv.2: アドバンス（全 8 ステップ: UI・テスト分離コース）
+        # ======================================================================
+        base_sop["T-3"] = {
+            "step_id": "T-3",
+            "title": f"ステップ T-3: 『{disp}』バックエンドAI＆ツール実装",
+            "objective": f"企画書どおりに『{disp}』のAI関数ツール（{tool_names}）とコアロジックを実装し、エージェントを動かしてスモークテストを行う。",
+            "command": smoke_cmd,
+            "expected_check": f"スモークテストで関数ツール（{tool_names}）が実際に呼ばれ、入力に応じて結果が変わること（SMOKE_RESULT: PASS）",
+            "cautions": "API キーは .env にだけ書き、チャットに貼らないこと。ツールは固定値ダミーではなく実際に動くよう実装してください。",
+            "agy_prompt": (
+                f"【AntiGravity投入用プロンプト: Step T-3 (Lv.2 アドバンス: バックエンドAI実装)】\n"
+                f"スキル「ipp-build-app-from-brief」に従い、『{disp}』のAIエージェント（{agent_dir}/agent.py）と関数ツール（{tool_names}）を実装してください。\n"
+                f"認証情報（.env）を準備後、スモークテストを実行してください：\n{smoke_cmd}\n"
+                "SMOKE_RESULT: PASS となったコードブロックを HITMAN へ提出してください。"
+            ),
+        }
+        base_sop["T-4"] = {
+            "step_id": "T-4",
+            "title": f"ステップ T-4: 『{disp}』Google標準リッチUI実装 ＆ 品質監査",
+            "objective": f"企画書の画面（{screens}）を Google Fonts, Material Symbols, Tailwind CSS, カード型UI で美しく実装し、ui_audit.py で 80点以上の PASS を取得する。",
+            "command": ui_audit_cmd,
+            "expected_check": "ui_audit.py で UI_AUDIT_RESULT: PASS（80点以上）が出力され、Google標準リッチUI基準を満たすこと",
+            "cautions": "ブラウザ標準の素のダサい HTML は不合格になります。Google Fonts、Material Symbols、Tailwind CSS、カード型UI を必ず導入してください。",
+            "agy_prompt": (
+                f"【AntiGravity投入用プロンプト: Step T-4 (Lv.2 アドバンス: Google標準リッチUI実装)】\n"
+                f"『{disp}』のフロントエンド画面（{agent_dir}/static/index.html）を実装してください。\n"
+                "■ 画面要件:\n"
+                "- 素のダサい・使えない HTML は禁止。Google 標準の洗練されたリッチな UI にすること。\n"
+                "- Google Fonts (Noto Sans JP) と Material Symbols (material-symbols-outlined) を導入する。\n"
+                "- Tailwind CSS (<script src=\"https://cdn.tailwindcss.com\"></script>) を導入し、カード型レイアウト (rounded-xl shadow-md p-6 bg-white) を構成する。\n"
+                "- レスポンシブ用 <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"> を設定する。\n"
+                f"実装後、以下の品質監査スクリプトを実行し、UI_AUDIT_RESULT: PASS になるまでブラッシュアップしてください：\n"
+                f"{ui_audit_cmd}\n"
+                "PASS した監査ログコードブロックを HITMAN に提出してください。"
+            ),
+        }
+        base_sop["T-5"] = {
+            "step_id": "T-5",
+            "title": f"ステップ T-5: 『{disp}』単体テスト（Pytest）＆自律Wチェック",
+            "objective": f"企画書の各機能の受け入れ条件と関数ツール（{tool_names}）を検証する Pytest を実行する。",
+            "command": f"pytest {agent_dir}/tests/ -v",
+            "expected_check": "pytest の全テストが PASSED で終了すること",
+            "cautions": "テストは API キーなしでも動くように、関数ツール・データ処理・画面用 API を直接テストしてください。",
+            "agy_prompt": (
+                f"【AntiGravity投入用プロンプト: Step T-5 (Lv.2 アドバンス: 単体テスト)】\n"
+                f"{agent_dir}/tests/test_agent.py を作成し、`pytest {agent_dir}/tests/ -v` を実行して全件合格ログを提出してください。"
+            ),
+        }
+        base_sop["T-6"] = {
+            "step_id": "T-6",
+            "title": f"ステップ T-6: 『{disp}』統合結合テスト＆動作確認",
+            "objective": "フロントエンド画面とバックエンドAIを連携させ、結合動作テストを完遂する。",
+            "command": smoke_cmd,
+            "expected_check": "結合スモークテストで SMOKE_RESULT: PASS が確認できること",
+            "cautions": "画面とバックエンドの疎通を確認してください。",
+            "agy_prompt": (
+                f"【AntiGravity投入用プロンプト: Step T-6 (Lv.2 アドバンス: 結合テスト)】\n"
+                f"{smoke_cmd} を再実行し、結合動作が PASS することを確認してログを提出してください。"
+            ),
+        }
+        base_sop["T-7"] = {
+            "step_id": "T-7",
+            "title": f"ステップ T-7: 『{disp}』Cloud Run デプロイ＆実稼働確認",
+            "objective": f"Secret Manager でキーを安全に渡し、『{disp}』を Cloud Run へデプロイして実稼働検証する。",
+            "command": deploy_cmd,
+            "expected_check": "DEPLOY_RESULT: PASS および /health, /chat の HTTP 200 AI正常応答が確認できること",
+            "cautions": "gcloud run deploy を手打ちせず、ipp-cloud-run-deploy スキルを使用してください。",
+            "agy_prompt": (
+                f"【AntiGravity投入用プロンプト: Step T-7 (Lv.2 アドバンス: デプロイ)】\n"
+                f"{deploy_cmd} を実行し、DEPLOY_RESULT: PASS となったコードブロックを提出してください。"
+            ),
+        }
+        base_sop["T-8"] = {
+            "step_id": "T-8",
+            "title": f"ステップ T-8: 『{disp}』個人GitHub公開＆修了証発行",
+            "objective": f"『{disp}』のソースコードを個人GitHub（{service}）へ公開し、研修修了認定を受ける。",
+            "command": f"python .agents/skills/ipp-secure-credentials/scripts/secret_scan.py {agent_dir}",
+            "expected_check": "受講生の個人GitHubリポジトリURLが出力され、公開が確認できること",
+            "cautions": "SECRET_SCAN: PASS でなければプッシュしないこと。修了後は安全停止コマンドでリソースをクリーンアップしてください。",
+            "agy_prompt": (
+                f"【AntiGravity投入用プロンプト: Step T-8 (Lv.2 アドバンス: GitHub公開＆修了)】\n"
+                f"1. `python .agents/skills/ipp-secure-credentials/scripts/secret_scan.py {agent_dir}` で PASS を確認\n"
+                "2. スキル「publish-to-github」で個人GitHubへプッシュし、リポジトリURLを出力してください。"
+            ),
+        }
 
-    t4 = base_sop["T-4"]
-    t4["title"] = f"ステップ T-4: 『{disp}』のテスト＆自律Wチェック"
-    t4["objective"] = f"企画書の各機能の受け入れ条件と関数ツール（{tool_names}）を検証する Pytest を実行する。"
-    t4["command"] = f"pytest {agent_dir}/tests/ -v"
-    t4["cautions"] = "テストは API キーなしでも動くように、関数ツール・データ処理・画面用 API を直接テストしてください。"
-    t4["agy_prompt"] = (
-        f"【AntiGravity投入用プロンプト: Step T-4（『{disp}』のテスト）】\n"
-        "あなたはIPPのAI実践研修専属メンターです。\n"
-        "受講生に以下を伝えてください：\n"
-        f"「お疲れ様です！ステップ T-4 です。企画書の機能がそれぞれ受け入れ条件どおりに動くかを、自動テストで確かめます。」\n\n"
-        "【自律実行タスク】\n"
-        f"1. {agent_dir}/tests/test_agent.py を作り、次をテストする（Gemini を呼ばずに実行できるテストにする）：\n"
-        f"   - 企画書の各機能の受け入れ条件（機能ごとに1つ以上）\n{features}\n"
-        f"   - 関数ツールが入力（引数）に応じて異なる正しい結果を返すこと: {tool_names}\n"
-        "   - 画面用のデータ API（FastAPI の TestClient で呼ぶ）\n"
-        f"2. `pytest {agent_dir}/tests/ -v` を実行し、全件 PASSED になるまで修正する（テストを削除・緩和して通さない）。\n\n"
-        + CREDENTIAL_RULES + "\n"
-        "【重要: HITMAN提出用生ログ出力規程】\n"
-        "提出用コードブロックの1行目には、この作業で実際に使用したスキルの証跡行をそのまま列挙してください（使っていないスキルの証跡は書かないこと）。\n"
-        "必ず pytest の標準出力（test session starts から passed in ... までの生ログ）を、```bash のコードブロック形式で回答の最末尾に逐語出力してください。\n"
-        "出力後、受講生へ「上記コードブロック内のテストログをコピーして、HITMANのチャット欄に貼り付けてください。HITMANが客観Wチェック承認を行い、ステップ T-5へ進みます！」と案内して待機してください。"
-    )
+    elif level == TRAINING_LEVEL_PROFESSIONAL:
+        # ======================================================================
+        # Lv.3: プロフェッショナル（全 10 ステップ: エンタープライズ完全コース）
+        # ======================================================================
+        base_sop["T-3"] = {
+            "step_id": "T-3",
+            "title": f"ステップ T-3: 『{disp}』バックエンドAIコアツール実装",
+            "objective": f"企画書の関数ツール（{tool_names}）を実装する。",
+            "command": smoke_cmd,
+            "expected_check": "SMOKE_RESULT: PASS が確認できること",
+            "cautions": "API キーは .env にのみ安全に設定してください。",
+            "agy_prompt": f"【AntiGravity投入用: Step T-3 (Lv.3)】関数ツールを実装し {smoke_cmd} を実行してログを提出してください。",
+        }
+        base_sop["T-4"] = {
+            "step_id": "T-4",
+            "title": f"ステップ T-4: 『{disp}』Google標準リッチUI複数画面実装＆品質監査",
+            "objective": f"企画書の全画面（{screens}）を Google Fonts, Material Symbols, Tailwind CSS で美しく実装し、ui_audit.py で 80点以上の PASS を取得する。",
+            "command": ui_audit_cmd,
+            "expected_check": "ui_audit.py で UI_AUDIT_RESULT: PASS が出力されること",
+            "cautions": "ダサい・素のHTMLは即座に差し戻されます。マテリアルデザインを徹底してください。",
+            "agy_prompt": f"【AntiGravity投入用: Step T-4 (Lv.3)】画面をリッチに実装し、{ui_audit_cmd} で PASS を確認してログを提出してください。",
+        }
+        base_sop["T-5"] = {
+            "step_id": "T-5",
+            "title": f"ステップ T-5: 『{disp}』データ永続化（store.py）＆状態管理連携",
+            "objective": f"企画書のデータ保存先（{data}）を store.py として実装し、画面とAI双方から参照可能にする。",
+            "command": f"pytest {agent_dir}/tests/ -k store -v || pytest {agent_dir}/tests/ -v",
+            "expected_check": "データ層のテストが PASS すること",
+            "cautions": "store.py が画面APIとAIツールの両方から安全にアクセスできるようにしてください。",
+            "agy_prompt": f"【AntiGravity投入用: Step T-5 (Lv.3)】{agent_dir}/store.py を実装し、テストログを提出してください。",
+        }
+        base_sop["T-6"] = {
+            "step_id": "T-6",
+            "title": f"ステップ T-6: 『{disp}』単体テスト（Pytest）全件網羅",
+            "objective": "機能・ツール・APIの全件を網羅するテストを実行する。",
+            "command": f"pytest {agent_dir}/tests/ -v",
+            "expected_check": "pytest が全件 PASSED で完了すること",
+            "cautions": "例外系・境界値テストも含めて網羅してください。",
+            "agy_prompt": f"【AntiGravity投入用: Step T-6 (Lv.3)】pytest を実行してログを提出してください。",
+        }
+        base_sop["T-7"] = {
+            "step_id": "T-7",
+            "title": f"ステップ T-7: 『{disp}』結合スモークテスト＆E2E検証",
+            "objective": "E2Eでのエージェント対話スモークテストを検証する。",
+            "command": smoke_cmd,
+            "expected_check": "SMOKE_RESULT: PASS が確認できること",
+            "cautions": "改ざん検知 nonce が一致していること。",
+            "agy_prompt": f"【AntiGravity投入用: Step T-7 (Lv.3)】{smoke_cmd} を実行してログを提出してください。",
+        }
+        base_sop["T-8"] = {
+            "step_id": "T-8",
+            "title": f"ステップ T-8: 『{disp}』Cloud Run 本番デプロイ＆実稼働確認",
+            "objective": f"Secret Manager 経由で安全に Cloud Run へデプロイする。",
+            "command": deploy_cmd,
+            "expected_check": "DEPLOY_RESULT: PASS および実稼働ヘルスチェック PASS",
+            "cautions": "平文での環境変数設定は厳禁です。",
+            "agy_prompt": f"【AntiGravity投入用: Step T-8 (Lv.3)】{deploy_cmd} を実行してログを提出してください。",
+        }
+        base_sop["T-9"] = {
+            "step_id": "T-9",
+            "title": f"ステップ T-9: 『{disp}』セキュリティ＆ガバナンススキャン",
+            "objective": "公開前に機密情報（APIキー、シークレット等）がコードベースに一切残っていないことを監査する。",
+            "command": f"python .agents/skills/ipp-secure-credentials/scripts/secret_scan.py {agent_dir}",
+            "expected_check": "SECRET_SCAN: PASS が出力されること",
+            "cautions": "キーが平文で検出された場合は即座に無効化・再発行が必要です。",
+            "agy_prompt": f"【AntiGravity投入用: Step T-9 (Lv.3)】`python .agents/skills/ipp-secure-credentials/scripts/secret_scan.py {agent_dir}` を実行して PASS ログを提出してください。",
+        }
+        base_sop["T-10"] = {
+            "step_id": "T-10",
+            "title": f"ステップ T-10: 『{disp}』個人GitHub公開＆最高位修了認定",
+            "objective": f"エンタープライズ品質の成果物を個人GitHub（{service}）へ公開し、最高位修了認定を受ける。",
+            "command": "gh repo view --web || git remote -v",
+            "expected_check": "個人GitHubリポジトリURLが出力されること",
+            "cautions": "公開完了後は安全停止コマンドを実行してクラウド環境をクリーンアップしてください。",
+            "agy_prompt": f"【AntiGravity投入用: Step T-10 (Lv.3)】スキル「publish-to-github」で個人GitHubへプッシュし、URLを提出してください。",
+        }
 
-    t5 = base_sop["T-5"]
-    t5["title"] = f"ステップ T-5: 『{disp}』の Cloud Run デプロイ＆動作確認"
-    t5["objective"] = f"API キーを Secret Manager で安全に渡して『{disp}』を Cloud Run へデプロイし、公開URLで AI が応答することを確かめる。"
-    t5["command"] = deploy_cmd
-    t5["cautions"] = "gcloud run deploy を手で実行しないこと（特に --set-env-vars に API キーを書くのは禁止）。スキル「ipp-cloud-run-deploy」のスクリプトを使ってください。"
-    t5["agy_prompt"] = (
-        f"【AntiGravity投入用プロンプト: Step T-5（『{disp}』Cloud Run デプロイ）】\n"
-        "あなたはIPPのAI実践研修専属メンターです。\n"
-        "受講生に以下を伝えてください：\n"
-        f"「お疲れ様です！ステップ T-5 です。『{disp}』を Cloud Run で公開します。API キーは Secret Manager で安全に渡し、公開URLで AI が応答するところまで確かめます。」\n\n"
-        "【自律実行タスク】\n"
-        "1. 受講生に gcloud auth login と gcloud config set project <プロジェクトID> が済んでいるか確認する（未実施なら受講生に実行してもらう）。\n"
-        f"2. `python .agents/skills/ipp-secure-credentials/scripts/secret_scan.py {agent_dir}` を実行し、SECRET_SCAN: PASS を確認する。\n"
-        "3. スキル「ipp-cloud-run-deploy」に従い、ワークスペースのルートで次をそのまま実行する（gcloud run deploy を手で実行しない）：\n"
-        f"   {deploy_cmd}\n"
-        "4. DEPLOY_RESULT: FAIL の場合は、スキルの表と Cloud Run のログで原因を直して再実行する。出力を書き換えない。\n"
-        "5. PASS したら、公開URLを受講生に伝え、ブラウザで企画書の画面が開けることを一緒に確認する。\n\n"
-        + CREDENTIAL_RULES + "\n"
-        "【重要: HITMAN提出用生ログ出力規程】\n"
-        "スクリプトが出力したコードブロック（1行目が [skill:ipp-cloud-run-deploy@v1]、最後の行が DEPLOY_DIGEST）を、一字一句変えずに回答の最末尾に出力してください。\n"
-        "出力後、受講生へ「上記コードブロックをコピーして、HITMANのチャット欄に貼り付けてください。HITMANが公開URLに実際にアクセスして確認し、最終ステップ T-6へ進みます！」と案内して待機してください。"
-    )
+    else:
+        # ======================================================================
+        # Lv.1: スタンダード（全 6 ステップ: 標準最短コース）
+        # ======================================================================
+        t3 = base_sop["T-3"]
+        t3["title"] = f"ステップ T-3: 『{disp}』の実装＆動作確認"
+        t3["objective"] = f"企画書どおりに『{disp}』の機能・Google標準リッチUI・関数ツール（{tool_names}）を実装し、エージェントを実際に動かして確認する。"
+        t3["command"] = smoke_cmd
+        t3["expected_check"] = f"スモークテストで、企画書の関数ツール（{tool_names}）が実際に呼ばれ、入力に応じて応答と結果が変わること（SMOKE_RESULT: PASS）"
+        t3["cautions"] = "API キーは .env にだけ書き、チャットには貼らないこと。画面はGoogle Fonts、Material Symbols、Tailwind CSSでリッチに装飾してください。"
+        t3["agy_prompt"] = (
+            f"【AntiGravity投入用プロンプト: Step T-3（『{disp}』の実装＆動作確認）】\n"
+            "あなたはIPPのAI実践研修専属メンターです。スキル「ipp-build-app-from-brief」の手順に従い、"
+            f"受講生と合意した要件定義書 {ws}/project_brief.md のとおりに実装してください。\n"
+            "受講生に以下を伝えてください：\n"
+            f"「お疲れ様です！ステップ T-3 です。あなたの企画書どおりに『{disp}』の画面・AI・関数ツールを実装します。途中で API キーの設定をお願いします。」\n\n"
+            "【作るもの（企画書より。すべて作ること）】\n"
+            f"■ 機能\n{features}\n"
+            f"■ 画面（static/ に Google標準リッチUI で作る。Google Fonts, Material Symbols, Tailwind CSS を導入し、素のダサいHTMLにしないこと）\n{screens}\n"
+            f"■ 関数ツール（この名前・引数で実装し、引数に応じて実際に処理する。固定値のダミーは不可）\n{tools}\n"
+            f"■ データと保存先\n{data}\n"
+            f"■ 今回は作らないもの\n{out_of_scope}\n\n"
+            "【自律実行タスク】\n"
+            f"1. 認証情報の準備: `python .agents/skills/ipp-secure-credentials/scripts/env_setup.py --agent-dir {agent_dir}` を実行する。\n"
+            f"2. スキル「ipp-build-app-from-brief」に従い {agent_dir}/ に実装する。\n"
+            f"3. 画面を作成後、`{ui_audit_cmd}` を実行して Google 標準リッチ UI の基準（80点以上）を満たしているか確認する。\n"
+            f"4. 動作確認（スモークテスト）: スキル「ipp-agent-smoke-test」を使い、エージェントを実際に動かす：\n"
+            f"   {smoke_cmd}\n"
+            "   結果が FAIL の場合は修正して PASS になるまで繰り返すこと。\n\n"
+            + CREDENTIAL_RULES + "\n"
+            "【重要: HITMAN提出用生ログ出力規程】\n"
+            "スクリプトが出力したコードブロック（1行目が [skill:ipp-agent-smoke-test@v1]、最後の行が SMOKE_DIGEST）を、一字一句変えずに回答の最末尾に出力してください。\n"
+            "出力後、受講生へ「上記コードブロックをそのままコピーして、HITMANのチャット欄に貼り付けてください。HITMANがエージェントの実動作を客観検証し、ステップ T-4へ進みます！」と案内して待機してください。"
+        )
 
-    t6 = base_sop["T-6"]
-    t6["title"] = f"ステップ T-6: 『{disp}』の個人GitHub公開＆修了証発行"
-    t6["objective"] = f"『{disp}』のソースコードを、認証情報が含まれていないことを確認したうえで受講生の個人GitHub（{service}）へ公開する。"
-    t6["command"] = f"python .agents/skills/ipp-secure-credentials/scripts/secret_scan.py {agent_dir}"
-    t6["cautions"] = "SECRET_SCAN: PASS でなければプッシュしないこと。.env がコミット対象に入っていないことを git status で確認してください。修了後は安全停止コマンドで Cloud Run と Secret Manager を破棄してください。"
-    t6["agy_prompt"] = (
-        f"【AntiGravity投入用プロンプト: Step T-6（『{disp}』個人GitHub公開＆修了認定）】\n"
-        "あなたはIPPのAI実践研修専属メンターです。\n"
-        "受講生に以下を伝えてください：\n"
-        f"「お疲れ様です！最終ステップ T-6 です。『{disp}』をあなたの個人GitHubリポジトリ（{service}）へ公開します。公開前に、API キーが含まれていないことを必ず確認します。」\n\n"
-        "【自律実行タスク】\n"
-        f"1. `python .agents/skills/ipp-secure-credentials/scripts/secret_scan.py {agent_dir}` を実行し、SECRET_SCAN: PASS でなければプッシュしない。\n"
-        "2. スキル「publish-to-github」を活用し、gh CLIのデバイス認証フローで個人GitHubへ公開する（.env がコミット対象に入っていないことを git status で確認）。\n"
-        "3. リポジトリURL（https://github.com/...）を出力する。\n\n"
-        + CREDENTIAL_RULES + "\n"
-        "【重要: HITMAN提出用生ログ出力規程】\n"
-        "提出用コードブロックの1行目には、この作業で実際に使用したスキルの証跡行をそのまま列挙してください（使っていないスキルの証跡は書かないこと）。\n"
-        "必ず secret_scan の結果と、git push の標準出力・リポジトリURLを、```bash のコードブロック形式で回答の最末尾に逐語出力してください。\n"
-        "出力後、受講生へ「上記コードブロック内の公開ログをコピーして、HITMANのチャット欄に貼り付けてください。HITMANが修了認定を行い、最終評価レポートを発行します！」と案内して待機してください。"
-    )
+        t4 = base_sop["T-4"]
+        t4["title"] = f"ステップ T-4: 『{disp}』のテスト＆自律Wチェック"
+        t4["objective"] = f"企画書の各機能の受け入れ条件と関数ツール（{tool_names}）を検証する Pytest を実行する。"
+        t4["command"] = f"pytest {agent_dir}/tests/ -v"
+        t4["cautions"] = "テストは API キーなしでも動くように、関数ツール・データ処理・画面用 API を直接テストしてください。"
+        t4["agy_prompt"] = (
+            f"【AntiGravity投入用プロンプト: Step T-4（『{disp}』のテスト）】\n"
+            "あなたはIPPのAI実践研修専属メンターです。\n"
+            "受講生に以下を伝えてください：\n"
+            f"「お疲れ様です！ステップ T-4 です。企画書の機能がそれぞれ受け入れ条件どおりに動くかを、自動テストで確かめます。」\n\n"
+            "【自律実行タスク】\n"
+            f"1. {agent_dir}/tests/test_agent.py を作り、次をテストする（Gemini を呼ばずに実行できるテストにする）：\n"
+            f"   - 企画書の各機能の受け入れ条件（機能ごとに1つ以上）\n{features}\n"
+            f"   - 関数ツールが入力（引数）に応じて異なる正しい結果を返すこと: {tool_names}\n"
+            "   - 画面用のデータ API（FastAPI の TestClient で呼ぶ）\n"
+            f"2. `pytest {agent_dir}/tests/ -v` を実行し、全件 PASSED になるまで修正する（テストを削除・緩和して通さない）。\n\n"
+            + CREDENTIAL_RULES + "\n"
+            "【重要: HITMAN提出用生ログ出力規程】\n"
+            "提出用コードブロックの1行目には、この作業で実際に使用したスキルの証跡行をそのまま列挙してください（使っていないスキルの証跡は書かないこと）。\n"
+            "必ず pytest の標準出力（test session starts から passed in ... までの生ログ）を、```bash のコードブロック形式で回答の最末尾に逐語出力してください。\n"
+            "出力後、受講生へ「上記コードブロック内のテストログをコピーして、HITMANのチャット欄に貼り付けてください。HITMANが客観Wチェック承認を行い、ステップ T-5へ進みます！」と案内して待機してください。"
+        )
+
+        t5 = base_sop["T-5"]
+        t5["title"] = f"ステップ T-5: 『{disp}』の Cloud Run デプロイ＆動作確認"
+        t5["objective"] = f"API キーを Secret Manager で安全に渡して『{disp}』を Cloud Run へデプロイし、公開URLで AI が応答することを確かめる。"
+        t5["command"] = deploy_cmd
+        t5["cautions"] = "gcloud run deploy を手で実行しないこと（特に --set-env-vars に API キーを書くのは禁止）。スキル「ipp-cloud-run-deploy」のスクリプトを使ってください。"
+        t5["agy_prompt"] = (
+            f"【AntiGravity投入用プロンプト: Step T-5（『{disp}』Cloud Run デプロイ）】\n"
+            "あなたはIPPのAI実践研修専属メンターです。\n"
+            "受講生に以下を伝えてください：\n"
+            f"「お疲れ様です！ステップ T-5 です。『{disp}』を Cloud Run で公開します。API キーは Secret Manager で安全に渡し、公開URLで AI が応答するところまで確かめます。」\n\n"
+            "【自律実行タスク】\n"
+            "1. 受講生に gcloud auth login と gcloud config set project <プロジェクトID> が済んでいるか確認する（未実施なら受講生に実行してもらう）。\n"
+            f"2. `python .agents/skills/ipp-secure-credentials/scripts/secret_scan.py {agent_dir}` を実行し、SECRET_SCAN: PASS を確認する。\n"
+            "3. スキル「ipp-cloud-run-deploy」に従い、ワークスペースのルートで次をそのまま実行する（gcloud run deploy を手で実行しない）：\n"
+            f"   {deploy_cmd}\n"
+            "4. DEPLOY_RESULT: FAIL の場合は、スキルの表と Cloud Run のログで原因を直して再実行する。出力を書き換えない。\n"
+            "5. PASS したら、公開URLを受講生に伝え、ブラウザで企画書の画面が開けることを一緒に確認する。\n\n"
+            + CREDENTIAL_RULES + "\n"
+            "【重要: HITMAN提出用生ログ出力規程】\n"
+            "スクリプトが出力したコードブロック（1行目が [skill:ipp-cloud-run-deploy@v1]、最後の行が DEPLOY_DIGEST）を、一字一句変えずに回答の最末尾に出力してください。\n"
+            "出力後、受講生へ「上記コードブロックをコピーして、HITMANのチャット欄に貼り付けてください。HITMANが公開URLに実際にアクセスして確認し、最終ステップ T-6へ進みます！」と案内して待機してください。"
+        )
+
+        t6 = base_sop["T-6"]
+        t6["title"] = f"ステップ T-6: 『{disp}』の個人GitHub公開＆修了証発行"
+        t6["objective"] = f"『{disp}』のソースコードを、認証情報が含まれていないことを確認したうえで受講生の個人GitHub（{service}）へ公開する。"
+        t6["command"] = f"python .agents/skills/ipp-secure-credentials/scripts/secret_scan.py {agent_dir}"
+        t6["cautions"] = "SECRET_SCAN: PASS でなければプッシュしないこと。.env がコミット対象に入っていないことを git status で確認してください。修了後は安全停止コマンドで Cloud Run と Secret Manager を破棄してください。"
+        t6["agy_prompt"] = (
+            f"【AntiGravity投入用プロンプト: Step T-6（『{disp}』個人GitHub公開＆修了認定）】\n"
+            "あなたはIPPのAI実践研修専属メンターです。\n"
+            "受講生に以下を伝えてください：\n"
+            f"「お疲れ様です！最終ステップ T-6 です。『{disp}』をあなたの個人GitHubリポジトリ（{service}）へ公開します。公開前に、API キーが含まれていないことを必ず確認します。」\n\n"
+            "【自律実行タスク】\n"
+            f"1. `python .agents/skills/ipp-secure-credentials/scripts/secret_scan.py {agent_dir}` を実行し、SECRET_SCAN: PASS でなければプッシュしない。\n"
+            "2. スキル「publish-to-github」を活用し、gh CLIのデバイス認証フローで個人GitHubへ公開する（.env がコミット対象に入っていないことを git status で確認）。\n"
+            "3. リポジトリURL（https://github.com/...）を出力する。\n\n"
+            + CREDENTIAL_RULES + "\n"
+            "【重要: HITMAN提出用生ログ出力規程】\n"
+            "提出用コードブロックの1行目には、この作業で実際に使用したスキルの証跡行をそのまま列挙してください（使っていないスキルの証跡は書かないこと）。\n"
+            "必ず secret_scan の結果と、git push の標準出力・リポジトリURLを、```bash のコードブロック形式で回答の最末尾に逐語出力してください。\n"
+            "出力後、受講生へ「上記コードブロック内の公開ログをコピーして、HITMANのチャット欄に貼り付けてください。HITMANが修了認定を行い、最終評価レポートを発行します！」と案内して待機してください。"
+        )
 
 
 def get_training_sop(course_type: str = None, params: dict = None, state: "HitmanState" = None) -> dict:
@@ -1171,7 +1403,21 @@ def get_training_sop(course_type: str = None, params: dict = None, state: "Hitma
         agent_name = brief.get("agent_name") or "my_agent"
         if brief.get("agent_name"):
             # ワークスペースの置換は下のループで1回だけ行う（ここで ws を入れると二重になる）
-            _personalize_course_a_sop(base_sop, brief, nonce_text, "ipp-agent-workspace")
+            _personalize_course_a_sop(base_sop, brief, nonce_text, "ipp-agent-workspace", level=state.level)
+        else:
+            # 確定前のプレースホルダー: state.step_sequence の全ステップを安全に用意
+            seq = state.step_sequence
+            for sid in seq:
+                if sid not in base_sop:
+                    base_sop[sid] = {
+                        "step_id": sid,
+                        "title": f"ステップ {sid}: 企画書確定待ち",
+                        "objective": "T-2 の企画書が合格すると、内容が確定します。",
+                        "command": "",
+                        "expected_check": "T-2 完了後に表示されます",
+                        "cautions": "T-2 の企画書が合格すると、内容が確定します。",
+                        "agy_prompt": COURSE_A_PENDING_PROMPT,
+                    }
 
     for step_id, step in base_sop.items():
         for field in ["command", "expected_check", "cautions", "agy_prompt", "title", "objective"]:
@@ -2087,6 +2333,109 @@ def judge_deploy_output(text: str, expected_nonce: str | None = None, expected_s
     return {"status": "FAIL", "reason": "デプロイしたアプリが正常に動いていません。", "hints": hints or ["DEPLOY_RESULT が FAIL です。"], "data": data}
 
 
+UI_AUDIT_MARKER = "[skill:ipp-build-app-from-brief@v1]"
+
+
+def judge_ui_audit_output(text: str) -> dict:
+    """ui_audit.py の出力を判定する。status: PASS / FAIL / ABSENT"""
+    raw = (text or "").strip()
+    if not raw:
+        return {"status": "ABSENT", "reason": "UI品質監査ログが出力されていません。", "score": 0, "hints": []}
+
+    has_marker = UI_AUDIT_MARKER in raw
+    has_header = "Google標準リッチUI" in raw or "UI品質監査" in raw
+    has_pass = "UI_AUDIT_RESULT: PASS" in raw or "UI_AUDIT: PASS" in raw
+    has_fail = "UI_AUDIT_RESULT: FAIL" in raw or "UI_AUDIT: FAIL" in raw
+
+    score_match = re.search(r"品質スコア[^\d]*(\d+)\s*/\s*100", raw)
+    score = int(score_match.group(1)) if score_match else None
+
+    if not has_marker and not has_header and not (has_pass or has_fail):
+        return {"status": "ABSENT", "reason": "ui_audit.py の実行ログが見当たりません。", "score": 0, "hints": []}
+
+    hints = []
+    for line in raw.splitlines():
+        line = line.strip()
+        if line.startswith("- ") and any(k in line for k in ("Google Fonts", "Material Symbols", "Tailwind", "カード", "viewport", "HTML ファイル")):
+            hints.append(line)
+
+    if has_fail or (score is not None and score < 80):
+        reason = f"UI品質スコアが合格基準（80点以上）に達していません（スコア: {score or '未測定'} 点）。素のHTMLや未装飾な画面は許可されません。"
+        return {
+            "status": "FAIL",
+            "score": score or 0,
+            "reason": reason,
+            "hints": hints or [
+                "Google Fonts (Noto Sans JP等) を <head> に導入してください。",
+                "Material Symbols アイコンを <head> に導入してください。",
+                "Tailwind CSS を導入し、カード型UI（bg-white rounded-lg shadow 等）を適用してください。",
+            ],
+        }
+
+    if has_pass or (score is not None and score >= 80):
+        return {
+            "status": "PASS",
+            "score": score or 100,
+            "reason": f"Google標準リッチUI基準クリア（スコア: {score or 80} 点）",
+            "hints": [],
+        }
+
+    return {"status": "FAIL", "score": score or 0, "reason": "UI品質判定が完了していません。", "hints": hints}
+
+
+def get_step_verification_kind(step_str: str, level: str = TRAINING_LEVEL_STANDARD) -> str:
+    """各レベルおよびステップにおける検証種別を返す。
+    返却値: 'skill_check' | 'brief' | 'smoke' | 'ui_audit' | 'pytest' | 'deploy' | 'secret_scan' | 'github'
+    """
+    s = str(step_str).strip().upper()
+    if s == "T-1":
+        return "skill_check"
+    if s == "T-2":
+        return "brief"
+
+    if level == TRAINING_LEVEL_ADVANCE:
+        mapping = {
+            "T-3": "smoke",
+            "T-4": "ui_audit",
+            "T-5": "pytest",
+            "T-6": "smoke",
+            "T-7": "deploy",
+            "T-8": "github",
+        }
+        return mapping.get(step_str, "unknown")
+
+    elif level == TRAINING_LEVEL_PROFESSIONAL:
+        mapping = {
+            "T-3": "smoke",
+            "T-4": "ui_audit",
+            "T-5": "pytest",
+            "T-6": "pytest",
+            "T-7": "smoke",
+            "T-8": "deploy",
+            "T-9": "secret_scan",
+            "T-10": "github",
+        }
+        return mapping.get(step_str, "unknown")
+
+    else:
+        mapping = {
+            "T-3": "smoke",
+            "T-4": "pytest",
+            "T-5": "deploy",
+            "T-6": "github",
+        }
+        return mapping.get(step_str, "unknown")
+
+
+def _next_step_in_seq(current: str, seq: list[str]) -> str | None:
+    if current in seq:
+        idx = seq.index(current)
+        if idx + 1 < len(seq):
+            return seq[idx + 1]
+    return None
+
+
+
 def _expected_agent_dir(state: "HitmanState") -> str | None:
     """T-3 カードのコマンドの --agent-dir から、確定した企画のエージェントフォルダ名を取り出す。"""
     sop_now = get_training_sop(state.course, state=state)
@@ -2277,8 +2626,9 @@ def verify_step_output(step_number: int | str, command_output: str, tool_context
     step_str = str(step_number).strip().upper()
     # 研修モードのアンチスキップ: 現在ステップより先のステップ番号が指定されても現在ステップとして検証する
     cur = state.current_step
-    if state.mode == MODE_TRAINING and cur in TRAINING_STEP_SEQUENCE and step_str in TRAINING_STEP_SEQUENCE:
-        if TRAINING_STEP_SEQUENCE.index(step_str) > TRAINING_STEP_SEQUENCE.index(cur):
+    seq = state.step_sequence
+    if state.mode == MODE_TRAINING and cur in seq and step_str in seq:
+        if seq.index(step_str) > seq.index(cur):
             step_number = cur
     result = _verify_step_output_impl(step_number, command_output, state)
     _annotate_skill_usage(result, command_output)
@@ -2372,7 +2722,8 @@ def _verify_step_output_impl(step_number: int | str, command_output: str, state:
         if CURRENT_STEP in normal_seq and step_str in normal_seq:
             cur_idx = normal_seq.index(CURRENT_STEP)
             cand_idx = normal_seq.index(step_str)
-            if cand_idx < cur_idx and cur_idx > 0:
+            has_explicit_step_log = (step_str == "1-1" and ("df" in output_lower or "filesystem" in output_lower))
+            if cand_idx < cur_idx and cur_idx > 0 and not has_explicit_step_log:
                 step_str = CURRENT_STEP
 
     # 0. 研修モードにおける受講コース選択・変更要求の自動判別（自己申告差し戻し回避）
@@ -2517,7 +2868,8 @@ def _verify_step_output_impl(step_number: int | str, command_output: str, state:
     # ==============================================================================
     # 研修モード（TRAINING）用ステップ（T-1 〜 T-6）の客観ログ検証
     # ==============================================================================
-    if step_str.startswith("T-") or "T-" in step_str or (ACTIVE_OPERATION_MODE == MODE_TRAINING and step_str in TRAINING_STEP_SEQUENCE):
+    seq = state.step_sequence
+    if step_str.startswith("T-") or "T-" in step_str or (ACTIVE_OPERATION_MODE == MODE_TRAINING and step_str in seq):
         # T-1: 開発環境構築とスキル同期
         # 合格条件は「新しい会話で /ipp-skill-check が起動した証跡」。クローンやフォルダ一覧のログだけでは、
         # スキルが Antigravity に読み込まれたことの証明にならない（下の階層のスキルは読み込まれない）。
@@ -2597,6 +2949,7 @@ def _verify_step_output_impl(step_number: int | str, command_output: str, state:
                     state.plan_confirmed = True
                 feats = "、".join(f"{f['id']} {f['name']}" for f in brief["features"])
                 tools = "、".join(t["name"] for t in brief["tools"])
+                nxt = _next_step_in_seq("T-2", seq)
                 return {
                     "verdict": "SUCCESS",
                     "w_check_status": "VERIFIED_APPROVED",
@@ -2605,12 +2958,14 @@ def _verify_step_output_impl(step_number: int | str, command_output: str, state:
                     "message": (
                         f"【判定: 合格】『{brief['display_name']}』（{brief['agent_name']}）の要件定義書を確認しました！\n"
                         f"・機能: {feats}\n・画面: {len(brief['screens'])} 画面\n・関数ツール: {tools}\n"
-                        "この企画書が、T-3〜T-6 の設計図になります。T-3 のカードに、この企画に合わせた手順と確認コード（スモークテスト用）が表示されます。"
+                        f"この企画書が、設計図になります。続いて『ステップ {nxt or 'T-3'}』へ進んでください。\n"
+                        f"カードに企画に合わせた手順と確認コードが表示されます。"
                     ),
                 }
             has_t2_sig = any(k in output_lower for k in ("hitman_spec", "## ", "wチェック", "sop"))
             if not has_t2_sig:
                 return _make_no_log_response("T-2", "hitman_spec.md の内容・要件定義の出力が確認できません。", state=state)
+            nxt = _next_step_in_seq("T-2", seq)
             return {
                 "verdict": "SUCCESS",
                 "w_check_status": "VERIFIED_APPROVED",
@@ -2618,15 +2973,83 @@ def _verify_step_output_impl(step_number: int | str, command_output: str, state:
                 "autonomous_verdict": "【AI確認者 Wチェック承認 ✓】HITMANクローンの仕様書（SOPデータ構造、Wチェック判定、エスカレーション）を確認しました。",
                 "message": (
                     "【判定: 合格】HITMANクローンの仕様書を確認しました！\n"
-                    "続いて『ステップ T-3: HITMAN判定コア＆A2UI実装』へ進んでください。"
-                    "T-3 のカードに、この受講生専用の確認コード（スモークテスト用）が表示されます。"
+                    f"続いて『ステップ {nxt or 'T-3'}: HITMAN判定コア＆A2UI実装』へ進んでください。\n"
+                    "カードに、この受講生専用の確認コード（スモークテスト用）が表示されます。"
                 ),
             }
 
-        # T-3: エージェントコア＆A2UI実装
-        # 合格条件は「実際にエージェントを動かした記録（スモークテスト）」。ファイル一覧やコードの冒頭だけでは、
-        # 固定値を返すだけのダミー実装でも合格してしまうため。判定は表示上の PASS ではなく生データから行う。
-        if "T-3" in step_str:
+        # ----------------------------------------------------------------------
+        # 動的ステップ（T-3 以降）の検証種別特定
+        # ----------------------------------------------------------------------
+        kind = get_step_verification_kind(step_str, state.level)
+        if kind == "unknown":
+            if any(k in output_lower for k in ("ui_audit", "google標準リッチui", "ui_audit_result")):
+                kind = "ui_audit"
+            elif any(k in output_lower for k in (SMOKE_MARKER.lower(), "smoke_digest", "smoke_result")):
+                kind = "smoke"
+            elif any(k in output_lower for k in (DEPLOY_MARKER.lower(), "deploy_digest", "deploy_result")):
+                kind = "deploy"
+            elif any(k in output_lower for k in ("secret_scan", "secret scan")):
+                kind = "secret_scan"
+            elif any(k in output_lower for k in ("github.com", "remote: create a pull request")):
+                kind = "github"
+            elif any(k in output_lower for k in ("test session starts", "passed in")):
+                kind = "pytest"
+
+        # ----------------------------------------------------------------------
+        # A. UI品質監査（Google標準リッチUI）
+        # ----------------------------------------------------------------------
+        if kind == "ui_audit" or "ui_audit_result:" in output_lower or "google標準リッチui" in output_lower:
+            audit = judge_ui_audit_output(command_output)
+            if audit["status"] == "PASS":
+                nxt = _next_step_in_seq(step_str, seq)
+                return {
+                    "verdict": "SUCCESS",
+                    "w_check_status": "VERIFIED_APPROVED",
+                    "step_id": step_str,
+                    "autonomous_verdict": f"【AI確認者 Wチェック承認 ✓】Google標準リッチUI（スコア: {audit['score']}点）の品質基準クリアを確認しました。",
+                    "message": (
+                        f"【判定: 合格】（Wチェック承認: VERIFIED_APPROVED）\n"
+                        f"Google Fonts, Material Symbols, Tailwind CSS によるリッチUI（品質スコア: {audit['score']}/100 点）を確認しました！\n"
+                        f"素のHTMLではない、現場本番品質のデザインが担保されました。\n"
+                        + (f"続いて『ステップ {nxt}』へ進んでください。" if nxt else "全研修ステップ完了です！")
+                    ),
+                }
+            if audit["status"] == "FAIL":
+                return {
+                    "verdict": "FAILED",
+                    "w_check_status": "BLOCKED_RETRY",
+                    "step_id": step_str,
+                    "reason": audit["reason"],
+                    "autonomous_verdict": f"【AI確認者 判定】UI品質基準未達を検知（スコア: {audit['score']}/100点）。素のHTMLやダサい画面を差し戻します。",
+                    "message": (
+                        f"【判定: 不合格】{audit['reason']}\n"
+                        + "".join(f"・{h}\n" for h in audit["hints"])
+                        + "\nAntiGravity に画面の修正（Google Fonts, Material Symbols, Tailwind CSS の導入とカード型UI化）を依頼し、"
+                        "ui_audit.py を再実行して合格ログ（80点以上）を貼り付けてください。"
+                    ),
+                }
+            has_html_sig = any(k in output_lower for k in ("<html", "index.html", "<body>", "<div", "static/"))
+            if has_html_sig:
+                return {
+                    "verdict": "FAILED",
+                    "w_check_status": "TRAINING_GUIDANCE",
+                    "step_id": step_str,
+                    "reason": "UI品質監査スクリプト（ui_audit.py）の実行ログがありません。",
+                    "autonomous_verdict": "【研修インストラクター 伴走ガイダンス】HTML作成を確認しました。ui_audit.py でGoogle標準リッチUIの客観品質を測定しましょう。",
+                    "message": (
+                        "【研修モード・教育ガイダンス】画面の作成ログを確認しました！\n"
+                        "HITMAN は客観的な品質基準（Google Fonts, Material Symbols, Tailwind CSS, カード型UI）を厳格に査定します。\n"
+                        "AntiGravity に次を実行してもらい、出力されたレポート（1行目が [skill:ipp-build-app-from-brief@v1]）をそのまま貼り付けてください：\n"
+                        f"`python .agents/skills/ipp-build-app-from-brief/scripts/ui_audit.py --agent-dir ipp-agent-workspace/{state.agent_slug or 'my_agent'}`"
+                    ),
+                }
+            return _make_no_log_response(step_str, "UI品質監査スクリプト（ui_audit.py）の出力が確認できません。", state=state)
+
+        # ----------------------------------------------------------------------
+        # B. スモークテスト（エージェントコア / 結合E2E動作確認）
+        # ----------------------------------------------------------------------
+        if kind == "smoke":
             expected_dir = _expected_agent_dir(state) if state.mode == MODE_TRAINING else None
             smoke = judge_smoke_output(
                 command_output,
@@ -2643,22 +3066,23 @@ def _verify_step_output_impl(step_number: int | str, command_output: str, state:
                 }
             if smoke["status"] == "PASS":
                 tools = "、".join(smoke["data"].get("tools") or []) or "自作ツール"
+                nxt = _next_step_in_seq(step_str, seq)
                 return {
                     "verdict": "SUCCESS",
                     "w_check_status": "VERIFIED_APPROVED",
-                    "step_id": "T-3",
+                    "step_id": step_str,
                     "autonomous_verdict": "【AI確認者 Wチェック承認 ✓】エージェントを実際に動かし、ツール呼び出しと入力に応じた応答の変化を確認しました。",
                     "message": (
                         "【判定: 合格】（Wチェック承認: VERIFIED_APPROVED）\n"
                         f"エージェントに異なる2つの質問を送り、ツール（{tools}）が実際に呼ばれ、入力に応じて応答と結果が変わることを確認しました。\n"
-                        "続いて『ステップ T-4: ローカルテスト＆自律Wチェック』へ進んでください。"
+                        + (f"続いて『ステップ {nxt}』へ進んでください。" if nxt else "全研修ステップ完了です！")
                     ),
                 }
             if smoke["status"] in ("FAIL", "TAMPERED", "BROKEN", "MISMATCH"):
                 return {
                     "verdict": "FAILED",
                     "w_check_status": "BLOCKED_RETRY",
-                    "step_id": "T-3",
+                    "step_id": step_str,
                     "reason": smoke["reason"],
                     "autonomous_verdict": f"【AI確認者 判定】動作確認で問題を検知しました：{smoke['reason']}",
                     "message": (
@@ -2672,47 +3096,80 @@ def _verify_step_output_impl(step_number: int | str, command_output: str, state:
                 return {
                     "verdict": "FAILED",
                     "w_check_status": "TRAINING_GUIDANCE",
-                    "step_id": "T-3",
+                    "step_id": step_str,
                     "reason": "エージェントを実際に動かした記録（スモークテスト）がありません。",
                     "autonomous_verdict": "【研修インストラクター 伴走ガイダンス】実装おつかれさまです！あとは実際に動くことを確かめましょう。",
                     "message": (
-                        "【研修モード・教育ガイダンス（ステップ T-3）】コードができていることは確認しました。順調です！\n"
+                        "【研修モード・教育ガイダンス】コードができていることは確認しました。順調です！\n"
                         "ただ、ファイルやコードの見た目だけでは『本当に動くか』まではわかりません。"
                         "AntiGravity に次のように頼んで、エージェントを実際に動かした記録を出してもらってください：\n"
                         "「ipp-agent-smoke-test スキルで、project_brief の用途に沿った内容の異なる2つの質問を使って動作確認して」\n"
                         f"出力されたコードブロック（1行目が {SMOKE_MARKER}）を、そのままここに貼り付けてください。"
                     ),
                 }
-            return _make_no_log_response("T-3", f"スモークテストの出力（1行目が {SMOKE_MARKER}）が確認できません。", state=state)
+            return _make_no_log_response(step_str, f"スモークテストの出力（1行目が {SMOKE_MARKER}）が確認できません。", state=state)
 
-        # T-4: ローカルテスト＆自律Wチェック
-        if "T-4" in step_str:
+        # ----------------------------------------------------------------------
+        # C. 単体テスト＆データ層検証（Pytest）
+        # ----------------------------------------------------------------------
+        if kind == "pytest":
             if "failed" in output_lower or "failure" in output_lower or "errors=" in output_lower:
                 return {
                     "verdict": "FAILED",
                     "w_check_status": "BLOCKED_RETRY",
-                    "step_id": "T-4",
+                    "step_id": step_str,
                     "reason": "テスト実行ログ内に失敗（FAILED / ERROR）が検知されました。修正して合格するまで前進できません。",
-                    "autonomous_verdict": "【AI確認者 判定】単体テストの失敗を検知。不合格箇所を修正し、全件PASSEDとなるまでデプロイへの進行を遮断します。",
+                    "autonomous_verdict": "【AI確認者 判定】単体テストの失敗を検知。不合格箇所を修正し、全件PASSEDとなるまで次ステップへの進行を遮断します。",
                     "message": "【判定: 不合格】単体テストでエラーが検知されました。AntiGravityにログを渡し修正を行って、再度全件合格のログを貼り付けてください。",
                 }
             has_t4_sig = any(k in output_lower for k in ("passed", "test session starts"))
             if not has_t4_sig:
-                return _make_no_log_response("T-4", "pytest実行ログ（passed, test session starts等）が確認できません。", state=state)
+                return _make_no_log_response(step_str, "pytest実行ログ（passed, test session starts等）が確認できません。", state=state)
+            nxt = _next_step_in_seq(step_str, seq)
             return {
                 "verdict": "SUCCESS",
                 "w_check_status": "VERIFIED_APPROVED",
-                "step_id": "T-4",
+                "step_id": step_str,
                 "autonomous_verdict": "【AI確認者 Wチェック承認 ✓】Pytest単体テストの全件合格（PASSED）を確認しました。品質基準クリア。",
                 "message": (
                     "【判定: 合格】単体テストの全件PASSED（エラー0件）を客観確認しました！\n"
-                    "エージェントの関数ツールおよびA2UIの整合性が保証されました。\n"
-                    "続いて『ステップ T-5: Cloud Run 本番デプロイ』へ進んでください。"
+                    "エージェントの関数ツールおよびA2UI/データ層の整合性が保証されました。\n"
+                    + (f"続いて『ステップ {nxt}』へ進んでください。" if nxt else "全研修ステップ完了です！")
                 ),
             }
 
-        # T-5: Cloud Run 本番デプロイ（URL が出ただけでは合格にしない。実際に AI が応答することを確かめる）
-        if "T-5" in step_str:
+        # ----------------------------------------------------------------------
+        # D. セキュリティ＆ガバナンススキャン（secret_scan.py）
+        # ----------------------------------------------------------------------
+        if kind == "secret_scan":
+            if "secret_scan: fail" in output_lower or "secret_scan: ng" in output_lower:
+                return {
+                    "verdict": "FAILED",
+                    "w_check_status": "BLOCKED_RETRY",
+                    "step_id": step_str,
+                    "reason": "コードベースまたはGit管理対象内に平文の認証情報（APIキー等）が検出されました。",
+                    "autonomous_verdict": "【AI確認者 判定】セキュリティスキャン失敗。平文シークレットの消去が完了するまで公開を遮断します。",
+                    "message": "【判定: 不合格】コードまたは .env に平文キーの混入が検知されました。キーを削除し .gitignore で除外して、再スキャンを実行してください。",
+                }
+            if "secret_scan: pass" in output_lower or "secret_scan: ok" in output_lower:
+                nxt = _next_step_in_seq(step_str, seq)
+                return {
+                    "verdict": "SUCCESS",
+                    "w_check_status": "VERIFIED_APPROVED",
+                    "step_id": step_str,
+                    "autonomous_verdict": "【AI確認者 Wチェック承認 ✓】セキュリティ＆ガバナンススキャン合格。機密情報漏洩リスクなし。",
+                    "message": (
+                        "【判定: 合格】セキュリティスキャン（SECRET_SCAN: PASS）を確認しました！\n"
+                        "平文APIキーや認証情報の漏洩がないことが証明されました。\n"
+                        + (f"続いて最終ステップ『ステップ {nxt}』へ進んでください。" if nxt else "全研修ステップ完了です！")
+                    ),
+                }
+            return _make_no_log_response(step_str, "secret_scan.py の出力（SECRET_SCAN: PASS）が確認できません。", state=state)
+
+        # ----------------------------------------------------------------------
+        # E. Cloud Run 本番デプロイ＆実稼働確認
+        # ----------------------------------------------------------------------
+        if kind == "deploy":
             in_training = state.mode == MODE_TRAINING
             dep = judge_deploy_output(
                 command_output,
@@ -2724,29 +3181,29 @@ def _verify_step_output_impl(step_number: int | str, command_output: str, state:
                     return {
                         "verdict": "FAILED",
                         "w_check_status": "TRAINING_GUIDANCE",
-                        "step_id": "T-5",
+                        "step_id": step_str,
                         "reason": "デプロイスクリプト（ipp-cloud-run-deploy）の出力ではありません。",
                         "autonomous_verdict": "【研修インストラクター 伴走ガイダンス】URL が出ただけでは、AI が動いているかまではわかりません。",
                         "message": (
-                            "【研修モード・教育ガイダンス（ステップ T-5）】デプロイのログを確認しました。\n"
+                            "【研修モード・教育ガイダンス】デプロイのログを確認しました。\n"
                             "ただし URL が出ただけでは、公開したアプリで AI が応答するか（API キーが正しく渡っているか）まではわかりません。"
                             "また、gcloud run deploy を手で実行すると API キーを平文で渡してしまう恐れがあります。\n"
-                            "T-5 のカードのコマンド（ipp-cloud-run-deploy の deploy.py）で実行し直し、出力されたコードブロック"
+                            "カードのコマンド（ipp-cloud-run-deploy の deploy.py）で実行し直し、出力されたコードブロック"
                             f"（1行目が {DEPLOY_MARKER}）をそのまま貼り付けてください。"
                         ),
                     }
-                return _make_no_log_response("T-5", f"デプロイスクリプトの出力（1行目が {DEPLOY_MARKER}）が確認できません。", state=state)
+                return _make_no_log_response(step_str, f"デプロイスクリプトの出力（1行目が {DEPLOY_MARKER}）が確認できません。", state=state)
             if dep["status"] != "PASS":
                 return {
                     "verdict": "FAILED",
                     "w_check_status": "BLOCKED_RETRY",
-                    "step_id": "T-5",
+                    "step_id": step_str,
                     "reason": dep["reason"],
                     "autonomous_verdict": f"【AI確認者 判定】{dep['reason']}",
                     "message": (
                         f"【判定: 不合格】{dep['reason']}\n"
                         + "".join(f"・{h}\n" for h in dep["hints"])
-                        + "AntiGravity に原因の修正を依頼し、T-5 のカードのコマンドで再実行して、出力をそのまま貼り付けてください。"
+                        + "AntiGravity に原因の修正を依頼し、カードのコマンドで再実行して、出力をそのまま貼り付けてください。"
                     ),
                 }
             url = dep["data"].get("url", "")
@@ -2757,7 +3214,7 @@ def _verify_step_output_impl(step_number: int | str, command_output: str, state:
                     return {
                         "verdict": "FAILED",
                         "w_check_status": "BLOCKED_RETRY",
-                        "step_id": "T-5",
+                        "step_id": step_str,
                         "reason": f"HITMAN から公開URLにアクセスしたところ、正常に応答しませんでした（/health: {live['status_health']}, /chat: {live['status_chat']}）。",
                         "autonomous_verdict": "【AI確認者 判定】公開URLの実地確認で異常を検知しました。",
                         "message": (
@@ -2766,30 +3223,33 @@ def _verify_step_output_impl(step_number: int | str, command_output: str, state:
                             "サービスが停止・削除されていないか、Cloud Run のログ（gcloud run services logs read）でエラーが出ていないかを確認してください。"
                         ),
                     }
+            nxt = _next_step_in_seq(step_str, seq)
             return {
                 "verdict": "SUCCESS",
                 "w_check_status": "VERIFIED_APPROVED",
-                "step_id": "T-5",
+                "step_id": step_str,
                 "autonomous_verdict": "【AI確認者 Wチェック承認 ✓】公開URLで /health と /chat が正常に応答し、AI が動いていることを確認しました（API キーは Secret Manager 参照）。",
                 "message": (
                     f"【判定: 合格】{url} で、アプリが起動し AI が応答することを確認しました！\n"
                     "API キーは Secret Manager から安全に渡されています。\n"
-                    "続いて『ステップ T-6: 個人GitHub公開＆修了証発行』へ進んでください。"
+                    + (f"続いて『ステップ {nxt}』へ進んでください。" if nxt else "全研修ステップ完了です！")
                 ),
             }
 
-        # T-6: 個人GitHub公開＆修了証発行
-        if "T-6" in step_str:
+        # ----------------------------------------------------------------------
+        # F. 個人GitHub公開＆修了証発行（最終ステップ）
+        # ----------------------------------------------------------------------
+        if kind == "github":
             has_t6_sig = any(k in output_lower for k in ("github.com", "remote: create a pull request"))
             if not has_t6_sig:
-                return _make_no_log_response("T-6", "個人GitHubリポジトリURL（https://github.com/...）またはプッシュログが確認できません。", state=state)
+                return _make_no_log_response(step_str, "個人GitHubリポジトリURL（https://github.com/...）またはプッシュログが確認できません。", state=state)
             clean_svc = (state.brief.get("agent_slug") if state.brief else None) or state.params.get("AGENT_NAME") or "my_hitman"
             cleanup_cmd = f"python .agents/skills/ipp-cloud-run-deploy/scripts/cleanup.py --service {clean_svc}"
 
             return {
                 "verdict": "SUCCESS",
                 "w_check_status": "VERIFIED_APPROVED",
-                "step_id": "T-6",
+                "step_id": step_str,
                 "autonomous_verdict": "【AI確認者 研修修了承認 ✓✓】受講生個人GitHubへのコード公開を確認。全研修カリキュラムの完走を正式承認します。",
                 "message": (
                     "🎉【全研修工程 修了認定・Wチェック承認】🎉\n"

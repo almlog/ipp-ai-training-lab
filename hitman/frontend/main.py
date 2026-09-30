@@ -935,6 +935,37 @@ async def api_training_course(req: Request):
     return JSONResponse(content=payload)
 
 
+@app.post("/api/training/level")
+async def api_training_level(req: Request):
+    """研修モード（コースA）の開発レベル（'standard'=6歩 / 'advance'=8歩 / 'professional'=10歩）を設定する。"""
+    _ensure_import_path()
+    from app.agent import (
+        get_active_approval,
+        get_active_branch_rules,
+        get_active_parameters,
+        set_training_level,
+    )
+
+    body = await req.json()
+    uid = _normalize_user_id(body.get("user_id"))
+    level = body.get("level", "standard")
+    async with _user_lock(uid):
+        async with _SessionState(uid) as (st, ctx, _):
+            res = set_training_level(level, tool_context=ctx)
+            payload = {
+                "result": {k: v for k, v in res.items() if k != "sop"},
+                "level": res.get("level"),
+                "level_name": res.get("level_name"),
+                "sop": res.get("sop"),
+                "sequence": res.get("step_sequence"),
+                "parameters": get_active_parameters(mode="TRAINING", state=st),
+                "approval": get_active_approval(mode="TRAINING", course=st.course, state=st),
+                "branch_rules": get_active_branch_rules(),
+                "state": st.snapshot(),
+            }
+    return JSONResponse(content=payload)
+
+
 @app.post("/api/supervisor/skip")
 async def api_supervisor_skip(req: Request):
     import sys
