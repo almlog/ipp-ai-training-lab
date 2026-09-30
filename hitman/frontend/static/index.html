@@ -128,24 +128,28 @@
   }
 
   .btn-reset {
-    background: #334155;
-    color: #f1f5f9;
-    border: 1px solid #475569;
+    background: #dc2626;
+    color: #ffffff;
+    border: 1px solid #ef4444;
     border-radius: 6px;
-    padding: 0.32rem 0.65rem;
-    font-size: 0.78rem;
+    padding: 0.35rem 0.75rem;
+    font-size: 0.8rem;
+    font-weight: 700;
     cursor: pointer;
     display: inline-flex;
     align-items: center;
-    gap: 0.3rem;
-    transition: all 0.2s;
+    gap: 0.35rem;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     white-space: nowrap;
     flex-shrink: 0;
+    box-shadow: 0 1px 3px rgba(220, 38, 38, 0.35);
   }
   .btn-reset:hover {
-    background: #dc2626;
-    color: #fff;
-    border-color: #ef4444;
+    background: #b91c1c;
+    border-color: #991b1b;
+    color: #ffffff;
+    box-shadow: 0 2px 6px rgba(185, 28, 28, 0.5);
+    transform: translateY(-1px);
   }
   .header-status {
     display: inline-flex;
@@ -1809,9 +1813,14 @@ html, body {
     display: none !important;
   }
 
-  .btn-report-hdr span:last-child,
-  .btn-reset span:last-child {
+  .btn-report-hdr span:last-child {
     display: none !important; /* Icon-only buttons for compact mobile header */
+  }
+  .btn-reset .hdr-btn-txt-long {
+    display: none !important;
+  }
+  .btn-reset .hdr-btn-txt-short {
+    display: inline !important;
   }
 
   .btn-report-hdr,
@@ -2165,10 +2174,10 @@ html, body {
       <div class="status-dot"></div>
       <span>稼働中</span>
     </div>
-    <button class="btn-reset" onclick="resetSessionConfirm()" title="作業履歴・進行ステップ・キャッシュを消去して初期化（サーバ側のセッションも破棄）">
-      <span class="material-symbols-outlined" style="font-size:16px;">restart_alt</span>
-      <span class="hdr-btn-txt-long">キャッシュ初期化</span>
-      <span class="hdr-btn-txt-short">初期化</span>
+    <button type="button" class="btn-reset" id="btn-cache-clear" onclick="resetSessionConfirm()" title="ブラウザの保存キャッシュ（localStorage・履歴）およびサーバ側セッションをすべて消去して完全初期化">
+      <span class="material-symbols-outlined" style="font-size:16px;">delete_sweep</span>
+      <span class="hdr-btn-txt-long">🧹 キャッシュクリア</span>
+      <span class="hdr-btn-txt-short">🧹 クリア</span>
     </button>
   </div>
 </header>
@@ -2712,24 +2721,63 @@ html, body {
 
 <script>
 
+// --- Full Cache & Session Reset Engine ---
+// ブラウザのキャッシュ・ローカルストレージに加えて、サーバ側のセッション（会話履歴・研修の進捗）も完全破棄する
+async function executeFullCacheReset(redirectUrl = null) {
+  let uid = null;
+  try { uid = localStorage.getItem("hitman_session_uid"); } catch (e) {}
+
+  // 1. サーバ側セッション破棄 API を呼出
+  if (uid) {
+    try {
+      await fetch("/api/session/reset", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_id: uid })
+      });
+    } catch (e) {
+      console.warn("Server session reset warning:", e);
+    }
+  }
+
+  // 2. ブラウザ Storage の全消去
+  try { localStorage.clear(); } catch (e) {}
+  try { sessionStorage.clear(); } catch (e) {}
+
+  // 3. CacheStorage (caches API) の全消去
+  try {
+    if (window.caches && caches.keys) {
+      const cacheNames = await caches.keys();
+      await Promise.all(cacheNames.map(name => caches.delete(name)));
+    }
+  } catch (e) {}
+
+  // 4. ServiceWorker の全解除
+  try {
+    if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations) {
+      const registrations = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(registrations.map(reg => reg.unregister()));
+    }
+  } catch (e) {}
+
+  // 5. 新規ランダムセッションIDを発行し、クリア完了通知フラグを付与
+  try {
+    const rnd = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : (Date.now().toString(36) + Math.random().toString(36).slice(2));
+    localStorage.setItem("hitman_session_uid", "u-" + rnd);
+    localStorage.setItem("hitman_just_cleared", "true");
+  } catch (e) {}
+
+  // 6. リダイレクト（キャッシュ無効化クエリ付き・履歴汚染防止）
+  const target = redirectUrl || (window.location.origin + window.location.pathname + "?_t=" + Date.now());
+  window.location.replace(target);
+}
+
 // --- URL Reset Handler (?reset=true or ?clear=1) ---
-// ブラウザのキャッシュに加えて、サーバ側のセッション（会話履歴・研修の進捗）も破棄する
 (function checkUrlReset() {
   try {
     const params = new URLSearchParams(window.location.search);
     if (params.get("reset") === "true" || params.get("clear") === "1") {
-      let uid = null;
-      try { uid = localStorage.getItem("hitman_session_uid"); } catch (e) {}
-      const finish = () => {
-        try { localStorage.clear(); sessionStorage.clear(); } catch (e) {}
-        window.location.replace(window.location.origin + window.location.pathname);
-      };
-      if (uid) {
-        fetch("/api/session/reset", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ user_id: uid }) })
-          .catch(() => {}).finally(finish);
-      } else {
-        finish();
-      }
+      executeFullCacheReset(window.location.origin + window.location.pathname);
     }
   } catch(e) {
     console.error("URL reset error:", e);
@@ -3055,18 +3103,13 @@ function loadState() {
   return false;
 }
 
-async function resetSessionConfirm() {
-  if (confirm("作業履歴・進行ステップ・保存キャッシュをすべて消去して、新規セッションに初期化しますか？\n（サーバ側の会話履歴と研修の進捗も破棄されます）")) {
-    // サーバ側の会話履歴・研修ステートも破棄する（旧実装はフロントのみ初期化し、LLMが旧文脈を引きずっていた）
-    try {
-      await fetch("/api/session/reset", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ user_id: getSessionUserId() })
-      });
-    } catch (e) { console.warn("session reset failed", e); }
-    try { localStorage.clear(); sessionStorage.clear(); } catch (e) {}
-    window.location.href = window.location.pathname + "?reset_done=" + Date.now();
+async function resetSessionConfirm(skipConfirm = false) {
+  const msg = "【🧹 キャッシュ＆セッション完全初期化】\n\n"
+    + "ブラウザの保存キャッシュ（チャット履歴・進捗・ローカルストレージ）および\n"
+    + "サーバ側のセッションをすべて破棄し、最初の状態に戻しますか？\n\n"
+    + "※ 最初からやり直したい場合や画面が古い状態のままの場合に実行してください。";
+  if (skipConfirm || confirm(msg)) {
+    await executeFullCacheReset();
   }
 }
 
@@ -4233,10 +4276,16 @@ function getCourseCardsHtml(isChat = false) {
               <div style="font-size:0.72rem;color:#64748b;">${isB ? '王道お手本コースで100%成功・安全運行へ進みます。' : '自由創作コースで現場の独自AI開発へ進みます。'}</div>
             </div>
           </div>
-          <button type="button" class="btn-toggle-course-card-chat" onclick="toggleCourseCardCollapse()" title="コースの変更または詳細を表示">
-            <span class="material-symbols-outlined" style="font-size:14px;">unfold_more</span>
-            <span>コース変更 / 詳細</span>
-          </button>
+          <div style="display:flex;align-items:center;gap:0.35rem;">
+            <button type="button" class="btn-toggle-course-card-chat" onclick="toggleCourseCardCollapse()" title="コースの変更または詳細を表示">
+              <span class="material-symbols-outlined" style="font-size:14px;">unfold_more</span>
+              <span>コース変更 / 詳細</span>
+            </button>
+            <button type="button" class="btn-toggle-course-card-chat" onclick="resetSessionConfirm()" style="background:#fee2e2;color:#b91c1c;border-color:#fca5a5;" title="ブラウザのキャッシュと作業履歴を消去して初期化">
+              <span class="material-symbols-outlined" style="font-size:14px;">delete_sweep</span>
+              <span>🧹 初期化</span>
+            </button>
+          </div>
         </div>
       `;
     }
@@ -4255,10 +4304,16 @@ function getCourseCardsHtml(isChat = false) {
             <div class="course-collapsed-subtext">${isB ? 'Excel解析・客観Wチェック・A2UIカード判定の本格AIオペレーター' : '現場の運用課題・自作社内ボットをAIと自律開発'}</div>
           </div>
         </div>
-        <button type="button" class="btn-toggle-course-card" onclick="toggleCourseCardCollapse()" title="受講コースの変更または詳細を表示">
-          <span class="material-symbols-outlined" style="font-size:14px;">unfold_more</span>
-          <span>コース切替 / レベル変更</span>
-        </button>
+        <div style="display:flex;align-items:center;gap:0.35rem;">
+          <button type="button" class="btn-toggle-course-card" onclick="toggleCourseCardCollapse()" title="受講コースの変更または詳細を表示">
+            <span class="material-symbols-outlined" style="font-size:14px;">unfold_more</span>
+            <span>コース切替 / レベル変更</span>
+          </button>
+          <button type="button" class="btn-toggle-course-card" onclick="resetSessionConfirm()" style="background:#fee2e2;color:#b91c1c;border-color:#fca5a5;" title="ブラウザのキャッシュと作業履歴を消去して初期化">
+            <span class="material-symbols-outlined" style="font-size:14px;">delete_sweep</span>
+            <span>🧹 初期化</span>
+          </button>
+        </div>
       </div>
     `;
   }
@@ -4274,6 +4329,10 @@ function getCourseCardsHtml(isChat = false) {
           <span style="font-size:0.72rem;background:${isB ? '#ede9fe' : '#fef3c7'};color:${isB ? '#6d28d9' : '#b45309'};padding:0.2rem 0.55rem;border-radius:4px;font-weight:700;">
             現在: ${isB ? 'コースB (HITMANクローン)' : 'コースA (自作AI開発)'}
           </span>
+          <button type="button" class="btn-fold-course-card" onclick="resetSessionConfirm()" style="background:#fee2e2;color:#b91c1c;border-color:#fca5a5;" title="ブラウザのキャッシュと作業履歴を消去して初期化">
+            <span class="material-symbols-outlined" style="font-size:14px;">delete_sweep</span>
+            <span>🧹 キャッシュクリア</span>
+          </button>
           <button type="button" class="btn-fold-course-card" onclick="toggleCourseCardCollapse()" title="メニューを折りたたむ">
             <span class="material-symbols-outlined" style="font-size:14px;">expand_less</span>
             <span>たたむ</span>
@@ -6629,6 +6688,13 @@ form.addEventListener("submit", (ev) => {
 
 // --- Initializer & Session Restore ---
 window.addEventListener("DOMContentLoaded", () => {
+  if (localStorage.getItem("hitman_just_cleared") === "true") {
+    try { localStorage.removeItem("hitman_just_cleared"); } catch (e) {}
+    setTimeout(() => {
+      showToast("✨ キャッシュとセッションを完全に初期化しました（最初から開始できます）", 5000);
+    }, 400);
+  }
+
   const urlParams = new URLSearchParams(window.location.search);
   const modeParam = urlParams.get("mode");
   const debugParam = urlParams.get("debug");
@@ -6693,7 +6759,7 @@ window.addEventListener("DOMContentLoaded", () => {
       const ssl = document.getElementById("sql-stat-label");
       if (ssl) ssl.textContent = `SQL: ${appState.sqlFileName || "db_update.sql"} (${appState.sqlContent.split('\n').length}行)`;
     }
-    showToast("✓ 前回の作業状態を復元しました（途中から再開可能です）");
+    showToast("✓ 前回の作業状態を復元しました（最初からやり直すには右上の「🧹 キャッシュクリア」を押してください）", 6000);
     if (appState.mode === "TRAINING") {
       // サーバのステートを正として同期（サーバ側セッションが消えていれば直前の進捗で復元）
       fetch("/api/session/sync", {
