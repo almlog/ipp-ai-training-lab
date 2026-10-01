@@ -3899,10 +3899,6 @@ function applyServerState(st, opts = {}) {
       if (!next[k]) next[k] = appState.sopResults[k];
     }
   });
-        next[k] = appState.sopResults[k];
-      }
-    });
-  }
   const vt = st.verdict_this_turn;
   if (vt && vt.verdict === "FAILED" && vt.step_id === appState.currentStep) {
     appState.errorStep = appState.currentStep;
@@ -7157,17 +7153,33 @@ window.addEventListener("DOMContentLoaded", () => {
 
   const urlParams = new URLSearchParams(window.location.search);
   const modeParam = urlParams.get("mode");
+  const courseParam = urlParams.get("course");
+  const stepParam = urlParams.get("step");
+  const uidParam = urlParams.get("uid") || urlParams.get("user_id");
   const debugParam = urlParams.get("debug");
 
+  if (uidParam) {
+    try { localStorage.setItem(SESSION_UID_KEY, uidParam); } catch (e) {}
+  }
+
   const hasSaved = loadState();
+
+  if (modeParam && modeParam.toUpperCase() === "TRAINING") {
+    appState.mode = "TRAINING";
+  }
+  if (courseParam) {
+    appState.trainingCourse = courseParam;
+    appState.trainingCourseSelected = true;
+  }
+  if (stepParam && stepParam.startsWith("T-")) {
+    appState.currentStep = stepParam;
+    ensurePriorStepsCompleted();
+  }
+
   // 履歴からの自己修復（T-1への巻き戻り事故を防ぎ、正当なステップを即座に復元）
   const healed = selfHealStateFromHistory();
   if (healed) {
     console.log("[SelfHealing] Session progress auto-recovered from chat history:", appState.currentStep);
-  }
-
-  if (modeParam && modeParam.toUpperCase() === "TRAINING") {
-    appState.mode = "TRAINING";
   }
   if (debugParam === "true") {
     appState.trainerDebugMode = true;
