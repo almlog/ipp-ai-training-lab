@@ -4966,7 +4966,8 @@ function renderFinalReportView() {
   const eTime = formatTime(appState.endTime);
   let duration = 18;
   if (appState.startTime) {
-    const diff = Math.round((new Date() - new Date(appState.startTime)) / 60000);
+    const endTarget = (appState.endTime && !isNaN(new Date(appState.endTime))) ? new Date(appState.endTime) : new Date();
+    const diff = Math.round((endTarget - new Date(appState.startTime)) / 60000);
     if (!isNaN(diff) && diff > 0) duration = diff;
   }
   const isSpecial = appState.mode === "SPECIAL_PAIR";
@@ -5307,7 +5308,8 @@ function exportReportMarkdown() {
   const eTime = formatTime(appState.endTime);
   let duration = 18;
   if (appState.startTime) {
-    const diff = Math.round((new Date() - new Date(appState.startTime)) / 60000);
+    const endTarget = (appState.endTime && !isNaN(new Date(appState.endTime))) ? new Date(appState.endTime) : new Date();
+    const diff = Math.round((endTarget - new Date(appState.startTime)) / 60000);
     if (!isNaN(diff) && diff > 0) duration = diff;
   }
   const isSpecial = appState.mode === "SPECIAL_PAIR";
