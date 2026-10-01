@@ -592,11 +592,14 @@ K_PLAN_CONFIRMED = "training:plan_confirmed"  # T-2 の企画が受講生の合�
 K_T3_NONCE = "training:t3_nonce"            # T-3 スモークテスト用の受講生ごとの確認コード
 K_BRIEF = "training:brief"                  # コースA: T-2 で合格した要件定義書の解析結果（T-3〜T-6 の唯一の設計図）
 K_LEVEL = "training:level"                  # コースA: 開発レベル（standard: 6歩 / advance: 8歩 / professional: 10歩）
+K_CLEANUP_DONE = "training:cleanup_done"    # 演習環境クリーンアップ完了（Cloud Run・Secret削除承認済）
+K_TOOL_IMPROVEMENTS = "training:tool_improvements"  # 修了後のツール改修・回収要望ログ
 
 STATE_KEYS = (
     K_MODE, K_CURRENT_STEP, K_LAST_VERDICT, K_VERDICT_SEQ, K_COURSE, K_PARAMS,
     K_USER_IDEA, K_RESULTS, K_T2_OVERRIDE, K_COURSE_SELECTED, "hitman:suggestions",
     K_AGENT_SLUG, K_PLAN_CONFIRMED, K_T3_NONCE, K_BRIEF, K_LEVEL,
+    K_CLEANUP_DONE, K_TOOL_IMPROVEMENTS,
 )
 
 # ToolContext なし呼び出し用のフォールバック格納先（グローバル変数に載らない項目）
@@ -787,6 +790,27 @@ class HitmanState:
         self._s[K_LEVEL] = v
 
     @property
+    def cleanup_done(self) -> bool:
+        return bool(self._get(K_CLEANUP_DONE, False))
+
+    @cleanup_done.setter
+    def cleanup_done(self, v: bool) -> None:
+        self._s[K_CLEANUP_DONE] = bool(v)
+
+    @property
+    def tool_improvements(self) -> list[dict]:
+        return list(self._get(K_TOOL_IMPROVEMENTS, []))
+
+    @tool_improvements.setter
+    def tool_improvements(self, v: list[dict]) -> None:
+        self._s[K_TOOL_IMPROVEMENTS] = list(v or [])
+
+    def record_tool_improvement(self, item: dict) -> None:
+        items = self.tool_improvements
+        items.append(item)
+        self.tool_improvements = items
+
+    @property
     def step_sequence(self) -> list[str]:
         if self.mode != MODE_TRAINING:
             return list(ACTIVE_STEP_SEQUENCE)
@@ -814,6 +838,8 @@ class HitmanState:
             "verdict_seq": self.verdict_seq,
             "sequence": seq,
             "completed": self.mode == MODE_TRAINING and self.results.get(seq[-1]) == "SUCCESS",
+            "cleanup_done": self.cleanup_done,
+            "tool_improvements": self.tool_improvements,
             "suggestions": list(self._get("hitman:suggestions", [])),
             "agent_slug": self.agent_slug,
             "plan_confirmed": self.plan_confirmed,
@@ -1022,6 +1048,10 @@ def seed_state_from_client(store: Any, client_state: dict | None) -> bool:
                 st.t3_nonce = client_nonce
             else:
                 st.issue_t3_nonce()
+        if client_state.get("cleanup_done"):
+            st.cleanup_done = True
+        if client_state.get("tool_improvements") and isinstance(client_state["tool_improvements"], list):
+            st.tool_improvements = list(client_state["tool_improvements"])
     return True
 
 
@@ -2831,6 +2861,77 @@ def _verify_step_output_impl(step_number: int | str, command_output: str, state:
             ),
         }
 
+    # --------------------------------------------------------------------------
+    # 演習環境クリーンアップ＆安全停止ログの検証（修了前後のFinOps・セキュリティ保全）
+    # --------------------------------------------------------------------------
+    is_cleanup_log = any(k in output_lower for k in ("cleanup.py", "cleanup_result", "演習環境クリーンアップ", "クリーンアップ実行レポート")) or (
+        "[skill:ipp-cloud-run-deploy" in output_lower and any(k in output_lower for k in ("削除", "破棄", "cleanup"))
+    )
+    if is_cleanup_log:
+        seq = state.step_sequence
+        last_step = seq[-1] if seq else "T-6"
+        clean_svc = (state.brief.get("agent_slug") if state.brief else None) or state.params.get("AGENT_NAME") or "my_agent"
+        disp = (state.brief.get("display_name") if state.brief else None) or clean_svc
+        has_success = (
+            "cleanup_result: success" in output_lower
+            or ("正常に削除しました" in output_lower and "[success]" in output_lower)
+            or ("削除を完了" in output_lower and "[success]" in output_lower)
+        )
+        if has_success:
+            state.cleanup_done = True
+            return {
+                "verdict": "SUCCESS",
+                "w_check_status": "VERIFIED_APPROVED",
+                "step_id": last_step,
+                "autonomous_verdict": "【AI確認者 安全停止・FinOps保全承認 ✓✓】Cloud Run サービスおよび Secret Manager シークレットの完全破棄を確認。課金発生リスクと認証情報漏洩リスクを完全に遮断しました。",
+                "message": (
+                    "🛡️【演習環境クリーンアップ完了・安全停止 Wチェック承認】🛡️\n"
+                    "Cloud Run サービスの破棄（課金停止）および Secret Manager からの API キー完全消去が客観確認できました！\n"
+                    "FinOps（コスト適正化）とセキュリティ（認証情報保護）の両面で、本番クラウド運用に求められる撤収・破棄基準を完全にクリアしました。\n\n"
+                    "これにて、IPP AI実践研修の全工程および安全管理作業がすべて完了しました！本当にお疲れ様でした！🎉\n\n"
+                    "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                    "🤝【研修修了後パートナーモード: 自作ツールの改修・回収要望・現場展開の相談受付】\n"
+                    f"これ以降、HITMAN は『修了後パートナー』として柔軟にあなたをサポートします。\n"
+                    f"完成した『{disp}』について、次のような相談や回収要望を何でも自由にお聞かせください：\n\n"
+                    "1. 🔧 ツールの改修・改善要望（「ここをこう直したい」「UIの配置を変えたい」など）\n"
+                    "2. ➕ 新機能・ツールの追加要望（「別のAPIやDBとも繋げたい」「関数ツールを増やしたい」など）\n"
+                    "3. 🏢 現場業務への導入・展開相談（「実際の自部署業務に組み込むには？」など）\n"
+                    "4. 💬 その他、AIエージェントやAntiGravity活用に関する自由なご質問\n\n"
+                    "ご要望をいただければ、HITMAN が要件を整理し、AntiGravity に投入する具体的なプロンプトや修正コードを一緒に作成します！"
+                ),
+            }
+        else:
+            return {
+                "verdict": "FAILED",
+                "w_check_status": "TRAINING_GUIDANCE",
+                "step_id": last_step,
+                "reason": "演習環境のクリーンアップスクリプトでエラーが検知されました。",
+                "autonomous_verdict": "【研修インストラクター 伴走ガイダンス】Cloud Run または Secret Manager の削除中にエラーが発生しました。残存リソースの有無を確認してください。",
+                "message": (
+                    "【クリーンアップ確認】リソースの削除処理中にエラーが検知されました。\n"
+                    "Google Cloud コンソールで Cloud Run サービスおよび Secret Manager にリソースが残っていないか確認するか、"
+                    f"AntiGravity で `python .agents/skills/ipp-cloud-run-deploy/scripts/cleanup.py --service {clean_svc}` を再実行してください。"
+                ),
+            }
+
+    # --------------------------------------------------------------------------
+    # 全研修ステップ修了後の柔軟対話（差し戻し・リトライ遮断の抑止）
+    # --------------------------------------------------------------------------
+    seq = state.step_sequence
+    if state.mode == MODE_TRAINING and seq and state.results.get(seq[-1]) == "SUCCESS":
+        clean_svc = (state.brief.get("agent_slug") if state.brief else None) or state.params.get("AGENT_NAME") or "my_agent"
+        disp = (state.brief.get("display_name") if state.brief else None) or clean_svc
+        return {
+            "verdict": "SUCCESS",
+            "w_check_status": "VERIFIED_APPROVED",
+            "step_id": seq[-1],
+            "autonomous_verdict": "【AI確認者 研修修了済み ✓】全研修カリキュラムは既に合格・修了認定済みです。ツールの改修・回収要望や現場活用の相談を継続して受け付けます。",
+            "message": (
+                f"全研修カリキュラムは既に修了認定済みです！🎉\n"
+                f"完成した『{disp}』の改修・改善・機能追加や、現場業務への活用・回収要望について何でもご相談ください。"
+            ),
+        }
+
     # 1. 致命的システム障害（データ破損・カーネルパニック・OOM） -> 緊急ロールバック (BRANCH_ROLLBACK -> R-1)
     fatal_keywords = [
         "segmentation fault", "kernel panic", "out of memory", "oom-killer",
@@ -3682,6 +3783,83 @@ def offer_choices(choices: list[str], tool_context: Any = None) -> dict:
     return {"status": "success", "shown": cleaned}
 
 
+def request_tool_improvement(
+    title: str,
+    details: str,
+    improvement_type: str = "feature_add",
+    tool_context: Any = None,
+) -> dict:
+    """研修修了後に、受講生の自作ツール（エージェント）の改修・回収・機能追加・仕様変更の要望を受け付け、
+    AntiGravityに投入できる具体的な改修プロンプトと修正方針を提示する。
+
+    Args:
+        title: 改修・回収要望のタイトル（例: 「週表示カレンダー機能の追加」「Slack通知連携」「UIデザイン微調整」等）。
+        details: 改善・改修要望の具体的内容や背景。
+        improvement_type: 改修種別 ('feature_add': 機能追加, 'ui_enhancement': UI改善, 'bug_fix': 不具合修正, 'logic_refactor': 処理ロジック改善, 'field_adoption': 現場業務展開)。
+
+    Returns:
+        受付完了状態、AntiGravity投入用プロンプト、推奨ネクストアクションを含む辞書。
+    """
+    state = HitmanState.of(tool_context)
+    brief = state.brief
+    agent_slug = (brief.get("agent_slug") or brief.get("agent_name") or state.agent_slug or state.params.get("AGENT_NAME") or "my_agent")
+    disp = brief.get("display_name") or agent_slug
+    agent_dir = f"ipp-agent-workspace/{agent_slug}"
+
+    type_labels = {
+        "feature_add": "➕ 新機能・ツールの追加",
+        "ui_enhancement": "🎨 UI・画面デザインの改善",
+        "bug_fix": "🐛 不具合・挙動の修正",
+        "logic_refactor": "⚙️ 処理ロジック・プロンプト改善",
+        "field_adoption": "🏢 現場業務・実務への展開カスタマイズ",
+    }
+    label = type_labels.get(improvement_type, "🔧 ツール改修・機能改善")
+
+    agy_prompt = (
+        f"【AntiGravity投入用プロンプト: 自作ツール『{disp}』の改修・機能改善】\n"
+        f"あなたはIPPのAI実践研修専属メンターです。受講生からの改修要望に基づき、"
+        f"{agent_dir} のコードを改修してください。\n\n"
+        f"【改修種別】: {label}\n"
+        f"【改修タイトル】: {title}\n"
+        f"【要望詳細】:\n{details}\n\n"
+        "【自律実行タスク】\n"
+        f"1. 対象ファイル（{agent_dir}/agent.py, static/index.html, tests/ 等）を確認し、改修方針を受講生に説明する。\n"
+        f"2. コードを改修し、新機能または修正を実装する。\n"
+        f"3. `pytest {agent_dir}/tests/ -v` でテストを実行し、既存機能が壊れていない（回帰がない）ことを確認する。\n"
+        "4. 改修完了後、受講生へローカル起動方法（`python main.py`）と動作確認手順を案内する。\n\n"
+        + CREDENTIAL_RULES
+    )
+
+    record = {
+        "title": title,
+        "details": details,
+        "type": improvement_type,
+        "label": label,
+        "timestamp": get_jst_now_str(),
+    }
+    state.record_tool_improvement(record)
+
+    return {
+        "status": "REGISTERED",
+        "agent_name": disp,
+        "title": title,
+        "type_label": label,
+        "agy_prompt": agy_prompt,
+        "message": (
+            f"📋【自作ツール『{disp}』の改修・回収要望を受け付けました！】\n\n"
+            f"■ 要望種別: {label}\n"
+            f"■ タイトル: {title}\n"
+            f"■ 要望詳細: {details}\n\n"
+            "以下のプロンプトを AntiGravity の新しいチャットに貼り付けて送信してください。"
+            "メンターAIが受講生と相談しながら安全にコードの改修とテストを実行します：\n\n"
+            "```text\n"
+            f"{agy_prompt}\n"
+            "```\n\n"
+            "改修の追加や、さらに別の機能についてのご相談もいつでも歓迎します！"
+        ),
+    }
+
+
 def analyze_sql_impact(
     step_number: str = "3-3",
     pre_select_log: str = "",
@@ -4103,7 +4281,13 @@ a2ui_instruction = schema_manager.generate_system_prompt(
         "【重要: 途中ステップ再開・復帰時の手順カード提示規程】"
         "オペレーターがエラーや質問等で手順の途中（例: T-3）で停止し、その後に正常なログを投入して合格した際は、必ず『次のステップ』（例: T-3合格なら『ステップ T-4』）の手順カードを提示すること。"
         "また再試行（リトライ）時は『現在のステップ』（例: T-3）の手順カードを提示すること。"
-        "いかなる場合もステップ T-1 や 1-1 のカードに巻き戻して表示してはならない！"
+        "【重要: 研修修了後（T-6合格後）の柔軟パートナーモード＆回収・改修要望受付規程】"
+        "受講生が最終ステップ（T-6）に合格した後は、カリキュラムの厳格な合否審査や機械的なステップ差し戻しはすべて終了します。"
+        "HITMAN は『卒業・修了後パートナー』へ移行し、受講生の自立的な活動を柔軟に伴走支援してください。"
+        "1. クリーンアップログの受付: 受講生が演習環境クリーンアップログ（cleanup.py / CLEANUP_RESULT: SUCCESS）を提出した際は、`verify_step_output` を呼び出して安全停止（課金防止・シークレット消去）を正式に承認し、完走を心から讃えてください。"
+        "2. ツールの改修・回収要望の受付: 修了後は、受講生が自作したツール（エージェント）の改修・回収・改善要望（「機能を追加したい」「ここを直したい」「現場に合わせてカスタマイズしたい」等）や、今後の現場導入相談、AI活用に関する質問を親身に受け付けてください。"
+        "3. 柔軟な伴走とAntiGravity指示の提供: 受講生から改修・改善の相談があった際は、受講生の要望を整理した上で、`request_tool_improvement` を呼び出して AntiGravity にそのまま投入できるプロンプト（コード修正指示・機能拡張指示）を具体的に作成・提案してください。"
+        "4. 差し戻しカードの禁止: T-6合格後は、過去ステップの差し戻しやリトライ指示カード（BLOCKED_RETRY）を決して出さないでください。"
         "【手順進行・運用ルール】"
         "4. 手順は原則 1-1 -> 1-2 -> 2-1 -> 2-2 -> 3-1 -> 3-2 -> 3-3 -> 3-4 -> 4-1 -> 4-2 の厳格な順序で1つずつ進めなければなりません。"
         "直前手順が合格していない状態での後続要求は『直前の手順が未完了です』と差し戻してください（ロールバック R-1/R-2、エスカレ E-1、上長責任スキップを除く）。"
@@ -4114,6 +4298,7 @@ a2ui_instruction = schema_manager.generate_system_prompt(
         "9. 全手順完了時は `generate_final_report` で評価報告書を生成してください。"
         "10. 運用モードの確認・変更は `get_operation_mode` および `set_operation_mode` を使用してください。"
         "11. 障害対応知識は `consult_sop_knowledge`、新手順書の取込は `import_sop_procedure` を使用してください。"
+        "12. 研修修了後の自作ツール改修・回収要望受付は `request_tool_improvement` を使用してください。"
     ),
     workflow_description="Analyze the operator's request, query the procedure database using tools, guide them step-by-step through pre-checks, SQL analysis, escalation gates, and return structured A2UI cards.",
     ui_description=(
@@ -4196,6 +4381,7 @@ _agent_tools = [
     offer_choices,
     set_training_course,
     set_training_environment,
+    request_tool_improvement,
 ]
 # Memory Bank先行プリロードツール（Vertex Memory Bank設定時のみ有効化してローカルの無駄な待機・遅延を回避）
 if os.environ.get("VERTEX_MEMORY_BANK_ID") or os.environ.get("AGENT_ENGINE_RESOURCE_NAME"):

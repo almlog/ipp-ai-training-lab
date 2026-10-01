@@ -3899,14 +3899,21 @@ function applyServerState(st, opts = {}) {
       if (!next[k]) next[k] = appState.sopResults[k];
     }
   });
+  const isCompleted = !!(st.completed || (st.results && STEP_SEQUENCE.length > 0 && st.results[STEP_SEQUENCE[STEP_SEQUENCE.length - 1]] === "SUCCESS"));
   const vt = st.verdict_this_turn;
-  if (vt && vt.verdict === "FAILED" && vt.step_id === appState.currentStep) {
+  if (!isCompleted && vt && vt.verdict === "FAILED" && vt.step_id === appState.currentStep) {
     appState.errorStep = appState.currentStep;
     next[appState.currentStep] = { verdict: "FAILED", timestamp: now, logSnippet: `判定: ${vt.w_check_status || "FAILED"}` };
   } else {
     appState.errorStep = null;
   }
   appState.sopResults = next;
+  if (st.cleanup_done !== undefined) {
+    appState.cleanup_done = !!st.cleanup_done;
+  }
+  if (st.tool_improvements && Array.isArray(st.tool_improvements)) {
+    appState.tool_improvements = st.tool_improvements;
+  }
   if (st.completed && !appState.endTime) {
     appState.endTime = new Date().toLocaleString('ja-JP');
   }
@@ -5239,6 +5246,21 @@ function renderFinalReportView() {
       <h4 style="margin:0.8rem 0 0.4rem;color:#1e3a8a;display:flex;align-items:center;gap:0.4rem;">
         <span class="material-symbols-outlined" style="font-size:18px;color:#dc2626;">shield</span> 演習環境の安全停止＆クリーンアップ（FinOps ＆ セキュリティ保全）
       </h4>
+      ${appState.cleanup_done ? `
+      <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;padding:0.7rem 0.9rem;font-size:0.8rem;color:#166534;">
+        <div style="font-weight:700;margin-bottom:0.3rem;display:flex;align-items:center;gap:0.4rem;">
+          <span class="material-symbols-outlined" style="font-size:18px;color:#16a34a;">check_circle</span>
+          演習環境の安全停止＆クリーンアップ完了（客観Wチェック承認済 ✓）
+        </div>
+        <p style="margin:0 0 0.4rem;line-height:1.5;">
+          Cloud Run サービスおよび Secret Manager のシークレットは完全に破棄されました。課金発生および認証情報の漏洩リスクはありません。
+        </p>
+        <div style="font-size:0.75rem;color:#15803d;display:flex;gap:1.2rem;">
+          <span>✓ Cloud Run インスタンス停止・削除完了</span>
+          <span>✓ Secret Manager APIキー破棄完了</span>
+        </div>
+      </div>
+      ` : `
       <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:6px;padding:0.7rem 0.9rem;font-size:0.8rem;color:#991b1b;">
         <div style="font-weight:700;margin-bottom:0.3rem;">⚠️ 研修修了後のリソース削除のお願い</div>
         <p style="margin:0 0 0.5rem;line-height:1.5;">
@@ -5255,6 +5277,7 @@ function renderFinalReportView() {
           <span>✓ Secret Manager APIキー破棄</span>
         </div>
       </div>
+      `}
     </div>
     ` : ''}
   `;
@@ -5375,8 +5398,16 @@ function exportReportMarkdown() {
     md += `\`\`\`bash\n`;
     md += `${cleanupCmd}\n`;
     md += `\`\`\`\n\n`;
-    md += `- [ ] Cloud Run サービス破棄完了（外部アクセス停止・インスタンス待機課金ゼロ）\n`;
-    md += `- [ ] Secret Manager シークレット破棄完了（APIキー消去）\n`;
+    md += `- [${appState.cleanup_done ? 'x' : ' '}] Cloud Run サービス破棄完了（外部アクセス停止・インスタンス待機課金ゼロ）\n`;
+    md += `- [${appState.cleanup_done ? 'x' : ' '}] Secret Manager シークレット破棄完了（APIキー消去）\n`;
+    if (appState.tool_improvements && appState.tool_improvements.length > 0) {
+      md += `\n## 5. 研修修了後 自作ツール改修・回収要望ログ\n\n`;
+      appState.tool_improvements.forEach((ti, i) => {
+        md += `### ${i + 1}. ${ti.title} (${ti.label || ti.type})\n`;
+        md += `- 受付日時: ${ti.timestamp || '-'}\n`;
+        md += `- 要望詳細: ${ti.details}\n\n`;
+      });
+    }
   } else {
     md += `## 2. 作業前後の状態比較 (Before vs After)\n\n`;
     md += `| 確認項目 | 作業前 (Before) | 作業後 (After) | 要件合致判定 |\n`;
@@ -6982,8 +7013,10 @@ async function sendMessage(text) {
       if (card) scrollLogTo(card.closest(".msg") || card);
     } else if (isTraining) {
       // 不合格・リトライ・差し戻し時の再実行カード表示（コマンドワンクリックコピー付き）
+      // 全ステップ修了後は決してリトライカードを出さない！
+      const isCompleted = !!(st && (st.completed || (st.results && STEP_SEQUENCE.length > 0 && st.results[STEP_SEQUENCE[STEP_SEQUENCE.length - 1]] === "SUCCESS")));
       const vt = st ? st.verdict_this_turn : null;
-      const isFailedOrRetry = vt && (
+      const isFailedOrRetry = !isCompleted && vt && (
         vt.verdict === "FAILED" ||
         vt.w_check_status === "BLOCKED_RETRY" ||
         vt.w_check_status === "TRAINING_GUIDANCE" ||
@@ -6993,6 +7026,10 @@ async function sendMessage(text) {
       if (isFailedOrRetry) {
         const rCard = appendRetryCommandCard(st, vt);
         if (rCard) scrollLogTo(rCard.closest(".msg") || rCard);
+      }
+      if (st && st.cleanup_done && !appState.cleanupToastShown) {
+        appState.cleanupToastShown = true;
+        showToast("🛡️ 演習環境の安全停止＆クリーンアップが承認されました！");
       }
     }
   } catch (e) {
