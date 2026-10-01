@@ -312,11 +312,14 @@ class _SessionState:
         self.store = dict(self.sess.state)
         if self.created and self.client_state:
             seed_state_from_client(self.store, self.client_state)
+            # 復元した受講生の進捗（T-3、企画書、nonce等）は直ちにセッションへコミットして永続化する
+            await _commit_state(self.sess, self.before, self.store)
+            self.before = dict(self.store)
         return HitmanState(self.store), SimpleNamespace(state=self.store), self.created
 
     async def __aexit__(self, exc_type, exc, tb):
-        if exc_type is None:
-            await _commit_state(self.sess, self.before, self.store)
+        # 例外発生時でもツール呼び出しで進んだステートを失わないようにコミット
+        await _commit_state(self.sess, self.before, self.store)
         return False
 
 
@@ -328,7 +331,7 @@ async def _snapshot_state(user_id: str) -> dict:
 
 
 async def _chat_direct(user_id: str, message: str) -> list[dict]:
-    """Execute ADK agent directly in-process when local HTTP server is not running."""
+    """Execute ADK agent directly in-process using native async execution (no thread pool to prevent loop closed errors)."""
     from google.genai import types
 
     runner, _ = _get_direct_runner()
@@ -340,21 +343,22 @@ async def _chat_direct(user_id: str, message: str) -> list[dict]:
         parts=[types.Part.from_text(text=message)],
     )
 
-    def _sync_run():
-        return list(
-            runner.run(
-                new_message=content,
-                user_id=user_id,
-                session_id=session_id,
-            )
-        )
+    async def _async_run():
+        collected_events = []
+        async for event in runner.run_async(
+            new_message=content,
+            user_id=user_id,
+            session_id=session_id,
+        ):
+            collected_events.append(event)
+        return collected_events
 
     async def _run_with_retry():
         max_retries = 3
         last_error = None
         for attempt in range(max_retries):
             try:
-                return await asyncio.to_thread(_sync_run)
+                return await _async_run()
             except Exception as e:
                 last_error = e
                 err_str = str(e).lower()
@@ -490,6 +494,7 @@ async def chat(req: Request):
         else:
             llm_message = message
 
+        chat_error = False
         try:
             if RESOURCE:
                 parts = await _chat_cloud(user_id, llm_message)
@@ -502,6 +507,7 @@ async def chat(req: Request):
                 parts = await _chat_direct(user_id, llm_message)
         except Exception as exc:
             logger.error(f"Chat execution failed after retries: {exc}")
+            chat_error = True
             parts = [{
                 "kind": "text",
                 "text": f"⚠️ AIクラウドサービスとの通信で一時的な遅延またはエラーが発生しました（{type(exc).__name__}: {str(exc)[:120]}）。お手数ですが、もう一度送信をお試しください。"
@@ -513,6 +519,7 @@ async def chat(req: Request):
             lv = state_payload.get("last_verdict")
             state_payload["verdict_this_turn"] = lv if (lv and state_payload.get("verdict_seq", 0) > state_before_seq) else None
             state_payload["session_restored"] = session_restored
+            state_payload["chat_error"] = chat_error
 
     if not parts:
         parts = [{"kind": "text", "text": "(応答がありませんでした。もう一度お試しください。)"}]

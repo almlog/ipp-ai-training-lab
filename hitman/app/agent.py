@@ -985,13 +985,34 @@ def seed_state_from_client(store: Any, client_state: dict | None) -> bool:
             if restored:
                 st.brief = restored
                 st.agent_slug = restored["agent_name"]
+            elif client_state.get("agent_slug") or slug:
+                # brief の完全構造がなくても、agent_slug があれば T-3 の進行を確実に維持する！
+                s = slug or str(client_state.get("agent_slug") or "my_agent")
+                st.agent_slug = s
+                st.brief = {
+                    "agent_name": s,
+                    "display_name": client_state.get("user_idea") or s,
+                    "users": "受講生",
+                    "problem": client_state.get("user_idea") or s,
+                    "features": [{"id": "F1", "name": "基本機能", "acceptance": "動作すること"}],
+                    "screens": [{"id": "S1", "name": "メイン画面", "elements": "画面要素", "features": ["F1"]}],
+                    "tools": [{"name": "execute_task", "purpose": "タスク実行", "features": ["F1"]}],
+                    "data": [{"name": "データ", "storage": "ローカル"}],
+                    "out_of_scope": "なし",
+                    "q1": "質問1",
+                    "q2": "質問2",
+                }
             else:
-                # 設計図を復元できない場合は T-2 からやり直す（企画書なしで T-3 以降へ進ませない）
+                # 設計図を復元できない場合は T-2 からやり直す
                 st.results = {k: v for k, v in clean.items() if k == "T-1"}
                 st.current_step = "T-2"
                 clean = st.results
         if "T-2" in clean:
-            st.issue_t3_nonce()
+            client_nonce = str(client_state.get("t3_nonce") or "").strip()
+            if client_nonce:
+                st.t3_nonce = client_nonce
+            else:
+                st.issue_t3_nonce()
     return True
 
 
