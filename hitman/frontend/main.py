@@ -1026,6 +1026,55 @@ async def api_training_guidance(req: Request):
     return JSONResponse(content=res)
 
 
+@app.post("/api/training/code-metrics")
+@app.get("/api/training/code-metrics")
+async def api_training_code_metrics(req: Request = None, user_id: str = None):
+    """受講生の成果物コード規模・ファイル数・品質評価および手戻り・迷走防止ROIを取得する。"""
+    _ensure_import_path()
+    from app.code_metrics import get_participant_code_metrics
+
+    uid = _normalize_user_id(user_id)
+    agent_slug = None
+    brief = None
+    sop_results = None
+    mode = "TRAINING"
+
+    if req and req.method == "POST":
+        try:
+            body = await req.json()
+            if not user_id:
+                uid = _normalize_user_id(body.get("user_id"))
+            agent_slug = body.get("agent_slug")
+            brief = body.get("brief")
+            sop_results = body.get("sop_results")
+            mode = body.get("mode", "TRAINING")
+        except Exception:
+            pass
+
+    async with _user_lock(uid):
+        async with _SessionState(uid) as (st, _ctx, _):
+            if not agent_slug:
+                agent_slug = st.agent_slug
+            if not brief:
+                brief = st.brief
+            if not sop_results:
+                sop_results = st.results
+            if not mode:
+                mode = st.mode
+
+    hitman_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    parent_dir = os.path.dirname(hitman_dir)
+    root_dir = parent_dir if os.path.exists(os.path.join(parent_dir, "ipp-agent-workspace")) else hitman_dir
+    metrics = get_participant_code_metrics(
+        workspace_root=root_dir,
+        agent_slug=agent_slug,
+        brief=brief,
+        sop_results=sop_results,
+        mode=mode,
+    )
+    return JSONResponse(content=metrics)
+
+
 # Static UI mount with no-cache headers for index.html
 static_dir = os.path.join(os.path.dirname(__file__), "static")
 if not os.path.exists(static_dir):

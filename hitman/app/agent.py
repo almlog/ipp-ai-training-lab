@@ -4099,6 +4099,19 @@ def generate_final_report(
             {"name": "個人GitHub公開リポジトリ", "path": "https://github.com/...", "status": "公開完了 ✓"},
         ]
 
+        from app.code_metrics import get_participant_code_metrics
+        import os
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        parent_dir = os.path.dirname(base_dir)
+        root_dir = parent_dir if os.path.exists(os.path.join(parent_dir, "ipp-agent-workspace")) else base_dir
+        code_metrics_data = get_participant_code_metrics(
+            workspace_root=root_dir,
+            agent_slug=slug,
+            brief=brief_now,
+            sop_results=sop_results or state.results,
+            mode=mode,
+        )
+
         return {
             "title": f"IPP AI実践研修 修了証＆{course_name} 総合評価報告書",
             "generated_at": now_str,
@@ -4116,6 +4129,7 @@ def generate_final_report(
             },
             "before_after_comparison": training_before_after,
             "deliverables": training_deliverables,
+            "code_metrics": code_metrics_data,
             "evaluation_score": "S+ ランク（全工程自律完走・客観Wチェック全件承認・Cloud Run本番公開）",
             "comment": (
                 f"【研修修了認定】現場課題の自律定義からGoogle ADKエージェント設計・A2UIリッチカード生成・"
