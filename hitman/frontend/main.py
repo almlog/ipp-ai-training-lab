@@ -880,6 +880,7 @@ async def api_set_mode(req: Request):
         get_active_parameters,
         get_active_sop,
         get_active_step_sequence,
+        select_training_course,
         set_operation_mode,
     )
 
@@ -893,6 +894,8 @@ async def api_set_mode(req: Request):
         async with _SessionState(uid) as (st, ctx, _):
             res = set_operation_mode(mode, supervisor_name, supervisor_role, tool_context=ctx)
             effective_mode = res.get("mode", mode)
+            if effective_mode == "TRAINING":
+                select_training_course(st, course or "original")
             res["sop"] = get_active_sop(mode=effective_mode, course=course, state=st)
             res["sequence"] = get_active_step_sequence(mode=effective_mode, course=course, state=st)
             res["parameters"] = get_active_parameters(mode=effective_mode, state=st)

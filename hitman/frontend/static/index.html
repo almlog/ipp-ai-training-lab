@@ -648,14 +648,15 @@
 
   /* 次にやること（プロンプト中心）カード */
   .step-prompt-card {
-    border: 1px solid #bfdbfe;
-    border-left: 4px solid var(--accent);
-    background: #f8fbff;
-    border-radius: 8px;
-    padding: 0.8rem 0.9rem;
-    font-size: 0.86rem;
+    border: 2px solid #93c5fd;
+    border-left: 6px solid #2563eb;
+    background: #f0f9ff;
+    border-radius: 10px;
+    padding: 0.9rem 1rem;
+    font-size: 0.88rem;
     line-height: 1.55;
-    scroll-margin-top: 8px;
+    scroll-margin-top: 12px;
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.12);
   }
   .step-prompt-card .spc-head { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; margin-bottom: 0.2rem; }
   .step-prompt-card .spc-tag { background: var(--accent); color: #fff; font-weight: 700; font-size: 0.72rem; border-radius: 4px; padding: 1px 6px; }
@@ -664,11 +665,17 @@
   .step-prompt-card .spc-section { margin-top: 0.6rem; }
   .step-prompt-card .spc-label { font-weight: 700; color: var(--primary); font-size: 0.8rem; margin-bottom: 0.25rem; }
   .step-prompt-card .spc-copy {
-    display: inline-flex; align-items: center; gap: 0.35rem;
-    background: var(--accent); color: #fff; border: none; border-radius: 6px;
-    padding: 0.45rem 0.9rem; font-size: 0.85rem; font-weight: 700; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 0.5rem;
+    background: #2563eb; color: #fff; border: 1px solid #1d4ed8; border-radius: 6px;
+    padding: 0.55rem 1.1rem; font-size: 0.9rem; font-weight: 700; cursor: pointer;
+    box-shadow: 0 2px 4px rgba(37, 99, 235, 0.25);
+    transition: all 0.2s ease;
   }
-  .step-prompt-card .spc-copy:hover { background: var(--primary-hover); }
+  .step-prompt-card .spc-copy:hover {
+    background: #1d4ed8;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(29, 78, 216, 0.35);
+  }
   .step-prompt-card .spc-prompt {
     margin: 0.4rem 0 0; max-height: 220px; overflow: auto; white-space: pre-wrap; word-break: break-word;
     background: #fff; border: 1px solid var(--border); border-radius: 6px; padding: 0.5rem 0.6rem;
@@ -3584,6 +3591,7 @@ async function changeOperationModeFromHdr(newMode) {
       saveState();
       showToast(`✓ 運用モードを【${data.mode}】に変更しました`);
       if (newMode === "TRAINING") {
+        appState.trainingCourseSelected = true;
         const cName = appState.trainingCourse === "hitman_clone" ? "コースB: HITMANクローン構築" : "コースA: オリジナルAIツール開発";
         sendMessage(`【運用モード切替: 研修モード（${cName}）】\n受講生の実践研修モードに切り替えました。現在のステップ（${appState.currentStep}）のガイダンスとAntiGravity投入用プロンプトを提示してください。`);
       } else if (newMode === "SPECIAL_PAIR") {
@@ -6209,8 +6217,33 @@ function scrollLogTo(elm, smooth = true) {
 
 // 「次にやること」カード：AntiGravity に貼るプロンプトを主役にし、コマンドは参考として畳んで表示する
 function buildStepPromptCard(stepId, verdictLine) {
-  const step = SOP_ITEMS.find(s => s.id === stepId);
-  if (!step) return null;
+  let step = SOP_ITEMS.find(s => s.id === stepId);
+  if (!step) {
+    if (stepId === "T-1") {
+      step = {
+        id: "T-1",
+        title: "ステップ T-1: 開発環境構築とスキル・MCP同期",
+        check: "新しい会話で /ipp-skill-check が起動し、証跡行 [skill:ipp-skill-check] と .agents/skills のスキル一覧が出力されること",
+        cautions: "AntiGravity のモデル設定で「gemini-3.8-flash」（エラー時は3.6-flash）を選択してください。スキルおよび MCP は『新しい会話』から有効になります。",
+        agy_prompt: `【AntiGravity投入用プロンプト: Step T-1（環境構築・スキル＆MCP同期）】
+あなたはIPPのAI実践研修専属メンターです。
+まず受講生に挨拶し、以下の手順を自律実行してください。
+
+【自律実行タスク】（すべてワークスペースのルートフォルダで実行）
+1. モデル選定確認: チャット設定で「gemini-3.8-flash」（エラー時は3.6-flash）が選択されていることを確認する。
+2. 作業フォルダ作成とリポジトリのクローン:
+   mkdir ipp-agent-workspace
+   git clone https://github.com/almlog/ipp-ai-training-lab.git ipp-agent-workspace/ipp-ai-training-lab
+3. 研修スキルおよび MCP の自動同期（重要）:
+   次のコマンドを実行して、研修スキル（.agents/skills）をワークスペース直下へ配置し、さらに Developer Knowledge MCP および Firebase MCP を AntiGravity の設定領域へ自動同期してください：
+   powershell -ExecutionPolicy Bypass -File ipp-agent-workspace/ipp-ai-training-lab/scripts/sync-skills.ps1
+4. 完了報告と受講生への案内:
+   セットアップ完了後、受講生に「画面左上の『＋』ボタン（またはCtrl+N）で【新しい会話】を開き、チャット欄に /ipp-skill-check と入力して送信してください」と案内してください。`
+      };
+    } else {
+      return null;
+    }
+  }
   const prompt = resolveStepVariables(step.agy_prompt || "");
   const pending = !prompt || prompt.includes("合格すると、あなたの企画書");
   const card = el("div", "step-prompt-card");
@@ -6218,21 +6251,21 @@ function buildStepPromptCard(stepId, verdictLine) {
 
   const head = el("div", "spc-head");
   head.appendChild(el("span", "spc-tag", stepId));
-  head.appendChild(el("span", "spc-title", "次にやること：" + (step.title || "").replace(/^ステップ\s*T-\d+:\s*/, "")));
+  head.appendChild(el("span", "spc-title", "📋 【次にやること】" + (step.title || "").replace(/^ステップ\s*T-\d+:\s*/, "")));
   card.appendChild(head);
   if (verdictLine) card.appendChild(el("div", "spc-verdict", verdictLine));
 
   const s1 = el("div", "spc-section");
-  s1.appendChild(el("div", "spc-label", "① AntiGravity に貼る指示"));
+  s1.appendChild(el("div", "spc-label", "① AntiGravity に貼る指示（プロンプト）"));
   if (pending) {
     s1.appendChild(el("div", "spc-pending", prompt || "このステップの指示は、前のステップが合格すると表示されます。"));
   } else {
     const btn = el("button", "spc-copy");
     btn.type = "button";
-    btn.innerHTML = `<span class="material-symbols-outlined" style="font-size:18px;">content_copy</span><span>プロンプトをコピー</span>`;
+    btn.innerHTML = `<span class="material-symbols-outlined" style="font-size:20px;">content_copy</span><span>📋 プロンプトをコピーする（クリックして AntiGravity に貼る）</span>`;
     btn.onclick = (e) => { e.stopPropagation(); copyAgyPrompt(stepId); };
     s1.appendChild(btn);
-    s1.appendChild(el("div", "", "AntiGravity の新しい会話に貼り付けて送信してください。"));
+    s1.appendChild(el("div", "", "👆 上のボタンをクリックしてプロンプトをコピーし、AntiGravity の新しい会話に貼り付けて送信してください。"));
     const pre = el("pre", "spc-prompt", prompt);
     s1.appendChild(pre);
   }
@@ -6521,22 +6554,30 @@ async function sendMessage(text) {
       updateCostMetrics(data.metrics);
     }
     const st = data.state || null;
-    const cardDue = !!(st && st.mode === "TRAINING" && st.course_selected && stepPromptCardKey(st) !== appState.promptCardKey);
-    if (st && st.mode === "TRAINING") {
-      // 状態を先に確定してから描画する（旧実装は描画→推測の順で1ステップずれていた）
+    const isTraining = !!(st && st.mode === "TRAINING");
+    const curStep = (st && st.current_step) || appState.currentStep;
+    // 研修モードであれば、画面内に現在のステップのプロンプトカードがまだ存在しない場合、または新ステップに進んだ場合は必ずカードを出す！
+    const cardAlreadyPresent = !!document.querySelector(`.step-prompt-card[data-step="${curStep}"]`);
+    const cardDue = isTraining && !!curStep && curStep.startsWith("T-") && (
+      stepPromptCardKey(st) !== appState.promptCardKey || !cardAlreadyPresent
+    );
+    if (isTraining) {
+      // 状態を先に確定してから描画する
       applyServerState(st, { refreshSop: !cardDue });
       if (st.session_restored) showToast("↻ サーバのセッションを直前の進捗から復元しました");
-      // 新しいステップのカードは、企画書に合わせて作り直された最新の手順で出す
       if (cardDue) await refreshTrainingSop();
     }
     stopWait();
     renderReply(b, data.parts || [], true, st, st ? st.current_step : null);
     if (cardDue) {
+      if (!SOP_ITEMS.some(s => s.id === curStep)) {
+        await refreshTrainingSop();
+      }
       const vt = st.verdict_this_turn;
       const line = (vt && vt.w_check_status === "VERIFIED_APPROVED" && prevStep && prevStep !== st.current_step)
         ? `✓ ステップ ${prevStep} 合格。続いてステップ ${st.current_step} です。` : "";
       const card = appendStepPromptCard(st, line);
-      // 次のステップへ進んだら、コピーすべきプロンプトの先頭が見える位置へ
+      // 指示カードが見える位置へスクロール
       if (card) scrollLogTo(card.closest(".msg") || card);
     }
   } catch (e) {
