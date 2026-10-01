@@ -20,7 +20,16 @@ import dotenv
 dotenv.load_dotenv()
 
 from typing import Any
-from zoneinfo import ZoneInfo
+
+def get_jst_now_str() -> str:
+    """Windows 等で tzdata がない場合でも安全に JST 時刻文字列を返す。"""
+    try:
+        from zoneinfo import ZoneInfo
+        return datetime.datetime.now(ZoneInfo("Asia/Tokyo")).strftime("%Y-%m-%d %H:%M:%S")
+    except Exception:
+        jst = datetime.timezone(datetime.timedelta(hours=9), name="JST")
+        return datetime.datetime.now(jst).strftime("%Y-%m-%d %H:%M:%S")
+
 
 from a2ui.basic_catalog.provider import BasicCatalog
 from a2ui.schema.manager import A2uiSchemaManager
@@ -3505,7 +3514,7 @@ def request_supervisor_step_skip(
             "reason": "【スキップ不可（責任所在未確認）】AI側からの無責任なスキップは行えません。利用者の自己責任においてリスクを受容する同意（user_responsibility_confirmed=True）が必要です。",
         }
 
-    now_str = datetime.datetime.now(ZoneInfo("Asia/Tokyo")).strftime("%Y-%m-%d %H:%M:%S")
+    now_str = get_jst_now_str()
     audit_entry = {
         "event": "SUPERVISOR_EXCEPTION_SKIP",
         "step_skipped": s_step,
@@ -3802,7 +3811,7 @@ def evaluate_escalation_gate(
             "reason": "【進行不可（ゲート遮断）】エスカレーション対応を完了するには、①エスカレ対応結果、②GO/NOGO判定、③判断根拠（こんきょ）のすべての入力が必須です。根拠のない再開は許可されません。",
         }
 
-    now_str = datetime.datetime.now(ZoneInfo("Asia/Tokyo")).strftime("%Y-%m-%d %H:%M:%S")
+    now_str = get_jst_now_str()
 
     if dec_clean == "NOGO":
         return {
@@ -3877,7 +3886,7 @@ def generate_final_report(
     """リリース作業完了後の最終評価レポートを生成する。
     作業前後の結果報告（Before/After）、作業所要時間、格納成果物の保全状況、エスカレ履歴に基づく総合評価を含む。
     """
-    now_str = datetime.datetime.now(ZoneInfo("Asia/Tokyo")).strftime("%Y-%m-%d %H:%M:%S")
+    now_str = get_jst_now_str()
     s_time = start_time or now_str
     e_time = end_time or now_str
     sup_text = supervisor_name if mode == "SPECIAL_PAIR" else "なし（通常1名体制）"
