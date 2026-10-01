@@ -761,6 +761,10 @@ class HitmanState:
             "verdict": result.get("verdict"),
             "w_check_status": result.get("w_check_status"),
             "branch_to": result.get("branch_to"),
+            "reason": result.get("reason"),
+            "hints": result.get("hints", []),
+            "retry_command": result.get("retry_command"),
+            "retry_prompt": result.get("retry_prompt"),
             "skills_detected": result.get("skills_detected", []),
             "skills_missing": result.get("skills_missing", []),
         }
@@ -2182,9 +2186,17 @@ def judge_smoke_output(text: str, expected_nonce: str | None = None, expected_ag
         data = json.loads(m_json.group(1))
     except Exception:
         return {"status": "BROKEN", "reason": "SMOKE_JSON を読み取れません。", "hints": ["出力を編集せずにそのまま貼り付けてください。"], "data": {}}
-    if _smoke_digest(data) != m_dig.group(1):
-        return {"status": "TAMPERED", "reason": "スモークテストの出力が書き換えられています（SMOKE_DIGEST が一致しません）。",
-                "hints": ["出力は一字一句変えずに貼り付けてください。結果が FAIL の場合は、原因を直して再実行してください。"], "data": data}
+    if _smoke_digest(data) != m_dig.group(1).strip():
+        return {
+            "status": "TAMPERED",
+            "reason": "スモークテストの出力が途中で切れているか、内容が書き換えられています（SMOKE_DIGEST 不一致）。",
+            "hints": [
+                "ターミナルまたは AntiGravity の出力結果を、1行目（[skill:...]）から末尾（SMOKE_DIGEST: ...）まで省略せずにすべてコピーして貼り付けてください。",
+                "コマンド引数や出力行の途中で文字が途切れていると改変検知エラー（SMOKE_DIGEST 不一致）になります。",
+                "結果が FAIL の場合は、エージェントを修正してから再実行してください。"
+            ],
+            "data": data,
+        }
     if expected_nonce is not None:
         if not expected_nonce:
             return {"status": "MISMATCH", "reason": "この受講生の確認コードがまだ発行されていません（T-2 合格後に発行されます）。",
@@ -2608,6 +2620,26 @@ def _annotate_skill_usage(result: dict, command_output: str) -> None:
         )
 
 
+def _enrich_failed_verdict(result: dict, state: "HitmanState", step_str: str) -> None:
+    """不合格・差し戻し結果に対して、受講生が迷わず再実行できるよう retry_command / retry_prompt を付与する。"""
+    if result.get("verdict") == "FAILED" and (state.mode == MODE_TRAINING or step_str.startswith("T-")):
+        sop_now = get_training_sop(state.course, state=state)
+        sid = result.get("step_id") or step_str
+        step_sop = sop_now.get(sid) or {}
+        cmd = step_sop.get("command") or ""
+        prompt = step_sop.get("agy_prompt") or ""
+        if cmd and not result.get("retry_command"):
+            result["retry_command"] = cmd
+        if prompt and not result.get("retry_prompt"):
+            result["retry_prompt"] = prompt
+        msg = result.get("message", "")
+        if cmd and "【再実行コマンド】" not in msg and "```" not in msg:
+            result["message"] = (
+                msg
+                + f"\n\n【再実行コマンド】\n```bash\n{cmd}\n```\n※ 出力コードブロックを先頭から末尾まで省略せずに貼り付けてください。"
+            )
+
+
 def verify_step_output(step_number: int | str, command_output: str, tool_context: Any = None) -> dict:
     """オペレーターがコマンドを実行した出力ログを有識者AI（確認者）として客観検証し、
     Wチェック判定（合格承認・リトライ遮断・自律分岐指示）を行う。
@@ -2630,6 +2662,7 @@ def verify_step_output(step_number: int | str, command_output: str, tool_context
         if seq.index(step_str) > seq.index(cur):
             step_number = cur
     result = _verify_step_output_impl(step_number, command_output, state)
+    _enrich_failed_verdict(result, state, str(result.get("step_id") or cur))
     _annotate_skill_usage(result, command_output)
     apply_training_verdict(state, result)
     if state.mode == MODE_TRAINING or str(result.get("step_id", "")).startswith("T-"):
@@ -3083,11 +3116,12 @@ def _verify_step_output_impl(step_number: int | str, command_output: str, state:
                     "w_check_status": "BLOCKED_RETRY",
                     "step_id": step_str,
                     "reason": smoke["reason"],
+                    "hints": smoke.get("hints", []),
                     "autonomous_verdict": f"【AI確認者 判定】動作確認で問題を検知しました：{smoke['reason']}",
                     "message": (
                         f"【判定: 不合格】{smoke['reason']}\n"
                         + "".join(f"・{h}\n" for h in smoke["hints"])
-                        + "AntiGravity に修正を依頼し、スモークテストを再実行して、出力をそのまま貼り付けてください。"
+                        + "\nAntiGravity に修正を依頼し、スモークテストを再実行して、出力をそのまま貼り付けてください。"
                     ),
                 }
             has_code_log = any(k in output_lower for k in ("agent.py", "root_agent", "import google.adk", "my_agent", "my_hitman"))

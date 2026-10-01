@@ -684,6 +684,51 @@
   .step-prompt-card .spc-pending { color: var(--text-muted); background: #fff; border: 1px dashed var(--border); border-radius: 6px; padding: 0.5rem 0.6rem; }
   .step-prompt-card details { margin-top: 0.5rem; font-size: 0.76rem; color: var(--text-muted); }
   .step-prompt-card details code { display: block; margin-top: 0.3rem; white-space: pre-wrap; word-break: break-all; background: var(--cmd-bg); color: var(--cmd-text); padding: 0.4rem 0.5rem; border-radius: 4px; }
+
+  /* リトライ・再実行指示カード */
+  .retry-command-card {
+    border: 2px solid #fca5a5;
+    border-left: 6px solid #ef4444;
+    background: #fff5f5;
+    border-radius: 10px;
+    padding: 0.9rem 1rem;
+    font-size: 0.88rem;
+    line-height: 1.55;
+    scroll-margin-top: 12px;
+    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.15);
+    margin-top: 0.6rem;
+  }
+  .retry-command-card .rcc-head { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; margin-bottom: 0.3rem; }
+  .retry-command-card .rcc-tag { background: #ef4444; color: #fff; font-weight: 700; font-size: 0.72rem; border-radius: 4px; padding: 2px 7px; }
+  .retry-command-card .rcc-title { font-weight: 700; color: #991b1b; font-size: 0.95rem; }
+  .retry-command-card .rcc-reason { background: #fff; border: 1px solid #fecaca; border-radius: 6px; padding: 0.55rem 0.75rem; color: #b91c1c; font-size: 0.82rem; margin-top: 0.4rem; }
+  .retry-command-card .rcc-hints { margin: 0.3rem 0 0 1rem; padding: 0; font-size: 0.8rem; color: #7f1d1d; }
+  .retry-command-card .rcc-hints li { margin-bottom: 0.2rem; }
+  .retry-command-card .rcc-section { margin-top: 0.75rem; }
+  .retry-command-card .rcc-label { font-weight: 700; color: #7f1d1d; font-size: 0.82rem; margin-bottom: 0.3rem; display: flex; align-items: center; gap: 0.3rem; }
+  .retry-command-card .rcc-copy-cmd {
+    display: inline-flex; align-items: center; gap: 0.5rem;
+    background: #dc2626; color: #fff; border: 1px solid #b91c1c; border-radius: 6px;
+    padding: 0.55rem 1.1rem; font-size: 0.9rem; font-weight: 700; cursor: pointer;
+    box-shadow: 0 2px 4px rgba(220, 38, 38, 0.25);
+    transition: all 0.2s ease;
+  }
+  .retry-command-card .rcc-copy-cmd:hover {
+    background: #b91c1c; transform: translateY(-1px); box-shadow: 0 4px 8px rgba(185, 28, 28, 0.35);
+  }
+  .retry-command-card .rcc-copy-prompt {
+    display: inline-flex; align-items: center; gap: 0.5rem;
+    background: #4b5563; color: #fff; border: 1px solid #374151; border-radius: 6px;
+    padding: 0.45rem 0.9rem; font-size: 0.82rem; font-weight: 600; cursor: pointer;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+    transition: all 0.2s ease;
+  }
+  .retry-command-card .rcc-copy-prompt:hover { background: #374151; }
+  .retry-command-card pre.rcc-code {
+    margin: 0.35rem 0 0; background: #1e293b; color: #f8fafc; border-radius: 6px; padding: 0.6rem 0.8rem;
+    font-size: 0.8rem; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    white-space: pre-wrap; word-break: break-all;
+  }
   /* 応答待ちの進捗表示 */
   .wait-indicator { color: var(--text-muted); font-size: 0.84rem; }
   .wait-indicator .wait-bar { position: relative; height: 4px; background: #e2e8f0; border-radius: 2px; overflow: hidden; margin-top: 0.4rem; width: 220px; max-width: 100%; }
@@ -6318,6 +6363,131 @@ function appendStepPromptCard(st, verdictLine) {
   return card;
 }
 
+// リトライ・再実行指示カード：エラー・不合格時に具体的なコマンドと対処プロンプトをワンクリックコピーできるように提示する
+function buildRetryCommandCard(stepId, vt) {
+  let step = SOP_ITEMS.find(s => s.id === stepId);
+  const cmd = (vt && vt.retry_command) || (step && resolveStepVariables(step.cmd)) || "";
+  const prompt = (vt && vt.retry_prompt) || (step && resolveStepVariables(step.agy_prompt)) || "";
+  const reason = (vt && vt.reason) || "入力された実行ログに不整合またはエラーが検知されました。";
+  const hints = (vt && vt.hints && Array.isArray(vt.hints)) ? vt.hints : [];
+
+  const card = el("div", "retry-command-card");
+  card.dataset.step = stepId;
+
+  const head = el("div", "rcc-head");
+  head.appendChild(el("span", "rcc-tag", "⚠️ 再実行"));
+  const titleText = step && step.title ? step.title.replace(/^ステップ\s*T-\d+:\s*/, "") : "手順の再実行";
+  head.appendChild(el("span", "rcc-title", `【リトライ指示】${stepId}: ${titleText}`));
+  card.appendChild(head);
+
+  // 判定理由とヒント
+  const rBlock = el("div", "rcc-reason");
+  rBlock.innerHTML = `<strong>❌ 差し戻し理由:</strong> ${escapeHtml(reason)}`;
+  if (hints.length > 0) {
+    const ul = el("ul", "rcc-hints");
+    hints.forEach(h => {
+      const li = el("li");
+      li.textContent = h;
+      ul.appendChild(li);
+    });
+    rBlock.appendChild(ul);
+  }
+  card.appendChild(rBlock);
+
+  // セクション1: 再実行コマンド
+  if (cmd) {
+    const s1 = el("div", "rcc-section");
+    const l1 = el("div", "rcc-label");
+    l1.innerHTML = `<span class="material-symbols-outlined" style="font-size:18px;">terminal</span><span>① 再実行コマンド（Terminal / PowerShell で実行）</span>`;
+    s1.appendChild(l1);
+
+    const btnCmd = el("button", "rcc-copy-cmd");
+    btnCmd.type = "button";
+    btnCmd.innerHTML = `<span class="material-symbols-outlined" style="font-size:20px;">content_copy</span><span>📋 コマンドをコピーする（ターミナルに貼る）</span>`;
+    btnCmd.onclick = async (e) => {
+      e.stopPropagation();
+      try {
+        await navigator.clipboard.writeText(cmd);
+        btnCmd.innerHTML = `<span class="material-symbols-outlined" style="font-size:20px;">check_circle</span><span>✓ コピー完了！ターミナルに貼り付けてください</span>`;
+        btnCmd.style.background = "#16a34a";
+        showToast("📋 再実行コマンドをコピーしました！ターミナルに貼り付けて実行してください");
+        setTimeout(() => {
+          btnCmd.innerHTML = `<span class="material-symbols-outlined" style="font-size:20px;">content_copy</span><span>📋 コマンドをコピーする（ターミナルに貼る）</span>`;
+          btnCmd.style.background = "#dc2626";
+        }, 3000);
+      } catch (err) {
+        showToast("コピーに失敗しました。手動でコピーしてください。");
+      }
+    };
+    s1.appendChild(btnCmd);
+
+    const pre = el("pre", "rcc-code", cmd);
+    s1.appendChild(pre);
+    card.appendChild(s1);
+  }
+
+  // セクション2: AntiGravity へのプロンプト（エラー修正・再実行依頼用）
+  if (prompt) {
+    const s2 = el("div", "rcc-section");
+    const l2 = el("div", "rcc-label");
+    l2.innerHTML = `<span class="material-symbols-outlined" style="font-size:18px;">smart_toy</span><span>② AntiGravity にエラー修正・再実行を依頼する場合（指示プロンプト）</span>`;
+    s2.appendChild(l2);
+
+    const btnPrompt = el("button", "rcc-copy-prompt");
+    btnPrompt.type = "button";
+    btnPrompt.innerHTML = `<span class="material-symbols-outlined" style="font-size:18px;">content_copy</span><span>📋 プロンプトをコピーする（AntiGravity に貼る）</span>`;
+    btnPrompt.onclick = async (e) => {
+      e.stopPropagation();
+      try {
+        await navigator.clipboard.writeText(prompt);
+        btnPrompt.innerHTML = `<span class="material-symbols-outlined" style="font-size:18px;">check_circle</span><span>✓ コピー完了！</span>`;
+        showToast("📋 プロンプトをコピーしました！AntiGravity に貼り付けて送信してください");
+        setTimeout(() => {
+          btnPrompt.innerHTML = `<span class="material-symbols-outlined" style="font-size:18px;">content_copy</span><span>📋 プロンプトをコピーする（AntiGravity に貼る）</span>`;
+        }, 3000);
+      } catch (err) {
+        showToast("コピーに失敗しました。");
+      }
+    };
+    s2.appendChild(btnPrompt);
+
+    const d = el("details");
+    d.style.marginTop = "0.4rem";
+    d.appendChild(el("summary", "", "プロンプト全文を表示"));
+    const preP = el("pre", "rcc-code", prompt);
+    preP.style.background = "#334155";
+    d.appendChild(preP);
+    s2.appendChild(d);
+    card.appendChild(s2);
+  }
+
+  // セクション3: 提出時の注意
+  const s3 = el("div", "rcc-section");
+  s3.style.fontSize = "0.78rem";
+  s3.style.color = "#7f1d1d";
+  s3.style.background = "#fee2e2";
+  s3.style.padding = "0.4rem 0.6rem";
+  s3.style.borderRadius = "4px";
+  s3.innerHTML = `<strong>⚠️ 提出時の重要ルール:</strong> AntiGravity またはターミナルの出力コードブロックを、1行目（<code>[skill:...]</code>）から末尾の行（<code>SMOKE_DIGEST: ...</code> 等）まで<strong>途中で省略・改変せずに全てコピー</strong>してこのチャット欄に貼り付けてください。`;
+  card.appendChild(s3);
+
+  return card;
+}
+
+function appendRetryCommandCard(st, vt) {
+  const stepId = (vt && vt.step_id) || (st && st.current_step) || appState.currentStep || "T-3";
+  const card = buildRetryCommandCard(stepId, vt);
+  if (!card) return null;
+  const m = el("div", "msg agent");
+  const b = el("div", "bubble rich");
+  b.appendChild(card);
+  m.appendChild(b);
+  log.appendChild(m);
+  appState.chatHistory.push({ role: "retry_card", step: stepId, vt: vt });
+  saveState();
+  return card;
+}
+
 function renderReply(b, parts, saveHistory = true, serverState = null, stepContext = null, showChips = true) {
   const ws = document.getElementById("workspace");
   if (ws && ws.classList.contains("mobile-show-sop")) {
@@ -6579,6 +6749,20 @@ async function sendMessage(text) {
       const card = appendStepPromptCard(st, line);
       // 指示カードが見える位置へスクロール
       if (card) scrollLogTo(card.closest(".msg") || card);
+    } else if (isTraining) {
+      // 不合格・リトライ・差し戻し時の再実行カード表示（コマンドワンクリックコピー付き）
+      const vt = st ? st.verdict_this_turn : null;
+      const isFailedOrRetry = vt && (
+        vt.verdict === "FAILED" ||
+        vt.w_check_status === "BLOCKED_RETRY" ||
+        vt.w_check_status === "TRAINING_GUIDANCE" ||
+        vt.w_check_status === "SECURITY_BLOCKED" ||
+        vt.w_check_status === "SECRET_LEAK_BLOCKED"
+      );
+      if (isFailedOrRetry) {
+        const rCard = appendRetryCommandCard(st, vt);
+        if (rCard) scrollLogTo(rCard.closest(".msg") || rCard);
+      }
     }
   } catch (e) {
     stopWait();
@@ -6776,6 +6960,15 @@ window.addEventListener("DOMContentLoaded", () => {
         bubble("user").textContent = item.text;
       } else if (item.role === "prompt_card") {
         const card = buildStepPromptCard(item.step, item.verdictLine);
+        if (card) {
+          const m = el("div", "msg agent");
+          const cb = el("div", "bubble rich");
+          cb.appendChild(card);
+          m.appendChild(cb);
+          log.appendChild(m);
+        }
+      } else if (item.role === "retry_card") {
+        const card = buildRetryCommandCard(item.step, item.vt);
         if (card) {
           const m = el("div", "msg agent");
           const cb = el("div", "bubble rich");
