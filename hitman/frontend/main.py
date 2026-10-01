@@ -310,7 +310,21 @@ class _SessionState:
         self.sess, self.created = await _get_or_create_session(self.user_id)
         self.before = dict(self.sess.state)
         self.store = dict(self.sess.state)
-        if self.created and self.client_state:
+        server_state = HitmanState(self.store)
+        should_seed = False
+        if self.client_state:
+            if self.created:
+                should_seed = True
+            else:
+                # 既存セッションであっても、クライアントの合格実績がサーバより進んでいる場合のみ同期・マージする
+                # 空の results や遅れたステートで既存セッションの進捗を上書きしてはならない
+                client_results = self.client_state.get("results") or {}
+                if len(client_results) > len(server_state.results):
+                    should_seed = True
+                elif ("T-2" in client_results or "T-3" in client_results) and "T-2" not in server_state.results:
+                    should_seed = True
+
+        if should_seed:
             seed_state_from_client(self.store, self.client_state)
             # 復元した受講生の進捗（T-3、企画書、nonce等）は直ちにセッションへコミットして永続化する
             await _commit_state(self.sess, self.before, self.store)
