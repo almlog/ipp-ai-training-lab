@@ -11,7 +11,7 @@
 [![Engine](https://img.shields.io/badge/Model-Gemini%203.6%20Flash-34A853?logo=googlecloud)](https://cloud.google.com/vertex-ai)
 [![Framework](https://img.shields.io/badge/Framework-Google%20ADK%201.5.0-FBBC05)](https://google.github.io/adk-docs/)
 [![Production URL](https://img.shields.io/badge/Production-Cloud%20Run%20(Live)-34A853?logo=googlecloud)](https://ipp-hitman-cockpit-1070367799384.us-central1.run.app)
-[![Tests](https://img.shields.io/badge/Tests-35%2F35%20Passed-brightgreen)](https://github.com/almlog/ipp-ai-training-lab)
+[![Tests](https://img.shields.io/badge/Tests-188%2F188%20Passed-brightgreen)](https://github.com/almlog/ipp-ai-training-lab)
 
 <br/>
 
@@ -24,7 +24,7 @@ IPPの社内教育カリキュラムとして **鈴木 駿平（Shunpei Suzuki�
 
 > [!TIP]
 > 📘 **公式ハンズオンマニュアル（完全版ドキュメント）を公開中！**  
-> Google 公式ワークショップ級の網羅性で、全8種の Skills、2種の MCP、HITMAN Cockpit と AntiGravity の 3者協調アーキテクチャ、作業フォルダ・Python環境の自由カスタマイズ（ゼロコンフィグ対応）、およびステップ T-1 〜 T-6（コースA / コースB）の操作手順を完全網羅した **[`TRAINING_LAB_MANUAL.md`](./TRAINING_LAB_MANUAL.md)** をご覧ください。
+> Google 公式ワークショップ級の網羅性で、全8種の Skills、2種の MCP、HITMAN Cockpit と AntiGravity の 3者協調アーキテクチャ、作業フォルダ・Python環境の自由カスタマイズ（ゼロコンフィグ対応）、ステップ T-1 〜 T-6（コースA / コースB / 3段階開発レベル）の操作手順、および **「クローンしたリポジトリの使い方と後続開発の完全指南（第11章）」** を完全網羅した **[`TRAINING_LAB_MANUAL.md`](./TRAINING_LAB_MANUAL.md)** をご覧ください。
 
 ---
 
@@ -41,6 +41,14 @@ IPPの社内教育カリキュラムとして **鈴木 駿平（Shunpei Suzuki�
    - 裏側で待機する **Skills（M0〜M5 ガバナンス研修、開発・デプロイスキル）** が自律的に処理を完遂する様を体験します。
 3. **思い思いのオリジナルツールを開発・デプロイする体験**:
    - スキルとAIの力を体感した受講生は、自らの現場課題を解決する **「自分専用のAIツール・エージェント」** をアンチグラビティと共に企画・実装し、各自の Cloud Run 環境へデプロイします。
+
+### 💡 教育理念：神ツールを求めるのではなく、「体験」と「自律解決の経験」を手に入れる
+
+> **「なんでもできる神ツールを作れるわけではない。躓いたり間違ったりしたら、自分で AI を使って解決する。このシステムを使って一度経験すると、次からは自分一人でできるようになる。」**
+
+- **神ツール信仰からの脱却**: 最初から何でもこなす万能ツールを一発で作ることはできません。小さく動くものを創り、後から育てていくのが AI 開発の王道です。
+- **躓きこそが最大の学び**: プログラミングや AI との対話では、プロでもエラーに直面します。エラーが出たときに諦めるのではなく、エラーログをそのまま AntiGravity に渡して自律解決させるトラブルシューティングの「体験・経験」を身につけます。
+- **現場への持ち帰りと後続開発**: 研修終了後にクローンしたリポジトリの動かし方、機能追加プロンプト例、Pytestによるデグレード防止、再デプロイ手順は、[`TRAINING_LAB_MANUAL.md` 第11章](./TRAINING_LAB_MANUAL.md#11-修了後の次のステップクローンしたリポジトリの使い方と後続開発の完全指南) に網羅されています。
 
 ---
 
