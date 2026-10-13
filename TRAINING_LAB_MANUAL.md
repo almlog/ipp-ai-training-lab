@@ -240,7 +240,10 @@ HITMAN Cockpit は、受講生それぞれの PC ドライブ構成や会社セ�
 - [ ] **② 有料 API キー**: Google Cloud Console または Google AI Studio で発行したキー（`AQ...` または `AIza...`）を手元に控えてある。
 - [ ] **③ AntiGravity**: アプリが起動し、Google アカウントでログインできている。
 - [ ] **④ Python**: パソコンのターミナル（PowerShell または ターミナルアプリ）で `python --version` と打つと `Python 3.11.x` や `Python 3.12.x` と表示される。
-- [ ] **⑤ GitHub アカウント**: GitHub の個人アカウントにログインできる。
+- [ ] **⑤ Git & GitHub CLI (`gh`)**: ターミナルで `git --version` および `gh --version` が正しく表示される（※Step T-6 でワンタイムコード公開に使用）。
+- [ ] **⑥ 個人 GitHub アカウント**: GitHub の個人アカウントにブラウザでログインできる。
+- [ ] **⑦ PCの管理者権限またはツール導入許可**: ツールのインストールやコマンド実行ができること（※会社のPCで権限が取れない場合は [PREREQUISITES.md](./PREREQUISITES.md) の3大回避策や私物PCの持ち込みを参照）。
+- [ ] **⑧ 外部API通信**: 社内プロキシやVPNで Gemini API（`generativelanguage.googleapis.com`）や Cloud Run が遮断されていないこと。
 
 ---
 
