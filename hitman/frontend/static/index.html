@@ -3792,6 +3792,7 @@ async function changeOperationModeFromHdr(newMode) {
       saveState();
       showToast(`✓ 運用モードを【${data.mode}】に変更しました`);
       if (newMode === "TRAINING") {
+        clearExcelGreetingIfPresent();
         appState.trainingCourseSelected = true;
         const cName = appState.trainingCourse === "hitman_clone" ? "コースB: HITMANクローン構築" : "コースA: オリジナルAIツール開発";
         sendMessage(`【運用モード切替: 研修モード（${cName}）】\n受講生の実践研修モードに切り替えました。現在のステップ（${appState.currentStep}）のガイダンスとAntiGravity投入用プロンプトを提示してください。`);
@@ -3805,6 +3806,144 @@ async function changeOperationModeFromHdr(newMode) {
     }
   } catch(e) {
     alert("モード切替APIエラー: " + e.message);
+  }
+}
+
+// 研修モードに入った際に、初期バブルに残っている「Excel手順書AIペアオペレーター」のメッセージを自動消去する
+function clearExcelGreetingIfPresent() {
+  const chatLog = document.getElementById("chat-log");
+  if (chatLog) {
+    const bubbles = chatLog.querySelectorAll(".msg.agent .bubble");
+    bubbles.forEach(b => {
+      if (b.innerText && (b.innerText.includes("Excel手順書AIペアオペレーター") || b.innerText.includes("既存の手順書をインポートして"))) {
+        const msg = b.closest(".msg");
+        if (msg) msg.remove();
+      }
+    });
+  }
+  if (Array.isArray(appState.chatHistory)) {
+    appState.chatHistory = appState.chatHistory.filter(item => {
+      const txt = typeof item === "string" ? item : (item && item.text ? item.text : "");
+      return !txt.includes("Excel手順書AIペアオペレーター") && !txt.includes("既存の手順書をインポートして");
+    });
+  }
+}
+
+// 【研修モード専用】指定ステップへ巻き戻す・切り替える
+async function jumpToTrainingStep(targetStepId) {
+  if (!targetStepId) return;
+  const seq = Array.isArray(STEP_SEQUENCE) && STEP_SEQUENCE.length > 0 ? STEP_SEQUENCE : ["T-1", "T-2", "T-3", "T-4", "T-5", "T-6"];
+  const currentIdx = seq.indexOf(appState.currentStep);
+  const targetIdx = seq.indexOf(targetStepId);
+  const isRewind = targetIdx < currentIdx;
+  const msg = isRewind
+    ? `【ステップ巻き戻し】\nステップを【${targetStepId}】へ戻しますか？\n\n※ ${targetStepId} 以降の合格結果と進行状態は巻き戻され、このステップからやり直せます。`
+    : `ステップを【${targetStepId}】へ切り替えますか？`;
+  if (!confirm(msg)) return;
+
+  try {
+    showToast(`⏳ ステップを ${targetStepId} へ切り替え中…`);
+    const res = await fetch("/api/training/step", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ step_id: targetStepId, user_id: getSessionUserId() })
+    });
+    const data = await res.json();
+    if (data.result && data.result.status === "success") {
+      appState.manualRewound = true;
+      appState.currentStep = data.current_step;
+      if (data.sop) updateSopItemsFromDb(data.sop, data.sequence);
+      if (data.state) {
+        applyServerState(data.state, { allowRewind: true, refreshSop: false });
+      } else {
+        seq.slice(targetIdx).forEach(s => {
+          if (appState.sopResults) delete appState.sopResults[s];
+        });
+      }
+      appState.promptCardKey = null;
+      renderFlowChart();
+      renderSopTable();
+      saveState();
+      appendStepPromptCard({
+        course: appState.trainingCourse,
+        current_step: data.current_step,
+        agent_slug: appState.agent_slug,
+        user_idea: appState.courseAIdea
+      }, `📋 ステップ ${data.current_step} に移動しました。`);
+      showToast(`✓ ステップ ${data.current_step} に移動しました`);
+    } else {
+      alert("ステップ変更エラー: " + (data.result ? data.result.message : "失敗しました"));
+    }
+  } catch (e) {
+    alert("ステップ変更通信エラー: " + e.message);
+  }
+}
+
+// 【研修モード専用】前回の履歴・キャッシュをリセットし、Step T-1から新規スタート
+async function startNewTrainingSession(courseType = null) {
+  const cType = courseType || appState.trainingCourse || "original";
+  const cName = cType === "hitman_clone" ? "【コースB】HITMANクローン構築" : "【コースA】オリジナルAIツール開発";
+  const msg = `【🚀 新規スタート（最初からやり直す）】\n\n`
+    + `受講コース: ${cName}\n\n`
+    + `過去のチャット履歴、作成中の企画、ステップ合格状況をすべてクリアし、\n`
+    + `ステップ T-1 から完全に新規スタートしますか？\n\n`
+    + `※ ブラウザのキャッシュや前回の進行状態をすべてリセットし、まっさらな状態で始められます。`;
+  if (!confirm(msg)) return;
+
+  try {
+    showToast("⏳ 研修環境を初期化して新規スタート中…");
+    const res = await fetch("/api/training/reset", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ course: cType, user_id: getSessionUserId() })
+    });
+    const data = await res.json();
+    if (data.result && data.result.status === "success") {
+      appState.manualRewound = true;
+      appState.mode = "TRAINING";
+      appState.trainingCourse = cType;
+      appState.trainingCourseSelected = true;
+      appState.courseCardCollapsed = true;
+      appState.currentStep = "T-1";
+      appState.sopResults = {};
+      appState.chatHistory = [];
+      appState.courseAIdea = "";
+      appState.agent_slug = "";
+      appState.brief = null;
+      appState.promptCardKey = null;
+      appState.errorStep = null;
+      if (data.sop) updateSopItemsFromDb(data.sop, data.sequence);
+      if (data.state) {
+        applyServerState(data.state, { allowRewind: true, refreshSop: false });
+      }
+
+      // チャット欄クリア＆初期化
+      const chatLog = document.getElementById("chat-log");
+      if (chatLog) chatLog.innerHTML = "";
+
+      const b = bubble("agent");
+      b.innerHTML = `🎓 <strong>研修モード新規スタート（${escapeHtml(cName)}）</strong><br>`
+        + `過去の履歴をリセットし、ステップ T-1 から開始します！<br>`
+        + `下の指示カードのプロンプトをコピーして、AntiGravity で作業を始めてください。`;
+
+      appendStepPromptCard({
+        course: cType,
+        current_step: "T-1",
+        agent_slug: "",
+        user_idea: ""
+      }, "📋 ステップ T-1: 開発環境構築とスキル同期からスタートします。");
+
+      renderFlowChart();
+      renderSopTable();
+      updateModeUI();
+      updateCourseSelectionUI();
+      saveState();
+      showToast("✓ ステップ T-1 から新規スタートしました！");
+    } else {
+      alert("初期化エラー: " + (data.result ? data.result.message : "失敗しました"));
+    }
+  } catch (e) {
+    alert("初期化通信エラー: " + e.message);
   }
 }
 
@@ -3893,8 +4032,8 @@ async function switchTrainingLevel(level) {
 // LLMの応答文を正規表現で解析してステップを推測する処理は研修モードでは使用しない。
 // チャット履歴を走査し、進捗巻き戻り（T-1への逆戻り）を検知して正当なステップ（T-3等）へ自己修復する
 function selfHealStateFromHistory() {
+  if (appState.manualRewound) return false;
   let hasT1Passed = false;
-  let hasT2Brief = false;
   let maxHistoryStep = "";
   const seq = (Array.isArray(STEP_SEQUENCE) && STEP_SEQUENCE.length > 0) ? STEP_SEQUENCE : ["T-1", "T-2", "T-3", "T-4", "T-5", "T-6"];
 
@@ -3918,50 +4057,25 @@ function selfHealStateFromHistory() {
       if (txt.includes("[skill:ipp-skill-check") || txt.includes("VERIFIED_APPROVED") || txt.includes("スキルが Antigravity に正しく読み込まれています") || txt.includes("ステップ T-1 合格")) {
         hasT1Passed = true;
       }
-      if (txt.includes("Project Brief") || txt.includes("calendar_wbs_agent") || txt.includes("カレンダーWBS") || txt.includes("カレンダーWBSタスクマネージャー") || txt.includes("F1: カレンダー") || (txt.includes("ステップ T-2 合格") && txt.includes("T-3"))) {
-        hasT2Brief = true;
-        if (txt.includes("calendar_wbs_agent") || txt.includes("カレンダーWBS")) {
-          appState.agent_slug = "calendar_wbs_agent";
-          appState.courseAIdea = "カレンダーWBSタスクマネージャー";
-        }
+      if (txt.includes("[skill:ipp-agent-smoke-test") || txt.includes("スモークテスト合格") || txt.includes("ステップ T-3 合格")) {
+        updateMax("T-4");
       }
-      if (txt.includes("ステップ T-3") || txt.includes("【AntiGravity投入用プロンプト: Step T-3") || txt.includes("Step T-3") || txt.includes("ipp-build-app-from-brief")) {
-        updateMax("T-3");
+      if (txt.includes("[skill:ipp-cloud-run-deploy") || txt.includes("デプロイ合格") || txt.includes("ステップ T-5 合格")) {
+        updateMax("T-6");
       }
     });
   }
 
-  // 2. ローカルステート自体の痕跡チェック
-  if (appState.courseAIdea && (appState.courseAIdea.includes("カレンダー") || appState.courseAIdea.includes("WBS"))) {
-    hasT2Brief = true;
-  }
-  if (appState.agent_slug && appState.agent_slug.includes("calendar")) {
-    hasT2Brief = true;
-  }
-  if (appState.sopResults && appState.sopResults["T-2"] && appState.sopResults["T-2"].verdict === "SUCCESS") {
-    hasT2Brief = true;
-  }
-
-  // 3. 自己修復の適用
-  if (hasT2Brief || maxHistoryStep === "T-3" || maxHistoryStep === "T-4" || maxHistoryStep === "T-5" || maxHistoryStep === "T-6") {
-    if (!appState.sopResults) appState.sopResults = {};
-    appState.sopResults["T-1"] = appState.sopResults["T-1"] || { verdict: "SUCCESS", timestamp: "-", logSnippet: "自己修復復元" };
-    appState.sopResults["T-2"] = appState.sopResults["T-2"] || { verdict: "SUCCESS", timestamp: "-", logSnippet: "自己修復復元" };
-    appState.trainingCourse = "original";
-    appState.trainingCourseSelected = true;
-    appState.courseAIdea = appState.courseAIdea || "カレンダーWBSタスクマネージャー";
-    appState.agent_slug = appState.agent_slug || "calendar_wbs_agent";
-    
-    // 現在ステップが T-1 または T-2 または未設定であれば確実に T-3（または検知された最大ステップ）に引き上げる
-    const target = maxHistoryStep && seq.indexOf(maxHistoryStep) >= seq.indexOf("T-3") ? maxHistoryStep : "T-3";
+  // 2. 自己修復の適用（受講生が自発的に進めた確証がある場合のみ）
+  if (maxHistoryStep && seq.indexOf(maxHistoryStep) >= seq.indexOf("T-3")) {
     const curIdx = seq.indexOf(appState.currentStep || "T-1");
-    const targetIdx = seq.indexOf(target);
+    const targetIdx = seq.indexOf(maxHistoryStep);
     if (curIdx < targetIdx) {
-      console.log(`[SelfHealing] Restored step from ${appState.currentStep} to ${target}`);
-      appState.currentStep = target;
+      console.log(`[SelfHealing] Restored step from ${appState.currentStep} to ${maxHistoryStep}`);
+      appState.currentStep = maxHistoryStep;
+      saveState();
+      return true;
     }
-    saveState();
-    return true;
   } else if (hasT1Passed && (!appState.currentStep || appState.currentStep === "T-1")) {
     if (!appState.sopResults) appState.sopResults = {};
     appState.sopResults["T-1"] = appState.sopResults["T-1"] || { verdict: "SUCCESS", timestamp: "-", logSnippet: "自己修復復元" };
@@ -3973,8 +4087,6 @@ function selfHealStateFromHistory() {
 }
 
 // --- Server State Sync (Single Source of Truth) ---
-// 研修モードの現在ステップ・合否・コースは、サーバ（ADKセッション）が返す state を尊重するが、
-// ローカルがすでに到達したステップより過去のステップへ巻き戻る指示（T-3 -> T-1）はアンチロールバック機構で厳格に拒否する。
 function applyServerState(st, opts = {}) {
   if (!st || typeof st !== "object") return;
   const prevCourse = appState.trainingCourse;
@@ -3988,26 +4100,31 @@ function applyServerState(st, opts = {}) {
   appState.trainingCourse = st.course || "original";
   appState.trainingLevel = st.level || "standard";
   appState.trainingCourseSelected = !!st.course_selected || appState.trainingCourseSelected;
-  if (st.user_idea) appState.courseAIdea = st.user_idea;
-  if (st.agent_slug) appState.agent_slug = st.agent_slug;
-  if (st.brief) appState.brief = st.brief;
+  if (st.user_idea !== undefined) appState.courseAIdea = st.user_idea;
+  if (st.agent_slug !== undefined) appState.agent_slug = st.agent_slug;
+  if (st.brief !== undefined) appState.brief = st.brief;
 
   if (Array.isArray(st.sequence) && st.sequence.length > 0) {
     STEP_SEQUENCE = st.sequence;
   }
 
-  // アンチ・ロールバック保護（単調増加の原則）:
-  // 受講生が自らキャッシュクリアを押した場合を除き、過去のステップへ勝手に巻き戻すことは絶対に許可しない！
+  const allowRewind = opts.allowRewind === true;
   const seq = STEP_SEQUENCE;
   const curIdx = seq.indexOf(appState.currentStep);
   const targetStep = st.current_step || "T-1";
   const targetIdx = seq.indexOf(targetStep);
 
-  if (curIdx > 0 && targetIdx >= 0 && targetIdx < curIdx) {
+  if (!allowRewind && curIdx > 0 && targetIdx >= 0 && targetIdx < curIdx) {
     console.warn(`[AntiRollback] Blocked rollback attempt: local=${appState.currentStep} (${curIdx}) -> server=${targetStep} (${targetIdx})`);
-    // ローカルのより進んだステップを死守する！
+    // ローカルのより進んだステップを保持
   } else {
     appState.currentStep = targetStep;
+    if (allowRewind && targetIdx >= 0) {
+      // 巻き戻し時：指定ステップ以降の結果をローカルでも確実に破棄
+      seq.slice(targetIdx).forEach(s => {
+        if (appState.sopResults) delete appState.sopResults[s];
+      });
+    }
   }
 
   appState.escalationActive = false;
@@ -4024,12 +4141,14 @@ function applyServerState(st, opts = {}) {
     const prev = appState.sopResults ? appState.sopResults[k] : null;
     next[k] = (prev && prev.verdict === "SUCCESS") ? prev : { verdict: "SUCCESS", timestamp: now, logSnippet: "HITMAN 客観Wチェック承認（サーバ判定）" };
   });
-  // ローカルですでに合格しているステップは、サーバが空や過去のステートを返してきても絶対に失わせない！
-  Object.keys(appState.sopResults || {}).forEach(k => {
-    if (k.startsWith("T-") && appState.sopResults[k] && appState.sopResults[k].verdict === "SUCCESS") {
-      if (!next[k]) next[k] = appState.sopResults[k];
-    }
-  });
+  // allowRewind でない場合のみ、ローカル合格を維持
+  if (!allowRewind) {
+    Object.keys(appState.sopResults || {}).forEach(k => {
+      if (k.startsWith("T-") && appState.sopResults[k] && appState.sopResults[k].verdict === "SUCCESS") {
+        if (!next[k]) next[k] = appState.sopResults[k];
+      }
+    });
+  }
   const isCompleted = !!(st.completed || (st.results && STEP_SEQUENCE.length > 0 && st.results[STEP_SEQUENCE[STEP_SEQUENCE.length - 1]] === "SUCCESS"));
   const vt = st.verdict_this_turn;
   if (!isCompleted && vt && vt.verdict === "FAILED" && vt.step_id === appState.currentStep) {
@@ -4077,9 +4196,9 @@ function clientStateForRestore() {
     level: appState.trainingLevel || "standard",
     course_selected: !!appState.trainingCourseSelected,
     results: results,
-    agent_slug: appState.agent_slug || (appState.brief && appState.brief.agent_name) || "calendar_wbs_agent",
+    agent_slug: appState.agent_slug || (appState.brief && appState.brief.agent_name) || "",
     brief: appState.brief || null,
-    user_idea: appState.courseAIdea || "カレンダーWBSタスクマネージャー"
+    user_idea: appState.courseAIdea || ""
   };
 }
 
@@ -4611,9 +4730,9 @@ function getCourseCardsHtml(isChat = false) {
               <span class="material-symbols-outlined" style="font-size:14px;">unfold_more</span>
               <span>コース変更 / 詳細</span>
             </button>
-            <button type="button" class="btn-toggle-course-card-chat" onclick="resetSessionConfirm()" style="background:#fee2e2;color:#b91c1c;border-color:#fca5a5;" title="ブラウザのキャッシュと作業履歴を消去して初期化">
-              <span class="material-symbols-outlined" style="font-size:14px;">delete_sweep</span>
-              <span>🧹 初期化</span>
+            <button type="button" class="btn-toggle-course-card-chat" onclick="startNewTrainingSession()" style="background:#fee2e2;color:#b91c1c;border-color:#fca5a5;" title="過去の履歴・キャッシュを消去してStep T-1から新規スタート">
+              <span class="material-symbols-outlined" style="font-size:14px;">restart_alt</span>
+              <span>🚀 新規スタート</span>
             </button>
           </div>
         </div>
@@ -4639,9 +4758,9 @@ function getCourseCardsHtml(isChat = false) {
             <span class="material-symbols-outlined" style="font-size:14px;">unfold_more</span>
             <span>コース切替 / レベル変更</span>
           </button>
-          <button type="button" class="btn-toggle-course-card" onclick="resetSessionConfirm()" style="background:#fee2e2;color:#b91c1c;border-color:#fca5a5;" title="ブラウザのキャッシュと作業履歴を消去して初期化">
-            <span class="material-symbols-outlined" style="font-size:14px;">delete_sweep</span>
-            <span>🧹 初期化</span>
+          <button type="button" class="btn-toggle-course-card" onclick="startNewTrainingSession()" style="background:#fee2e2;color:#b91c1c;border-color:#fca5a5;" title="過去の履歴・キャッシュを消去してStep T-1から新規スタート">
+            <span class="material-symbols-outlined" style="font-size:14px;">restart_alt</span>
+            <span>🚀 新規スタート</span>
           </button>
         </div>
       </div>
@@ -4659,9 +4778,9 @@ function getCourseCardsHtml(isChat = false) {
           <span style="font-size:0.72rem;background:${isB ? '#ede9fe' : '#fef3c7'};color:${isB ? '#6d28d9' : '#b45309'};padding:0.2rem 0.55rem;border-radius:4px;font-weight:700;">
             現在: ${isB ? 'コースB (HITMANクローン)' : 'コースA (自作AI開発)'}
           </span>
-          <button type="button" class="btn-fold-course-card" onclick="resetSessionConfirm()" style="background:#fee2e2;color:#b91c1c;border-color:#fca5a5;" title="ブラウザのキャッシュと作業履歴を消去して初期化">
-            <span class="material-symbols-outlined" style="font-size:14px;">delete_sweep</span>
-            <span>🧹 キャッシュクリア</span>
+          <button type="button" class="btn-fold-course-card" onclick="startNewTrainingSession()" style="background:#fee2e2;color:#b91c1c;border-color:#fca5a5;" title="過去の履歴・キャッシュを消去してStep T-1から新規スタート">
+            <span class="material-symbols-outlined" style="font-size:14px;">restart_alt</span>
+            <span>🚀 新規スタート</span>
           </button>
           <button type="button" class="btn-fold-course-card" onclick="toggleCourseCardCollapse()" title="メニューを折りたたむ">
             <span class="material-symbols-outlined" style="font-size:14px;">expand_less</span>
@@ -4689,9 +4808,14 @@ function getCourseCardsHtml(isChat = false) {
             </ul>
             ${getLevelSelectorHtml()}
           </div>
-          <button type="button" class="btn-course-action course-a ${!isB ? 'is-selected' : ''}" style="margin-top:0.6rem;" onclick="switchTrainingCourse('original')">
-            ${!isB ? '✓ コースA 選択中（確定・折りたたむ）' : '🚀 コースAを選択して進む'}
-          </button>
+          <div style="display:flex;gap:0.4rem;align-items:center;margin-top:0.6rem;">
+            <button type="button" class="btn-course-action course-a ${!isB ? 'is-selected' : ''}" style="flex:1;" onclick="switchTrainingCourse('original')">
+              ${!isB ? '✓ コースA 選択中（確定・折りたたむ）' : '🚀 コースAを選択して進む'}
+            </button>
+            <button type="button" class="btn-course-action" style="background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5;padding:0.45rem 0.65rem;border-radius:6px;font-size:0.75rem;font-weight:700;white-space:nowrap;" onclick="startNewTrainingSession('original')" title="過去の履歴や企画をリセットし、コースAをStep T-1から新規スタート">
+              🚀 新規開始
+            </button>
+          </div>
         </div>
 
         <!-- Course B -->
@@ -4712,9 +4836,14 @@ function getCourseCardsHtml(isChat = false) {
               <li>A2UIリッチカード表示を備えた本格AIオペレーター</li>
             </ul>
           </div>
-          <button type="button" class="btn-course-action course-b ${isB ? 'is-selected' : ''}" onclick="switchTrainingCourse('hitman_clone')">
-            ${isB ? '✓ コースB (推奨) 選択中（確定・折りたたむ）' : '🛡️ コースBを選択して進む (推奨)'}
-          </button>
+          <div style="display:flex;gap:0.4rem;align-items:center;margin-top:0.6rem;">
+            <button type="button" class="btn-course-action course-b ${isB ? 'is-selected' : ''}" style="flex:1;" onclick="switchTrainingCourse('hitman_clone')">
+              ${isB ? '✓ コースB (推奨) 選択中（確定・折りたたむ）' : '🛡️ コースBを選択して進む (推奨)'}
+            </button>
+            <button type="button" class="btn-course-action" style="background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5;padding:0.45rem 0.65rem;border-radius:6px;font-size:0.75rem;font-weight:700;white-space:nowrap;" onclick="startNewTrainingSession('hitman_clone')" title="過去の履歴や企画をリセットし、コースBをStep T-1から新規スタート">
+              🚀 新規開始
+            </button>
+          </div>
         </div>
       </div>
       <div class="course-bottom-tip">
@@ -5683,6 +5812,16 @@ function renderFlowChart() {
       
       // 研修モードの時：そのステップの指示カードがあればスクロール、なければ即座に描画
       if (appState.mode === "TRAINING") {
+        if (step.id !== appState.currentStep) {
+          const seq = Array.isArray(STEP_SEQUENCE) && STEP_SEQUENCE.length > 0 ? STEP_SEQUENCE : ["T-1", "T-2", "T-3", "T-4", "T-5", "T-6"];
+          const curIdx = seq.indexOf(appState.currentStep);
+          const clickedIdx = seq.indexOf(step.id);
+          if (clickedIdx >= 0 && clickedIdx < curIdx) {
+            // 過去のステップをクリックした場合は巻き戻し確認ダイアログへ
+            jumpToTrainingStep(step.id);
+            return;
+          }
+        }
         const existingCard = document.querySelector(`.step-prompt-card[data-step="${step.id}"]`);
         if (existingCard) {
           scrollLogTo(existingCard);
@@ -6740,6 +6879,24 @@ function buildStepPromptCard(stepId, verdictLine) {
   card.appendChild(head);
   if (verdictLine) card.appendChild(el("div", "spc-verdict", verdictLine));
 
+  if (stepId === "T-1") {
+    const fGuide = el("div", "spc-folder-guide");
+    fGuide.style.cssText = "margin:0.55rem 0 0.75rem 0;padding:0.65rem 0.85rem;background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;font-size:0.75rem;color:#0369a1;line-height:1.55;";
+    fGuide.innerHTML = `
+      <div style="font-weight:800;display:flex;align-items:center;gap:0.35rem;margin-bottom:0.35rem;color:#0284c7;font-size:0.78rem;">
+        <span class="material-symbols-outlined" style="font-size:18px;">folder_open</span>
+        <span>💡 【作業を始める前の第0歩】AntiGravity で作業フォルダを開こう！</span>
+      </div>
+      <ol style="margin:0;padding-left:1.2rem;color:#0f172a;">
+        <li style="margin-bottom:0.3rem;"><strong>PCの好きな場所に作業フォルダを作成</strong>: デスクトップや <code>C:\\workspace\\my-lab</code> など、半角英数字のフォルダを1つ作ります。</li>
+        <li style="margin-bottom:0.3rem;"><strong>AntiGravity でそのフォルダを開く</strong>: AntiGravity のメニュー <code>[File] ➡️ [Open Folder...]</code>（フォルダを開く）で作成したフォルダを選択して開きます。</li>
+        <li style="margin-bottom:0.3rem;"><strong>好きなフォルダ名・ドライブで進めたい場合</strong>: 画面左上の <strong style="color:#2563eb;">[⚙️ 研修環境設定]</strong> で作業パスを指定できます（※未指定でも自動で <code>ipp-agent-workspace</code> が作られるので大丈夫です）。</li>
+        <li><strong>下のプロンプトを投入</strong>: フォルダが開けたら、下の青いボタンでプロンプトをコピーして AntiGravity のチャット欄に貼り付けて送信してください！</li>
+      </ol>
+    `;
+    card.appendChild(fGuide);
+  }
+
   const s1 = el("div", "spc-section");
   s1.appendChild(el("div", "spc-label", "① AntiGravity に貼る指示（プロンプト）"));
   if (pending) {
@@ -6782,6 +6939,57 @@ function buildStepPromptCard(stepId, verdictLine) {
     c.style.color = "var(--text-muted)";
     c.textContent = "⚠ " + resolveStepVariables(step.cautions);
     card.appendChild(c);
+  }
+
+  // 研修モード専用：ステップ巻き戻し・ジャンプ・新規スタート操作バー
+  if (stepId && stepId.startsWith("T-")) {
+    const navBox = el("div", "spc-nav-box");
+    navBox.style.cssText = "margin-top:0.75rem;padding:0.5rem 0.65rem;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.4rem;font-size:0.75rem;";
+
+    const navLeft = el("div", "");
+    navLeft.style.cssText = "display:flex;align-items:center;gap:0.4rem;flex-wrap:wrap;";
+
+    const seq = Array.isArray(STEP_SEQUENCE) && STEP_SEQUENCE.length > 0 ? STEP_SEQUENCE : ["T-1", "T-2", "T-3", "T-4", "T-5", "T-6"];
+    const currentIdx = seq.indexOf(stepId);
+    if (currentIdx > 0) {
+      const prevStepId = seq[currentIdx - 1];
+      const prevBtn = el("button", "btn-step-nav");
+      prevBtn.type = "button";
+      prevBtn.style.cssText = "background:#ffffff;color:#334155;border:1px solid #cbd5e1;padding:0.25rem 0.55rem;border-radius:4px;cursor:pointer;display:inline-flex;align-items:center;gap:0.25rem;font-weight:600;font-size:0.75rem;";
+      prevBtn.innerHTML = `<span class="material-symbols-outlined" style="font-size:15px;color:#2563eb;">arrow_back</span><span>◀ 前のステップ (${prevStepId}) に戻る</span>`;
+      prevBtn.title = `ステップ ${prevStepId} に戻ってやり直します（以降の進行状態は巻き戻されます）`;
+      prevBtn.onclick = (e) => {
+        e.stopPropagation();
+        jumpToTrainingStep(prevStepId);
+      };
+      navLeft.appendChild(prevBtn);
+    }
+
+    const jumpSel = el("select", "");
+    jumpSel.style.cssText = "font-size:0.73rem;padding:0.22rem 0.45rem;border:1px solid #cbd5e1;border-radius:4px;background:#ffffff;color:#334155;cursor:pointer;";
+    jumpSel.innerHTML = `<option value="">別のステップへ移動…</option>` + seq.map(s => `<option value="${s}" ${s === stepId ? "disabled" : ""}>ステップ ${s}${s === stepId ? " (現在)" : ""}</option>`).join("");
+    jumpSel.onchange = (e) => {
+      if (e.target.value) {
+        const target = e.target.value;
+        e.target.value = "";
+        jumpToTrainingStep(target);
+      }
+    };
+    navLeft.appendChild(jumpSel);
+    navBox.appendChild(navLeft);
+
+    const resetBtn = el("button", "btn-step-reset");
+    resetBtn.type = "button";
+    resetBtn.style.cssText = "background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5;padding:0.25rem 0.55rem;border-radius:4px;cursor:pointer;display:inline-flex;align-items:center;gap:0.25rem;font-weight:600;font-size:0.75rem;";
+    resetBtn.innerHTML = `<span class="material-symbols-outlined" style="font-size:15px;">restart_alt</span><span>🚀 最初から新規スタート</span>`;
+    resetBtn.title = "前回の履歴や作成途中の企画を消去し、ステップ T-1 から完全に新規スタートします";
+    resetBtn.onclick = (e) => {
+      e.stopPropagation();
+      startNewTrainingSession();
+    };
+    navBox.appendChild(resetBtn);
+
+    card.appendChild(navBox);
   }
   return card;
 }
@@ -7465,8 +7673,9 @@ window.addEventListener("DOMContentLoaded", () => {
       const ssl = document.getElementById("sql-stat-label");
       if (ssl) ssl.textContent = `SQL: ${appState.sqlFileName || "db_update.sql"} (${appState.sqlContent.split('\n').length}行)`;
     }
-    showToast("✓ 前回の作業状態を復元しました（最初からやり直すには右上の「🧹 キャッシュクリア」を押してください）", 6000);
+    showToast("✓ 前回の作業状態を復元しました（最初からやり直すには「🚀 新規スタート」を押してください）", 6000);
     if (appState.mode === "TRAINING") {
+      clearExcelGreetingIfPresent();
       // サーバのステートを正として同期（サーバ側セッションが消えていれば直前の進捗で復元）
       fetch("/api/session/sync", {
         method: "POST",
@@ -7479,9 +7688,14 @@ window.addEventListener("DOMContentLoaded", () => {
     }
   } else {
     if (appState.mode === "TRAINING") {
-      switchTrainingModeManual(true);
+      clearExcelGreetingIfPresent();
+      const b = bubble("agent");
+      const cName = appState.trainingCourse === "hitman_clone" ? "【コースB】HITMANクローン構築" : "【コースA】オリジナルAIツール開発";
+      b.innerHTML = `🎓 <strong>実践AI研修モードへようこそ！（${escapeHtml(cName)}）</strong><br>`
+        + `伴走ペアオペレーターの HITMAN です。これから一緒にあなただけのAIツールを作っていきましょう！<br>`
+        + `下の指示カードのプロンプトをコピーして AntiGravity に投入してください。`;
     } else {
-      // Default initial agent greeting
+      // Default initial agent greeting (通常モードのみ)
       const b = bubble("agent");
       b.innerHTML = `こんにちは！Excel手順書AIペアオペレーター「HITMAN」です。<br>
 既存の手順書をインポートして安全にコマンドを抽出し、<strong>作業者＆AI有識者（確認者）のWチェック体制</strong>で自律判断・分岐制御・エビデンス保全を行います。<br><br>

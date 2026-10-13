@@ -504,3 +504,46 @@ def test_chat_message_with_api_key_is_never_sent_to_llm(client, scripted):
     _chat(client, uid, "こんにちは")
     history = " ".join(p.text or "" for c in scripted.requests[-1].contents for p in (c.parts or []))
     assert fake_key not in history
+
+
+def test_step_rewind_api_clears_downstream_results(client):
+    """ステップ巻き戻しAPIを呼ぶと、指定ステップ以降の合格結果がクリアされ指定ステップに戻る。"""
+    uid = "u-rewind-test"
+    _start_training(client, uid)
+    _pass_until_t3(client, uid)  # T-1, T-2 合格で現在ステップは T-3
+    st = client.get("/api/session/state", params={"user_id": uid}).json()["state"]
+    assert st["current_step"] == "T-3"
+    assert "T-1" in st["results"]
+    assert "T-2" in st["results"]
+
+    # T-2 に巻き戻す
+    r = client.post("/api/training/step", json={"user_id": uid, "step_id": "T-2"})
+    assert r.status_code == 200
+    data = r.json()
+    assert data["current_step"] == "T-2"
+    assert "T-1" in data["state"]["results"]
+    assert "T-2" not in data["state"]["results"]  # T-2 以降はクリアされている
+
+    # T-1 に巻き戻す
+    r2 = client.post("/api/training/step", json={"user_id": uid, "step_id": "T-1"})
+    assert r2.status_code == 200
+    data2 = r2.json()
+    assert data2["current_step"] == "T-1"
+    assert "T-1" not in data2["state"]["results"]
+
+
+def test_step_reset_api_resets_to_t1(client):
+    """研修リセットAPIを呼ぶと、全履歴・企画・合格結果が消去されて T-1 に戻る。"""
+    uid = "u-reset-test"
+    _start_training(client, uid)
+    _pass_until_t3(client, uid)
+    _chat(client, uid, "何かおしゃべり")
+
+    r = client.post("/api/training/reset", json={"user_id": uid, "course": "original"})
+    assert r.status_code == 200
+    data = r.json()
+    assert data["current_step"] == "T-1"
+    assert data["state"]["results"] == {}
+    assert data["state"]["agent_slug"] == ""
+    assert data["state"]["brief"] == {}
+

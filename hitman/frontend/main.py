@@ -990,6 +990,66 @@ async def api_training_level(req: Request):
     return JSONResponse(content=payload)
 
 
+@app.post("/api/training/step")
+async def api_training_step(req: Request):
+    """研修モードの現在ステップをユーザー自身で戻す／切り替える（巻き戻し対応）。"""
+    _ensure_import_path()
+    from app.agent import (
+        get_active_approval,
+        get_active_branch_rules,
+        get_active_parameters,
+        set_training_step,
+    )
+
+    body = await req.json()
+    uid = _normalize_user_id(body.get("user_id"))
+    step_id = body.get("step_id", "T-1")
+    async with _user_lock(uid):
+        async with _SessionState(uid) as (st, ctx, _):
+            res = set_training_step(step_id, tool_context=ctx)
+            payload = {
+                "result": res,
+                "current_step": res.get("current_step"),
+                "sequence": res.get("step_sequence"),
+                "sop": res.get("sop"),
+                "parameters": get_active_parameters(mode="TRAINING", state=st),
+                "approval": get_active_approval(mode="TRAINING", course=st.course, state=st),
+                "branch_rules": get_active_branch_rules(),
+                "state": st.snapshot(),
+            }
+    return JSONResponse(content=payload)
+
+
+@app.post("/api/training/reset")
+async def api_training_reset(req: Request):
+    """研修モードを完全初期化し、Step T-1から新規スタートする。"""
+    _ensure_import_path()
+    from app.agent import (
+        get_active_approval,
+        get_active_branch_rules,
+        get_active_parameters,
+        reset_training_state,
+    )
+
+    body = await req.json()
+    uid = _normalize_user_id(body.get("user_id"))
+    course = body.get("course", "original")
+    async with _user_lock(uid):
+        async with _SessionState(uid) as (st, ctx, _):
+            res = reset_training_state(course, tool_context=ctx)
+            payload = {
+                "result": res,
+                "current_step": res.get("current_step"),
+                "sequence": res.get("step_sequence"),
+                "sop": res.get("sop"),
+                "parameters": get_active_parameters(mode="TRAINING", state=st),
+                "approval": get_active_approval(mode="TRAINING", course=st.course, state=st),
+                "branch_rules": get_active_branch_rules(),
+                "state": st.snapshot(),
+            }
+    return JSONResponse(content=payload)
+
+
 @app.post("/api/supervisor/skip")
 async def api_supervisor_skip(req: Request):
     import sys

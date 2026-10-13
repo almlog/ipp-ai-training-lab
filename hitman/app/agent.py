@@ -1109,6 +1109,51 @@ def set_training_level(level: str, tool_context: Any = None) -> dict:
     }
 
 
+def set_training_step(step_id: str, tool_context: Any = None) -> dict:
+    """【研修モード専用】受講生が任意のステップ（T-1, T-2等）へ戻る・切り替える。
+    指定ステップ以降の合格結果を巻き戻し、安全に再実行できるようにする。
+    """
+    state = HitmanState.of(tool_context)
+    step = (step_id or "").strip()
+    seq = list(state.step_sequence)
+    if step not in seq:
+        return {"status": "error", "message": f"無効なステップIDです: {step}（有効なステップ: {seq}）"}
+
+    idx = seq.index(step)
+    # 指定ステップ以降の完了結果をクリア（巻き戻し）
+    cur_results = state.results
+    for s in seq[idx:]:
+        cur_results.pop(s, None)
+    state.results = cur_results
+
+    state.current_step = step
+    return {
+        "status": "success",
+        "current_step": step,
+        "step_sequence": seq,
+        "sop": get_training_sop(state.course, state=state),
+    }
+
+
+def reset_training_state(course_type: str = "original", tool_context: Any = None) -> dict:
+    """【研修モード専用】過去のチャット・企画・合格結果を完全に初期化し、Step T-1から新規スタートする。"""
+    state = HitmanState.of(tool_context)
+    state.mode = MODE_TRAINING
+    state.course = course_type
+    state.current_step = "T-1"
+    state.results = {}
+    state.brief = {}
+    state.agent_slug = ""
+    state.user_idea = ""
+    state.plan_confirmed = False
+    return {
+        "status": "success",
+        "current_step": "T-1",
+        "step_sequence": list(state.step_sequence),
+        "sop": get_training_sop(state.course, state=state),
+    }
+
+
 def set_training_environment(workspace_dir: str = "", agent_name: str = "", python_env: str = "", tool_context: Any = None) -> dict:
     """【研修モード専用】受講生のPC環境に合わせて、作業ディレクトリのパス・フォルダ名、開発エージェント名、仮想環境設定をカスタマイズする。
     
