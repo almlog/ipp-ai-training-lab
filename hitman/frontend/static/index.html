@@ -324,7 +324,7 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: 0.45rem 0.3rem;
+    padding: 0.35rem 0.25rem;
     border-radius: 6px;
     border: 1px solid #cbd5e1;
     background: #ffffff;
@@ -332,6 +332,8 @@
     cursor: pointer;
     transition: all 0.15s ease;
     text-align: center;
+    white-space: nowrap;
+    line-height: 1.25;
   }
   .level-btn:hover {
     background: #f1f5f9;
@@ -428,8 +430,8 @@
   .btn-course-action {
     margin-top: 0.75rem;
     width: 100%;
-    padding: 0.5rem 0.6rem;
-    font-size: 0.8rem;
+    padding: 0.45rem 0.65rem;
+    font-size: 0.78rem;
     font-weight: 700;
     border-radius: 6px;
     cursor: pointer;
@@ -437,7 +439,8 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 0.3rem;
+    gap: 0.35rem;
+    white-space: nowrap;
     transition: all 0.2s;
   }
   .btn-course-action.course-a {
@@ -562,7 +565,7 @@
   .btn-fold-course-card {
     display: inline-flex;
     align-items: center;
-    gap: 0.2rem;
+    gap: 0.25rem;
     padding: 0.25rem 0.55rem;
     border-radius: 6px;
     border: 1px solid #cbd5e1;
@@ -571,6 +574,8 @@
     font-size: 0.73rem;
     font-weight: 600;
     cursor: pointer;
+    white-space: nowrap;
+    flex-shrink: 0;
     transition: all 0.15s ease;
   }
   .btn-fold-course-card:hover {
@@ -807,14 +812,16 @@
     display: inline-flex;
     align-items: center;
     gap: 0.3rem;
-    padding: 0.2rem 0.55rem;
+    padding: 0.25rem 0.55rem;
     background: #f0fdf4;
     border: 1px solid #86efac;
     border-radius: 5px;
     color: #166534;
-    font-size: 0.72rem;
+    font-size: 0.73rem;
     font-weight: 700;
     cursor: pointer;
+    white-space: nowrap;
+    flex-shrink: 0;
     transition: all 0.15s ease;
     vertical-align: middle;
   }
@@ -2278,32 +2285,34 @@ html, body {
       </div>
 
       <!-- Dedicated Clean View for Training Mode -->
-      <div id="meta-view-training" class="training-meta-card-row" style="display:none;">
-        <div class="training-meta-left">
-          <div class="training-lab-icon-box">
-            <span class="material-symbols-outlined" style="font-size:22px;color:#2563eb;">school</span>
-          </div>
-          <div class="training-lab-text">
-            <div class="training-lab-title">IPP AI実践研修 開発ラボ</div>
-            <div class="training-lab-sub">
-              <span>メンター: <strong>AntiGravity</strong></span>
-              <span>｜</span>
-              <span>客観検証: <strong>HITMAN (AI有識者)</strong></span>
+      <div id="meta-view-training" class="training-meta-card-row" style="display:none;padding:0.25rem 0;">
+        <div style="display:flex;align-items:center;justify-content:space-between;width:100%;gap:0.5rem;flex-wrap:wrap;">
+          <div class="training-meta-left">
+            <div class="training-lab-icon-box">
+              <span class="material-symbols-outlined" style="font-size:20px;color:#2563eb;">school</span>
+            </div>
+            <div class="training-lab-text">
+              <div class="training-lab-title">IPP AI実践研修 開発ラボ</div>
+              <div class="training-lab-sub">
+                <span>メンター: <strong>AntiGravity</strong></span>
+                <span>｜</span>
+                <span>客観検証: <strong>HITMAN</strong></span>
+              </div>
             </div>
           </div>
-        </div>
-        <div class="training-meta-right">
-          <div class="param-badge-resolved" title="研修環境パラメータが自動展開されています">
-            <span class="material-symbols-outlined" style="font-size:14px;">task_alt</span>
-            <span>パラメータ <span id="training-meta-param-count">7</span>件 ✓</span>
+          <div class="param-badge-resolved" title="研修環境パラメータが自動展開されています" style="flex-shrink:0;">
+            <span class="material-symbols-outlined" style="font-size:13px;">task_alt</span>
+            <span style="white-space:nowrap;">パラメータ <span id="training-meta-param-count">7</span>件 ✓</span>
           </div>
+        </div>
+        <div class="training-meta-actions" style="display:flex;align-items:center;justify-content:flex-end;width:100%;gap:0.35rem;margin-top:0.35rem;">
           <button type="button" class="btn-config-env" onclick="openTrainingEnvModal()" title="作業フォルダ・パス・エージェント名・仮想環境設定を変更">
             <span class="material-symbols-outlined" style="font-size:13px;">settings</span>
-            <span>⚙️ 研修環境設定</span>
+            <span>研修環境設定</span>
           </button>
           <button type="button" class="btn-config-env" onclick="resetSessionConfirm()" title="作業履歴・進行ステップ・キャッシュを消去して初期化（サーバ側のセッションも破棄）" style="background:#fee2e2;border-color:#fca5a5;color:#b91c1c;">
             <span class="material-symbols-outlined" style="font-size:13px;">restart_alt</span>
-            <span>↺ 初期化</span>
+            <span>初期化</span>
           </button>
         </div>
       </div>
@@ -4675,30 +4684,30 @@ function toggleCourseCardCollapse() {
 function getLevelSelectorHtml() {
   const curLevel = appState.trainingLevel || "standard";
   return `
-    <div class="level-selector-box" style="margin-top:0.6rem;padding:0.55rem 0.65rem;background:#f8fafc;border:1px solid #cbd5e1;border-radius:8px;">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.4rem;flex-wrap:wrap;gap:0.2rem;">
-        <div style="display:flex;align-items:center;gap:0.3rem;">
-          <span class="material-symbols-outlined" style="font-size:16px;color:#2563eb;">tune</span>
-          <strong style="font-size:0.78rem;color:#1e293b;">開発レベル選択（ステップ数のカスタマイズ）</strong>
+    <div class="level-selector-box" style="margin-top:0.5rem;padding:0.45rem 0.55rem;background:#f8fafc;border:1px solid #cbd5e1;border-radius:6px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.35rem;flex-wrap:wrap;gap:0.2rem;">
+        <div style="display:flex;align-items:center;gap:0.25rem;">
+          <span class="material-symbols-outlined" style="font-size:15px;color:#2563eb;">tune</span>
+          <strong style="font-size:0.76rem;color:#1e293b;">開発レベル（歩数）</strong>
         </div>
-        <span style="font-size:0.68rem;color:#64748b;">受講生のペースに合わせて選択</span>
+        <span style="font-size:0.66rem;color:#64748b;">受講ペースで選択</span>
       </div>
-      <div style="display:grid;grid-template-columns:repeat(3, 1fr);gap:0.35rem;">
+      <div style="display:grid;grid-template-columns:repeat(3, 1fr);gap:0.3rem;">
         <button type="button" class="level-btn ${curLevel === 'standard' ? 'active' : ''}" onclick="switchTrainingLevel('standard')" title="最短で標準アプリを完成させる6ステップ">
-          <div style="font-weight:700;font-size:0.75rem;">Lv.1 標準</div>
-          <div style="font-size:0.66rem;opacity:0.85;">全6歩 (最短)</div>
+          <span style="font-weight:700;font-size:0.72rem;white-space:nowrap;">Lv.1 標準</span>
+          <span style="font-size:0.63rem;opacity:0.85;white-space:nowrap;">全6歩 (最短)</span>
         </button>
         <button type="button" class="level-btn ${curLevel === 'advance' ? 'active' : ''}" onclick="switchTrainingLevel('advance')" title="Google標準リッチUI品質監査とテストを独立分離した8ステップ">
-          <div style="font-weight:700;font-size:0.75rem;">Lv.2 発展</div>
-          <div style="font-size:0.66rem;opacity:0.85;">全8歩 (UI分離)</div>
+          <span style="font-weight:700;font-size:0.72rem;white-space:nowrap;">Lv.2 発展</span>
+          <span style="font-size:0.63rem;opacity:0.85;white-space:nowrap;">全8歩 (UI分離)</span>
         </button>
         <button type="button" class="level-btn ${curLevel === 'professional' ? 'active' : ''}" onclick="switchTrainingLevel('professional')" title="エンタープライズ仕様の全10ステップ（UI・データ・E2E・セキュリティ）">
-          <div style="font-weight:700;font-size:0.75rem;">Lv.3 完全</div>
-          <div style="font-size:0.66rem;opacity:0.85;">全10歩 (プロ)</div>
+          <span style="font-weight:700;font-size:0.72rem;white-space:nowrap;">Lv.3 完全</span>
+          <span style="font-size:0.63rem;opacity:0.85;white-space:nowrap;">全10歩 (プロ)</span>
         </button>
       </div>
-      <div style="margin-top:0.45rem;padding:0.35rem 0.5rem;background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px;font-size:0.68rem;color:#1e40af;line-height:1.4;">
-        💡 <strong>神ツールではなく、体験と経験の獲得へ:</strong> 最初から万能を目指さず、小さく動かす体験を重視します。躓いたときも自分でAIと対話して解決する経験を一度積めば、次は自分一人でできるようになります！
+      <div style="margin-top:0.35rem;padding:0.3rem 0.45rem;background:#eff6ff;border:1px solid #bfdbfe;border-radius:5px;font-size:0.66rem;color:#1e40af;line-height:1.35;">
+        💡 <strong>体験と経験の獲得へ:</strong> 最初から万能を目指さず、小さく動かす体験を重視します。躓いたときもAIと対話して解決する経験を一度積めば、次は一人でできるようになります！
       </div>
     </div>
   `;
@@ -4725,14 +4734,14 @@ function getCourseCardsHtml(isChat = false) {
               <div style="font-size:0.72rem;color:#64748b;">${isB ? '王道お手本コースで100%成功・安全運行へ進みます。' : '自由創作コースで現場の独自AI開発へ進みます。'}</div>
             </div>
           </div>
-          <div style="display:flex;align-items:center;gap:0.35rem;">
+          <div style="display:flex;align-items:center;gap:0.3rem;flex-shrink:0;">
             <button type="button" class="btn-toggle-course-card-chat" onclick="toggleCourseCardCollapse()" title="コースの変更または詳細を表示">
               <span class="material-symbols-outlined" style="font-size:14px;">unfold_more</span>
-              <span>コース変更 / 詳細</span>
+              <span>コース変更</span>
             </button>
             <button type="button" class="btn-toggle-course-card-chat" onclick="startNewTrainingSession()" style="background:#fee2e2;color:#b91c1c;border-color:#fca5a5;" title="過去の履歴・キャッシュを消去してStep T-1から新規スタート">
               <span class="material-symbols-outlined" style="font-size:14px;">restart_alt</span>
-              <span>🚀 新規スタート</span>
+              <span>新規スタート</span>
             </button>
           </div>
         </div>
@@ -4753,14 +4762,14 @@ function getCourseCardsHtml(isChat = false) {
             <div class="course-collapsed-subtext">${isB ? 'Excel解析・客観Wチェック・A2UIカード判定の本格AIオペレーター' : '現場の運用課題・自作社内ボットをAIと自律開発'}</div>
           </div>
         </div>
-        <div style="display:flex;align-items:center;gap:0.35rem;">
+        <div style="display:flex;align-items:center;gap:0.3rem;flex-shrink:0;">
           <button type="button" class="btn-toggle-course-card" onclick="toggleCourseCardCollapse()" title="受講コースの変更または詳細を表示">
             <span class="material-symbols-outlined" style="font-size:14px;">unfold_more</span>
-            <span>コース切替 / レベル変更</span>
+            <span>コース変更</span>
           </button>
           <button type="button" class="btn-toggle-course-card" onclick="startNewTrainingSession()" style="background:#fee2e2;color:#b91c1c;border-color:#fca5a5;" title="過去の履歴・キャッシュを消去してStep T-1から新規スタート">
             <span class="material-symbols-outlined" style="font-size:14px;">restart_alt</span>
-            <span>🚀 新規スタート</span>
+            <span>新規スタート</span>
           </button>
         </div>
       </div>
@@ -4769,21 +4778,23 @@ function getCourseCardsHtml(isChat = false) {
 
   return `
     <div class="course-showcase-box" style="${isChat ? 'margin:0.6rem 0;border:1px solid #cbd5e1;background:#ffffff;' : ''}">
-      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.4rem;">
-        <div style="display:flex;align-items:center;gap:0.4rem;">
-          <span class="material-symbols-outlined" style="font-size:20px;color:#d97706;">school</span>
-          <strong style="font-size:0.86rem;color:#92400e;">研修受講コース選択（あなたはどっちで受講する？）</strong>
-        </div>
-        <div style="display:flex;align-items:center;gap:0.4rem;">
-          <span style="font-size:0.72rem;background:${isB ? '#ede9fe' : '#fef3c7'};color:${isB ? '#6d28d9' : '#b45309'};padding:0.2rem 0.55rem;border-radius:4px;font-weight:700;">
-            現在: ${isB ? 'コースB (HITMANクローン)' : 'コースA (自作AI開発)'}
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.35rem;padding-bottom:0.35rem;border-bottom:1px solid #f1f5f9;">
+        <div style="display:flex;align-items:center;gap:0.35rem;flex-wrap:wrap;">
+          <div style="display:flex;align-items:center;gap:0.3rem;">
+            <span class="material-symbols-outlined" style="font-size:18px;color:#d97706;">school</span>
+            <strong style="font-size:0.83rem;color:#92400e;white-space:nowrap;">研修受講コース選択</strong>
+          </div>
+          <span style="font-size:0.68rem;background:${isB ? '#ede9fe' : '#fef3c7'};color:${isB ? '#6d28d9' : '#b45309'};padding:0.12rem 0.45rem;border-radius:4px;font-weight:700;white-space:nowrap;">
+            ${isB ? 'コースB 選択中' : 'コースA 選択中'}
           </span>
-          <button type="button" class="btn-fold-course-card" onclick="startNewTrainingSession()" style="background:#fee2e2;color:#b91c1c;border-color:#fca5a5;" title="過去の履歴・キャッシュを消去してStep T-1から新規スタート">
-            <span class="material-symbols-outlined" style="font-size:14px;">restart_alt</span>
-            <span>🚀 新規スタート</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:0.3rem;">
+          <button type="button" class="btn-fold-course-card" onclick="startNewTrainingSession()" style="background:#fee2e2;color:#b91c1c;border-color:#fca5a5;padding:0.2rem 0.5rem;font-size:0.71rem;" title="過去の履歴・キャッシュを消去してStep T-1から新規スタート">
+            <span class="material-symbols-outlined" style="font-size:13px;">restart_alt</span>
+            <span>新規スタート</span>
           </button>
-          <button type="button" class="btn-fold-course-card" onclick="toggleCourseCardCollapse()" title="メニューを折りたたむ">
-            <span class="material-symbols-outlined" style="font-size:14px;">expand_less</span>
+          <button type="button" class="btn-fold-course-card" onclick="toggleCourseCardCollapse()" style="padding:0.2rem 0.5rem;font-size:0.71rem;" title="メニューを折りたたむ">
+            <span class="material-symbols-outlined" style="font-size:13px;">expand_less</span>
             <span>たたむ</span>
           </button>
         </div>
@@ -4808,12 +4819,10 @@ function getCourseCardsHtml(isChat = false) {
             </ul>
             ${getLevelSelectorHtml()}
           </div>
-          <div style="display:flex;gap:0.4rem;align-items:center;margin-top:0.6rem;">
-            <button type="button" class="btn-course-action course-a ${!isB ? 'is-selected' : ''}" style="flex:1;" onclick="switchTrainingCourse('original')">
-              ${!isB ? '✓ コースA 選択中（確定・折りたたむ）' : '🚀 コースAを選択して進む'}
-            </button>
-            <button type="button" class="btn-course-action" style="background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5;padding:0.45rem 0.65rem;border-radius:6px;font-size:0.75rem;font-weight:700;white-space:nowrap;" onclick="startNewTrainingSession('original')" title="過去の履歴や企画をリセットし、コースAをStep T-1から新規スタート">
-              🚀 新規開始
+          <div style="margin-top:0.6rem;">
+            <button type="button" class="btn-course-action course-a ${!isB ? 'is-selected' : ''}" onclick="switchTrainingCourse('original')">
+              <span class="material-symbols-outlined" style="font-size:15px;">${!isB ? 'check_circle' : 'rocket_launch'}</span>
+              <span>${!isB ? '✓ コースA 選択中（確定）' : 'コースA を選択する'}</span>
             </button>
           </div>
         </div>
@@ -4836,12 +4845,10 @@ function getCourseCardsHtml(isChat = false) {
               <li>A2UIリッチカード表示を備えた本格AIオペレーター</li>
             </ul>
           </div>
-          <div style="display:flex;gap:0.4rem;align-items:center;margin-top:0.6rem;">
-            <button type="button" class="btn-course-action course-b ${isB ? 'is-selected' : ''}" style="flex:1;" onclick="switchTrainingCourse('hitman_clone')">
-              ${isB ? '✓ コースB (推奨) 選択中（確定・折りたたむ）' : '🛡️ コースBを選択して進む (推奨)'}
-            </button>
-            <button type="button" class="btn-course-action" style="background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5;padding:0.45rem 0.65rem;border-radius:6px;font-size:0.75rem;font-weight:700;white-space:nowrap;" onclick="startNewTrainingSession('hitman_clone')" title="過去の履歴や企画をリセットし、コースBをStep T-1から新規スタート">
-              🚀 新規開始
+          <div style="margin-top:0.6rem;">
+            <button type="button" class="btn-course-action course-b ${isB ? 'is-selected' : ''}" onclick="switchTrainingCourse('hitman_clone')">
+              <span class="material-symbols-outlined" style="font-size:15px;">${isB ? 'check_circle' : 'shield'}</span>
+              <span>${isB ? '✓ コースB 選択中 (推奨・確定)' : 'コースB を選択する (推奨)'}</span>
             </button>
           </div>
         </div>
