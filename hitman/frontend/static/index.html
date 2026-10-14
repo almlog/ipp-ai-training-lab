@@ -4344,30 +4344,71 @@ async function saveTrainingEnvModal() {
   showToast(`✓ 作業環境を『${ws}』に更新しました（全手順・プロンプトに連動）`);
 }
 
-function copyAgyPrompt(stepId) {
-  const step = SOP_ITEMS.find(s => s.id === stepId);
-  let promptText = (step && step.agy_prompt) ? step.agy_prompt : `ステップ ${stepId} を AntiGravity で実行してください。`;
-  promptText = resolveStepVariables(promptText);
-  
+function copyAgyPrompt(stepId, explicitPrompt = null, triggerBtn = null) {
+  let promptText = explicitPrompt;
+
+  // 1. explicitPrompt が渡されていない場合、画面に表示されている該当ステップカードの <pre class="spc-prompt"> の内容を最優先で取得
+  if (!promptText) {
+    const cardPre = document.querySelector(`.step-prompt-card[data-step="${stepId}"] .spc-prompt`);
+    if (cardPre && cardPre.textContent && !cardPre.textContent.includes("合格すると、あなたの企画書")) {
+      promptText = cardPre.textContent;
+    }
+  }
+
+  // 2. それでも取得できない場合、SOP_ITEMS または動的生成から取得
+  if (!promptText) {
+    const step = SOP_ITEMS.find(s => s.id === stepId);
+    promptText = (step && step.agy_prompt) ? step.agy_prompt : "";
+    if (stepId === "T-3" && (!promptText || promptText.includes("合格すると、あなたの企画書"))) {
+      const idea = appState.courseAIdea || "オリジナルAIツール";
+      promptText = `【AntiGravity投入用プロンプト: Step T-3（『${idea}』の実装＆動作確認）】\nあなたはIPPのAI実践研修専属メンターです。スキル「ipp-build-app-from-brief」の手順に従い、受講生と合意した要件定義書 ipp-agent-workspace/project_brief.md のとおりに実装してください。`;
+    }
+  }
+
+  promptText = resolveStepVariables(promptText || `ステップ ${stepId} を AntiGravity で実行してください。`);
+  copyTextToClipboard(promptText, `📋 ステップ ${stepId} のAntiGravityプロンプトをコピーしました！`, triggerBtn);
+}
+
+function copyTextToClipboard(text, successToastMsg = null, triggerBtn = null) {
+  function onCopied() {
+    if (successToastMsg) showToast(successToastMsg);
+    if (triggerBtn) {
+      const origHtml = triggerBtn.innerHTML;
+      triggerBtn.innerHTML = `<span class="material-symbols-outlined" style="font-size:18px;color:#16a34a;">check_circle</span><span style="color:#16a34a;font-weight:700;">✓ コピー完了！</span>`;
+      triggerBtn.style.borderColor = "#86efac";
+      triggerBtn.style.background = "#f0fdf4";
+      setTimeout(() => {
+        triggerBtn.innerHTML = origHtml;
+        triggerBtn.style.borderColor = "";
+        triggerBtn.style.background = "";
+      }, 1600);
+    }
+  }
+
   if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(promptText).then(() => {
-      showToast(`📋 ステップ ${stepId} のAntiGravityプロンプトをコピーしました！`);
-    }).catch(() => {
-      _fallbackCopy(promptText, stepId);
+    navigator.clipboard.writeText(text).then(onCopied).catch(() => {
+      _fallbackCopy(text);
+      onCopied();
     });
   } else {
-    _fallbackCopy(promptText, stepId);
+    _fallbackCopy(text);
+    onCopied();
   }
 }
 
-function _fallbackCopy(text, stepId) {
+function _fallbackCopy(text) {
   const ta = document.createElement("textarea");
   ta.value = text;
+  ta.style.position = "fixed";
+  ta.style.opacity = "0";
   document.body.appendChild(ta);
   ta.select();
-  document.execCommand("copy");
+  try {
+    document.execCommand("copy");
+  } catch (e) {
+    console.warn("execCommand copy failed", e);
+  }
   document.body.removeChild(ta);
-  showToast(`📋 ステップ ${stepId} のAntiGravityプロンプトをコピーしました！`);
 }
 
 const TEST_EVIDENCES = {
@@ -5855,7 +5896,7 @@ function renderFlowChart() {
           ? `<div class="step-cmd-preview" style="font-family:inherit;">${escapeHtml(resolveStepVariables(step.check || "").substring(0, 48))}${(step.check || "").length > 48 ? "…" : ""}</div>`
           : `<div class="step-cmd-preview">${resolveStepVariables(step.cmd).substring(0, 45)}...</div>`}
         <div style="margin-top:0.35rem;display:flex;gap:0.35rem;flex-wrap:wrap;">
-          ${step.agy_prompt ? `<button type="button" class="btn-copy-agy" onclick="event.stopPropagation(); copyAgyPrompt('${step.id}')" title="AntiGravity投入用プロンプトをクリップボードにコピー"><span class="material-symbols-outlined" style="font-size:14px;vertical-align:middle;">content_copy</span><span>AGYプロンプト</span></button>` : ""}
+          ${step.agy_prompt ? `<button type="button" class="btn-copy-agy" onclick="event.stopPropagation(); copyAgyPrompt('${step.id}', null, this)" title="AntiGravity投入用プロンプトをクリップボードにコピー"><span class="material-symbols-outlined" style="font-size:14px;vertical-align:middle;">content_copy</span><span>AGYプロンプト</span></button>` : ""}
           ${appState.mode === "TRAINING" && appState.trainerDebugMode !== false ? `<button type="button" class="btn-step-test-log" onclick="event.stopPropagation(); injectStepDummyLog('${step.id}', 'ok')" title="正常パターン（合格する想定のログ）を入力欄に注入"><span>🧪 正常</span></button><button type="button" class="btn-step-test-log btn-step-test-log-ng" onclick="event.stopPropagation(); injectStepDummyLog('${step.id}', 'ng')" title="異常パターン（不合格になる想定のログ）を入力欄に注入"><span>🧪 異常</span></button>` : ""}
         </div>
       </div>
@@ -5939,7 +5980,7 @@ function renderFlowChart() {
           <span class="step-title-text">${step.title}</span>
         </div>
         <div class="step-cmd-preview">${resolveStepVariables(step.cmd).substring(0, 45)}...</div>
-        ${step.agy_prompt ? `<div style="margin-top:0.35rem;"><button type="button" class="btn-copy-agy" onclick="event.stopPropagation(); copyAgyPrompt('${step.id}')" title="AntiGravity投入用プロンプトをクリップボードにコピー"><span class="material-symbols-outlined" style="font-size:14px;vertical-align:middle;">content_copy</span><span>AGYプロンプトをコピー</span></button></div>` : ""}
+        ${step.agy_prompt ? `<div style="margin-top:0.35rem;"><button type="button" class="btn-copy-agy" onclick="event.stopPropagation(); copyAgyPrompt('${step.id}', null, this)" title="AntiGravity投入用プロンプトをクリップボードにコピー"><span class="material-symbols-outlined" style="font-size:14px;vertical-align:middle;">content_copy</span><span>AGYプロンプトをコピー</span></button></div>` : ""}
       </div>
       <div class="step-status-icon">${icon}</div>
     `;
@@ -6914,7 +6955,7 @@ function buildStepPromptCard(stepId, verdictLine) {
     btn.innerHTML = `<span class="material-symbols-outlined" style="font-size:20px;">content_copy</span><span>📋 プロンプトをコピーする（クリックして AntiGravity に貼る）</span>`;
     btn.onclick = (e) => {
       e.stopPropagation();
-      copyAgyPrompt(stepId);
+      copyAgyPrompt(stepId, prompt, btn);
     };
     s1.appendChild(btn);
     s1.appendChild(el("div", "", "👆 上のボタンをクリックしてプロンプトをコピーし、AntiGravity の新しい会話に貼り付けて送信してください。"));
